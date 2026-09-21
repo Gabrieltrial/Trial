@@ -1,0 +1,1049 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Chord Practice</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --background: #11131a;
+      --panel: #1c2030;
+      --ink: #f6f7fb;
+      --muted: #b8bfd4;
+      --accent: #91f2c0;
+      --accent-strong: #1ea86a;
+      --pulse: #e1fff0;
+      --glow: #283452;
+      --beat-start: rgba(145,242,192,.55);
+      --beat-end: rgba(30,168,106,.2);
+      --beat-shadow: rgba(30,168,106,.22);
+      --accent-shadow: rgba(145,242,192,.18);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      margin: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background: radial-gradient(circle at 50% 0%, var(--glow), var(--background) 54%);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    main {
+      width: min(100%, 760px);
+      text-align: center;
+    }
+
+    h1 {
+      margin: 0 0 24px;
+      font-size: clamp(1rem, 2.5vw, 1.25rem);
+      font-weight: 700;
+      letter-spacing: .11em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .practice-time {
+      margin: -10px 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      color: var(--muted);
+      font-size: .98rem;
+    }
+
+    .practice-time output {
+      display: inline;
+      min-width: 0;
+      margin-left: 5px;
+      font-size: 1rem;
+    }
+
+    .reset-btn {
+      width: 26px;
+      height: 26px;
+      min-height: 26px;
+      padding: 0;
+      border-radius: 50%;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,.25);
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    .reset-btn:hover { background: rgba(255,255,255,.1); color: var(--ink); }
+    .reset-btn:active { transform: scale(.9); }
+
+    .note-card {
+      position: relative;
+      min-height: min(50vh, 420px);
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+      align-items: center;
+      column-gap: clamp(16px, 3.5vw, 40px);
+      padding: 28px clamp(20px, 4vw, 40px);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 32px;
+      background: linear-gradient(145deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+      box-shadow: 0 20px 70px rgba(0,0,0,.28);
+      transition: background .08s ease, transform .08s ease, box-shadow .08s ease;
+    }
+
+    .current-chord {
+      display: grid;
+      justify-items: end;
+      text-align: right;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .next-chord {
+      display: grid;
+      justify-items: center;
+      gap: 8px;
+      padding: 16px 22px;
+      border-radius: 20px;
+      background: rgba(8,10,18,.4);
+      backdrop-filter: blur(3px);
+      color: var(--muted);
+      min-width: 0;
+    }
+
+    .next-chord .next-label {
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      opacity: .75;
+    }
+
+    .next-chord #nextChord {
+      font-size: clamp(2.8rem, 13vw, 6.5rem);
+      font-weight: 800;
+      color: var(--accent);
+      opacity: .7;
+      line-height: 1;
+    }
+
+    .staff-wrap-main { justify-self: center; }
+
+    .staff-wrap[hidden] { display: none; }
+    .staff-wrap-main svg { display: block; width: 224px; height: 124px; }
+    .staff-wrap-next svg { display: block; width: 172px; height: 96px; }
+
+    .staff .clef { fill: var(--muted); }
+    .staff line { stroke: var(--muted); stroke-width: 1.8; }
+    .staff .ledger { stroke: var(--muted); stroke-width: 1.8; }
+    .staff .notehead { fill: var(--accent); }
+    .staff .accidental { fill: var(--accent); }
+
+    @media (max-width: 640px) {
+      .note-card { grid-template-columns: 1fr; row-gap: 18px; }
+      .current-chord { justify-items: center; text-align: center; }
+      .next-chord { justify-self: center; }
+    }
+
+    .note-card.beat {
+      background: linear-gradient(145deg, var(--beat-start), var(--beat-end));
+      transform: scale(1.012);
+      box-shadow: 0 20px 70px var(--beat-shadow);
+    }
+
+    #chord {
+      font-size: clamp(8rem, 30vw, 17rem);
+      line-height: .8;
+      font-weight: 800;
+      letter-spacing: -.07em;
+      color: var(--accent);
+      text-shadow: 0 0 28px var(--accent-shadow);
+    }
+
+    .triangle {
+      display: inline-block;
+      font-size: .34em;
+      font-weight: 700;
+      letter-spacing: normal;
+      vertical-align: top;
+      line-height: 1;
+      margin-left: .03em;
+      transform: translateY(.06em);
+    }
+
+    .progress {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin: 26px 0 30px;
+    }
+
+    .dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #40475c;
+      transition: transform .12s ease, background .12s ease;
+    }
+
+    .dot.active {
+      background: var(--accent);
+      transform: scale(1.35);
+    }
+
+    .controls {
+      display: grid;
+      gap: 20px;
+      padding: 24px;
+      border-radius: 22px;
+      background: var(--panel);
+    }
+
+    .tempo-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 14px;
+      text-align: left;
+    }
+
+    label { font-weight: 650; }
+
+    output {
+      min-width: 5.5ch;
+      font-variant-numeric: tabular-nums;
+      font-size: 1.15rem;
+      font-weight: 750;
+      color: var(--accent);
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent-strong);
+      cursor: pointer;
+    }
+
+    button {
+      width: 100%;
+      min-height: 58px;
+      border: 0;
+      border-radius: 14px;
+      background: var(--accent);
+      color: #092116;
+      cursor: pointer;
+      font: inherit;
+      font-size: 1.1rem;
+      font-weight: 800;
+      transition: transform .15s ease, background .15s ease;
+    }
+
+    button:hover { background: var(--pulse); }
+    button:active { transform: scale(.985); }
+    button.running { background: #ffb4aa; color: #4a0c08; }
+    button:focus-visible, input:focus-visible { outline: 3px solid white; outline-offset: 3px; }
+
+    .instrument-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      text-align: left;
+    }
+
+    .instrument-row span { font-weight: 650; }
+
+    .option-buttons {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+    }
+
+    button.secondary {
+      width: 100%;
+      min-height: 44px;
+      padding: 0 16px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: #30394f;
+      color: var(--ink);
+      font-size: .98rem;
+    }
+
+    button.secondary:hover { background: #3d4965; }
+    button.secondary.selected {
+      background: #4d3c79;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent), 0 0 22px var(--accent-shadow);
+    }
+
+    .chord-type-section {
+      display: grid;
+      gap: 10px;
+      text-align: left;
+    }
+
+    .chord-type-section > span { font-weight: 650; }
+
+    .chord-options {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 9px;
+    }
+
+    button.chord-option {
+      min-height: 46px;
+      padding: 0 8px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: #30394f;
+      color: var(--ink);
+      font-size: 1rem;
+    }
+
+    button.chord-option:hover { background: #3d4965; }
+    button.chord-option:not(.selected) { color: var(--muted); opacity: .68; }
+    button.chord-option.selected {
+      background: #285c50;
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 0 2px var(--accent), 0 0 18px var(--accent-shadow);
+    }
+    button.chord-option.selected::after { content: "  ✓"; }
+
+    .help { margin: 16px 0 0; color: var(--muted); font-size: .92rem; }
+
+    .played-notes {
+      min-height: 1.5em;
+      margin: 13px 0 0;
+      color: var(--muted);
+      font-size: clamp(1rem, 3.2vw, 1.35rem);
+      font-weight: 650;
+      letter-spacing: .04em;
+    }
+
+    @media (max-height: 700px) {
+      body { padding: 14px; }
+      h1 { margin-bottom: 12px; }
+      .note-card { min-height: 39vh; }
+      .progress { margin: 14px 0 18px; }
+      .controls { padding: 18px; gap: 14px; }
+      .next-chord { padding: 8px 14px; }
+      .next-chord #nextChord { font-size: clamp(2.1rem, 9vw, 4.4rem); }
+      .staff-wrap-main svg { width: 176px; height: 98px; }
+      .staff-wrap-next svg { width: 136px; height: 76px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Chord Practice</h1>
+    <p class="practice-time" aria-live="polite">
+      Practice time:<output id="practiceTime">0.0 min</output>
+      <button id="resetPracticeTime" class="reset-btn" type="button" aria-label="Reset practice time" title="Reset practice time">⟲</button>
+    </p>
+
+    <section class="note-card" id="chordCard" aria-live="polite" aria-label="Current chord">
+      <div class="current-chord">
+        <div id="chord">Ab7</div>
+        <div class="staff-wrap staff-wrap-main" id="chordStaffWrap" hidden></div>
+      </div>
+      <div class="next-chord" aria-label="Next chord">
+        <span class="next-label">Next</span>
+        <span id="nextChord">Db7</span>
+        <div class="staff-wrap staff-wrap-next" id="nextChordStaffWrap" hidden></div>
+      </div>
+    </section>
+    <p class="played-notes" id="playedNotes" aria-live="polite">—</p>
+
+    <div class="progress" aria-label="Beats of the current bar">
+      <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+    </div>
+
+    <section class="controls" aria-label="Metronome controls">
+      <div class="tempo-row">
+        <label for="tempo">Tempo</label>
+        <output id="tempoValue" for="tempo">80 BPM</output>
+      </div>
+      <input id="tempo" type="range" min="40" max="240" value="80" step="5" aria-label="Metronome tempo">
+      <button id="toggle" type="button" aria-pressed="false">Start</button>
+      <div class="option-buttons" aria-label="Practice options">
+        <button id="transposition" class="secondary selected" type="button" aria-pressed="true">Instrument: Bb</button>
+        <button id="continuity" class="secondary" type="button" aria-label="Toggle harmonic continuity" aria-pressed="false">C.H.</button>
+        <button id="bass" class="secondary" type="button" aria-label="Toggle acoustic bass" aria-pressed="false">BASS</button>
+      </div>
+      <div class="chord-type-section">
+        <span>Chord type</span>
+        <div class="chord-options" role="group" aria-label="Chord types to practice">
+          <button class="chord-option" type="button" data-chord-type="Maj7" aria-pressed="false">Maj7</button>
+          <button class="chord-option selected" type="button" data-chord-type="7" aria-pressed="true">7</button>
+          <button class="chord-option" type="button" data-chord-type="m7" aria-pressed="false">m7</button>
+        </div>
+      </div>
+    </section>
+
+    <p class="help">A new chord sounds on the first beat of every 4/4 bar. Press the space bar to start or stop.</p>
+  </main>
+
+  <script>
+    (() => {
+      const chordRoots = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
+      const chordDisplay = document.querySelector("#chord");
+      const chordCard = document.querySelector("#chordCard");
+      const playedNotes = document.querySelector("#playedNotes");
+      const dots = [...document.querySelectorAll(".dot")];
+      const tempo = document.querySelector("#tempo");
+      const tempoValue = document.querySelector("#tempoValue");
+      const toggle = document.querySelector("#toggle");
+      const transpositionButton = document.querySelector("#transposition");
+      const continuityButton = document.querySelector("#continuity");
+      const bassButton = document.querySelector("#bass");
+      const practiceTime = document.querySelector("#practiceTime");
+      const resetPracticeButton = document.querySelector("#resetPracticeTime");
+      const nextChordDisplay = document.querySelector("#nextChord");
+      const chordStaffWrap = document.querySelector("#chordStaffWrap");
+      const nextChordStaffWrap = document.querySelector("#nextChordStaffWrap");
+      const chordTypeButtons = [...document.querySelectorAll(".chord-option")];
+      const chordTypes = {
+        Maj7: { suffix: "Maj7", intervals: [0, 4, 7, 11] },
+        "7": { suffix: "7", intervals: [0, 4, 7, 10] },
+        m7: { suffix: "m7", intervals: [0, 3, 7, 10] }
+      };
+      // How each chord type's quality is drawn next to the root in the big
+      // chord display: Maj7 uses the small raised triangle jazz players use
+      // instead of spelling it out, so it takes far less horizontal space.
+      const CHORD_SUFFIX_HTML = {
+        Maj7: '<span class="triangle" aria-label="major 7th">△</span>',
+        "7": "7",
+        m7: "m7"
+      };
+      // Pitch classes with two common spellings: shown ~50/50 at random each time.
+      const enharmonicSpellings = {
+        1: ["Db", "C#"],
+        6: ["Gb", "F#"],
+        8: ["Ab", "G#"]
+      };
+
+      // Each chord type gets its matching mode, so a random scale tone can be
+      // shown on a small staff (treble clef): Ionian for Maj7, Mixolydian for
+      // dominant 7, Dorian for m7.
+      const LETTER_ORDER = ["C", "D", "E", "F", "G", "A", "B"];
+      const NATURAL_PITCH_CLASS = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+      const SCALE_INTERVALS = {
+        Maj7: [0, 2, 4, 5, 7, 9, 11],
+        "7": [0, 2, 4, 5, 7, 9, 10],
+        m7: [0, 2, 3, 5, 7, 9, 10]
+      };
+      const ACCIDENTAL_SYMBOLS = { "-1": "♭", "0": "", "1": "♯" };
+      const STAFF_BASE_OCTAVE = 4;
+      const BOTTOM_LINE_STEP = diatonicStep("E", 4);
+      const instruments = [
+        { label: "C", writtenOffset: 0 },
+        { label: "Bb", writtenOffset: 2 },
+        { label: "Eb", writtenOffset: 9 }
+      ];
+      const pastelPalettes = [
+        { background: "#211a27", panel: "#30253a", accent: "#f6bad0", accentStrong: "#c76d90", glow: "#553c65", beatStart: "rgba(246,186,208,.55)", beatEnd: "rgba(199,109,144,.2)", beatShadow: "rgba(199,109,144,.24)", accentShadow: "rgba(246,186,208,.2)" },
+        { background: "#162329", panel: "#20343a", accent: "#aee9df", accentStrong: "#549d96", glow: "#2d5b62", beatStart: "rgba(174,233,223,.55)", beatEnd: "rgba(84,157,150,.2)", beatShadow: "rgba(84,157,150,.24)", accentShadow: "rgba(174,233,223,.2)" },
+        { background: "#25211a", panel: "#373125", accent: "#f4d99b", accentStrong: "#bd9250", glow: "#69553a", beatStart: "rgba(244,217,155,.55)", beatEnd: "rgba(189,146,80,.2)", beatShadow: "rgba(189,146,80,.24)", accentShadow: "rgba(244,217,155,.2)" },
+        { background: "#1c2030", panel: "#293147", accent: "#bfcaff", accentStrong: "#7987cf", glow: "#46527e", beatStart: "rgba(191,202,255,.55)", beatEnd: "rgba(121,135,207,.2)", beatShadow: "rgba(121,135,207,.24)", accentShadow: "rgba(191,202,255,.2)" },
+        { background: "#202018", panel: "#323326", accent: "#d6e9a9", accentStrong: "#91ac58", glow: "#596b36", beatStart: "rgba(214,233,169,.55)", beatEnd: "rgba(145,172,88,.2)", beatShadow: "rgba(145,172,88,.24)", accentShadow: "rgba(214,233,169,.2)" }
+      ];
+
+      let audioContext;
+      let masterOutput;
+      let concertReverb;
+      let pianoWave;
+      let timerId;
+      let running = false;
+      let beat = 0;
+      let currentConcertRootIndex = null;
+      let currentChordType = "7";
+      let currentChordObj = null;
+      let instrumentIndex = 1; // default instrument: Bb
+      const selectedChordTypes = new Set(["7"]);
+      let harmonicContinuity = false;
+      let bassEnabled = false;
+      let previousVoicing = null;
+      let queuedChord = null;
+      let lastPaletteIndex = -1;
+      let practiceTimerId;
+      let practiceStartedAt = 0;
+      let accumulatedPracticeMs = 0;
+
+      function getAudioContext() {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          masterOutput = audioContext.createDynamicsCompressor();
+          masterOutput.threshold.value = -20;
+          masterOutput.knee.value = 16;
+          masterOutput.ratio.value = 5;
+          masterOutput.attack.value = 0.003;
+          masterOutput.release.value = 0.24;
+          masterOutput.connect(audioContext.destination);
+
+          const real = new Float32Array(12);
+          const imaginary = new Float32Array([0, 1, 0.68, 0.37, 0.22, 0.12, 0.07, 0.035, 0.018, 0.01, 0.006, 0.003]);
+          pianoWave = audioContext.createPeriodicWave(real, imaginary);
+          concertReverb = createReverb(audioContext);
+        }
+        if (audioContext.state === "suspended") audioContext.resume();
+        return audioContext;
+      }
+
+      function createReverb(context) {
+        const duration = 2.2;
+        const length = Math.floor(context.sampleRate * duration);
+        const impulse = context.createBuffer(2, length, context.sampleRate);
+
+        for (let channel = 0; channel < impulse.numberOfChannels; channel += 1) {
+          const data = impulse.getChannelData(channel);
+          for (let index = 0; index < length; index += 1) {
+            const fade = Math.pow(1 - index / length, 2.7);
+            const noise = Math.sin(index * 12.9898 + channel * 78.233) * 43758.5453;
+            data[index] = ((noise - Math.floor(noise)) * 2 - 1) * fade;
+          }
+        }
+
+        const convolver = context.createConvolver();
+        const reverbGain = context.createGain();
+        convolver.buffer = impulse;
+        reverbGain.gain.value = 0.18;
+        convolver.connect(reverbGain).connect(masterOutput);
+        return convolver;
+      }
+
+      function chooseChord() {
+        const chord = queuedChord ?? createRandomChord();
+        currentConcertRootIndex = chord.rootIndex;
+        currentChordType = chord.type;
+        currentChordObj = chord;
+        renderChordSymbol();
+        renderStaff(chordStaffWrap, currentChordObj, "main");
+        playSeventhChord(currentConcertRootIndex, currentChordType);
+        queuedChord = createRandomChord();
+        renderNextChordSymbol();
+        renderStaff(nextChordStaffWrap, queuedChord, "next");
+      }
+
+      function createRandomChord() {
+        let nextConcertRootIndex;
+        let nextChordType;
+        do {
+          nextConcertRootIndex = Math.floor(Math.random() * chordRoots.length);
+          const choices = [...selectedChordTypes];
+          nextChordType = choices[Math.floor(Math.random() * choices.length)];
+        } while (
+          nextConcertRootIndex === currentConcertRootIndex &&
+          nextChordType === currentChordType &&
+          chordRoots.length * selectedChordTypes.size > 1
+        );
+        const scaleDegreeIndex = Math.floor(Math.random() * 7);
+        // Decided once per chord so the symbol, the scale and the played notes
+        // all agree on flats vs. sharps (e.g. F#7 stays sharp throughout, Gb7 stays flat).
+        const preferSharp = Math.random() < 0.5;
+        return { rootIndex: nextConcertRootIndex, type: nextChordType, scaleDegreeIndex, preferSharp };
+      }
+
+      function noteName(pitchClassIndex, preferSharp) {
+        const alternatives = enharmonicSpellings[pitchClassIndex];
+        if (!alternatives) return chordRoots[pitchClassIndex];
+        return alternatives[preferSharp ? 1 : 0];
+      }
+
+      function chordSymbolFor(chordObj) {
+        const writtenRoot = (chordObj.rootIndex + instruments[instrumentIndex].writtenOffset) % chordRoots.length;
+        return `${noteName(writtenRoot, chordObj.preferSharp)}${CHORD_SUFFIX_HTML[chordObj.type]}`;
+      }
+
+      function diatonicStep(letter, octave) {
+        return LETTER_ORDER.indexOf(letter) + 7 * octave;
+      }
+
+      function normalizeAccidental(diff) {
+        if (diff > 6) return diff - 12;
+        if (diff < -6) return diff + 12;
+        return diff;
+      }
+
+      // Picks whichever of the 7 natural letters spells a pitch class with the
+      // smallest accidental — used as a fallback so we never show a double
+      // sharp/flat for the rare keys where strict diatonic spelling would need one.
+      function simplestSpelling(targetPitchClass) {
+        let best = null;
+        for (const letter of LETTER_ORDER) {
+          const accidental = normalizeAccidental(targetPitchClass - NATURAL_PITCH_CLASS[letter]);
+          if (!best || Math.abs(accidental) < Math.abs(best.accidental)) best = { letter, accidental };
+        }
+        return best;
+      }
+
+      // Sharp-spelling letters for the same 3 ambiguous pitch classes, so a
+      // chord's whole scale can be spelled consistently with its symbol.
+      const SHARP_LETTER_FOR_AMBIGUOUS = { 1: "C", 6: "F", 8: "G" };
+      function rootLetterFor(pitchClassIndex, preferSharp) {
+        if (preferSharp && SHARP_LETTER_FOR_AMBIGUOUS[pitchClassIndex]) return SHARP_LETTER_FOR_AMBIGUOUS[pitchClassIndex];
+        return chordRoots[pitchClassIndex][0];
+      }
+
+      function chordScale(rootIndex, chordType, preferSharp) {
+        const intervals = SCALE_INTERVALS[chordType];
+        const rootLetter = rootLetterFor(rootIndex, preferSharp);
+        const startLetterIdx = LETTER_ORDER.indexOf(rootLetter);
+        return intervals.map((semitones, degree) => {
+          const letterIdx = (startLetterIdx + degree) % 7;
+          let letter = LETTER_ORDER[letterIdx];
+          const octaveOffset = Math.floor((startLetterIdx + degree) / 7);
+          const targetPitchClass = (rootIndex + semitones) % 12;
+          let accidental = normalizeAccidental(targetPitchClass - NATURAL_PITCH_CLASS[letter]);
+          if (Math.abs(accidental) > 1) {
+            ({ letter, accidental } = simplestSpelling(targetPitchClass));
+          }
+          return { letter, accidental, octaveOffset };
+        });
+      }
+
+      function scaleToneFor(chordObj) {
+        if (!chordObj) return null;
+        const writtenRoot = (chordObj.rootIndex + instruments[instrumentIndex].writtenOffset) % chordRoots.length;
+        const degree = chordScale(writtenRoot, chordObj.type, chordObj.preferSharp)[chordObj.scaleDegreeIndex];
+        return { letter: degree.letter, accidental: degree.accidental, octave: STAFF_BASE_OCTAVE + degree.octaveOffset };
+      }
+
+      function staffMarkup(tone, size) {
+        const dims = size === "main"
+          ? { width: 224, height: 124, lineGap: 17, bottomY: 103, noteRx: 13, noteRy: 10.4, clefSize: 76, accidentalSize: 38 }
+          : { width: 172, height: 96, lineGap: 13, bottomY: 79, noteRx: 10, noteRy: 8, clefSize: 58, accidentalSize: 29 };
+
+        const lines = [];
+        for (let i = 0; i < 5; i += 1) {
+          const y = dims.bottomY - i * dims.lineGap;
+          lines.push(`<line x1="${dims.clefSize * 0.62}" y1="${y}" x2="${dims.width - 6}" y2="${y}" />`);
+        }
+
+        const step = diatonicStep(tone.letter, tone.octave) - BOTTOM_LINE_STEP;
+        const noteY = dims.bottomY - step * (dims.lineGap / 2);
+        const lineStartX = dims.clefSize * 0.62;
+        const lineEndX = dims.width - 6;
+        const noteX = (lineStartX + lineEndX) / 2;
+
+        const ledgerSteps = [];
+        if (step > 8) {
+          for (let s = 10; s <= step; s += 2) ledgerSteps.push(s);
+        } else if (step < 0) {
+          for (let s = -2; s >= step; s -= 2) ledgerSteps.push(s);
+        }
+        const ledgers = ledgerSteps
+          .map(s => {
+            const y = dims.bottomY - s * (dims.lineGap / 2);
+            return `<line class="ledger" x1="${noteX - dims.noteRx - 4}" y1="${y}" x2="${noteX + dims.noteRx + 4}" y2="${y}" />`;
+          })
+          .join("");
+
+        const notehead = `<ellipse class="notehead" cx="${noteX}" cy="${noteY}" rx="${dims.noteRx}" ry="${dims.noteRy}" transform="rotate(-18 ${noteX} ${noteY})" />`;
+
+        const symbol = ACCIDENTAL_SYMBOLS[String(tone.accidental)] || "";
+        const accidentalGlyph = symbol
+          ? `<text class="accidental" x="${noteX - dims.noteRx - 9}" y="${noteY + dims.accidentalSize * 0.32}" font-size="${dims.accidentalSize}" text-anchor="middle">${symbol}</text>`
+          : "";
+
+        const clef = `<text class="clef" x="4" y="${dims.bottomY - dims.lineGap * 0.9}" font-size="${dims.clefSize}">𝄞</text>`;
+
+        return `<svg class="staff" viewBox="0 0 ${dims.width} ${dims.height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${clef}${lines.join("")}${ledgers}${notehead}${accidentalGlyph}</svg>`;
+      }
+
+      function renderStaff(container, chordObj, size) {
+        const tone = scaleToneFor(chordObj);
+        if (!tone) {
+          container.hidden = true;
+          container.innerHTML = "";
+          return;
+        }
+        container.hidden = false;
+        container.innerHTML = staffMarkup(tone, size);
+      }
+
+      function renderChordSymbol() {
+        const chord = currentChordObj || { rootIndex: 0, type: currentChordType, preferSharp: false };
+        chordDisplay.innerHTML = chordSymbolFor(chord);
+      }
+
+      function renderNextChordSymbol() {
+        if (!queuedChord) {
+          nextChordDisplay.textContent = "—";
+          return;
+        }
+        nextChordDisplay.innerHTML = chordSymbolFor(queuedChord);
+      }
+
+      function renderPlayedNotes(voicing) {
+        const writtenOffset = instruments[instrumentIndex].writtenOffset;
+        const preferSharp = currentChordObj ? currentChordObj.preferSharp : false;
+        playedNotes.textContent = voicing
+          .map(note => noteName(pitchClass(note + writtenOffset), preferSharp))
+          .join(" – ");
+      }
+
+      function toggleTransposition() {
+        instrumentIndex = (instrumentIndex + 1) % instruments.length;
+        const instrument = instruments[instrumentIndex];
+        transpositionButton.textContent = `Instrument: ${instrument.label}`;
+        transpositionButton.classList.toggle("selected", instrument.label !== "C");
+        transpositionButton.setAttribute("aria-pressed", String(instrument.label !== "C"));
+        renderChordSymbol();
+        renderNextChordSymbol();
+        renderStaff(chordStaffWrap, currentChordObj, "main");
+        renderStaff(nextChordStaffWrap, queuedChord, "next");
+        if (previousVoicing) renderPlayedNotes(previousVoicing);
+      }
+
+      function toggleChordType(chordType) {
+        if (selectedChordTypes.has(chordType) && selectedChordTypes.size === 1) return;
+        if (selectedChordTypes.has(chordType)) {
+          selectedChordTypes.delete(chordType);
+        } else {
+          selectedChordTypes.add(chordType);
+        }
+        chordTypeButtons.forEach(button => {
+          const selected = selectedChordTypes.has(button.dataset.chordType);
+          button.classList.toggle("selected", selected);
+          button.setAttribute("aria-pressed", String(selected));
+        });
+        queuedChord = createRandomChord();
+        renderNextChordSymbol();
+        renderStaff(nextChordStaffWrap, queuedChord, "next");
+      }
+
+      function applyRandomPastelPalette() {
+        let paletteIndex;
+        do {
+          paletteIndex = Math.floor(Math.random() * pastelPalettes.length);
+        } while (paletteIndex === lastPaletteIndex && pastelPalettes.length > 1);
+        lastPaletteIndex = paletteIndex;
+        const palette = pastelPalettes[paletteIndex];
+        const style = document.documentElement.style;
+        style.setProperty("--background", palette.background);
+        style.setProperty("--panel", palette.panel);
+        style.setProperty("--accent", palette.accent);
+        style.setProperty("--accent-strong", palette.accentStrong);
+        style.setProperty("--glow", palette.glow);
+        style.setProperty("--beat-start", palette.beatStart);
+        style.setProperty("--beat-end", palette.beatEnd);
+        style.setProperty("--beat-shadow", palette.beatShadow);
+        style.setProperty("--accent-shadow", palette.accentShadow);
+      }
+
+      function updatePracticeTime() {
+        const elapsedMs = accumulatedPracticeMs + (running ? Date.now() - practiceStartedAt : 0);
+        practiceTime.textContent = `${(elapsedMs / 60000).toFixed(1)} min`;
+      }
+
+      function startPracticeTimer() {
+        practiceStartedAt = Date.now();
+        updatePracticeTime();
+        practiceTimerId = window.setInterval(updatePracticeTime, 1000);
+      }
+
+      function stopPracticeTimer() {
+        accumulatedPracticeMs += Date.now() - practiceStartedAt;
+        window.clearInterval(practiceTimerId);
+        practiceTimerId = undefined;
+        updatePracticeTime();
+      }
+
+      function resetPracticeTime() {
+        accumulatedPracticeMs = 0;
+        if (running) practiceStartedAt = Date.now();
+        updatePracticeTime();
+      }
+
+      function pitchClass(note) {
+        return ((note % 12) + 12) % 12;
+      }
+
+      function buildVoicing(rootIndex, intervals) {
+        if (!harmonicContinuity || !previousVoicing) {
+          return intervals.map(interval => rootIndex + interval);
+        }
+
+        const pitchClasses = intervals.map(interval => pitchClass(rootIndex + interval));
+        const previous = [...previousVoicing].sort((a, b) => a - b);
+        const previousNotes = new Set(previous);
+        let bestVoicing;
+        let bestCommonTones = -1;
+        let bestMovement = Infinity;
+        let bestCentreDistance = Infinity;
+
+        function consider(candidate) {
+          const voicing = [...candidate].sort((a, b) => a - b);
+          const commonTones = voicing.filter(note => previousNotes.has(note)).length;
+          const movement = voicing.reduce((total, note, index) => total + Math.abs(note - previous[index]), 0);
+          const centreDistance = voicing.reduce((total, note) => total + Math.abs(note - 12), 0);
+
+          const isBetter =
+            commonTones > bestCommonTones ||
+            (commonTones === bestCommonTones && movement < bestMovement) ||
+            (commonTones === bestCommonTones && movement === bestMovement && centreDistance < bestCentreDistance);
+
+          if (isBetter) {
+            bestVoicing = voicing;
+            bestCommonTones = commonTones;
+            bestMovement = movement;
+            bestCentreDistance = centreDistance;
+          }
+        }
+
+        function search(voiceIndex, candidate) {
+          if (voiceIndex === pitchClasses.length) {
+            consider(candidate);
+            return;
+          }
+
+          for (let octave = -1; octave <= 3; octave += 1) {
+            const note = pitchClasses[voiceIndex] + octave * 12;
+            if (note >= -12 && note <= 35) {
+              search(voiceIndex + 1, [...candidate, note]);
+            }
+          }
+        }
+
+        search(0, []);
+        return bestVoicing;
+      }
+
+      function toggleHarmonicContinuity() {
+        harmonicContinuity = !harmonicContinuity;
+        updateToggleButton(continuityButton, "C.H.", harmonicContinuity);
+      }
+
+      function toggleBass() {
+        bassEnabled = !bassEnabled;
+        updateToggleButton(bassButton, "BASS", bassEnabled);
+      }
+
+      function updateToggleButton(button, label, enabled) {
+        button.textContent = label;
+        button.classList.toggle("selected", enabled);
+        button.setAttribute("aria-pressed", String(enabled));
+      }
+
+      function updateDots() {
+        dots.forEach((dot, index) => dot.classList.toggle("active", index === beat));
+      }
+
+      function clickSound(accented) {
+        const context = getAudioContext();
+
+        const now = context.currentTime;
+        const oscillator = context.createOscillator();
+        const gain = context.createGain();
+        oscillator.type = "sine";
+        oscillator.frequency.value = accented ? 1200 : 850;
+        gain.gain.setValueAtTime(accented ? 0.18 : 0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
+        oscillator.connect(gain).connect(masterOutput);
+        oscillator.start(now);
+        oscillator.stop(now + 0.06);
+      }
+
+      function playSeventhChord(rootIndex, chordType) {
+        const context = getAudioContext();
+        const now = context.currentTime;
+        const intervals = chordTypes[chordType].intervals;
+        const voicing = buildVoicing(rootIndex, intervals);
+        previousVoicing = voicing;
+        renderPlayedNotes(voicing);
+        const barDuration = 4 * interval() / 1000;
+        const pianoRelease = Math.max(0.45, Math.min(2.35, barDuration * 0.78));
+        const stringRelease = Math.max(0.7, Math.min(3.15, barDuration * 0.94));
+        const chordGain = context.createGain();
+        const filter = context.createBiquadFilter();
+        const dryGain = context.createGain();
+        const reverbSend = context.createGain();
+
+        chordGain.gain.setValueAtTime(0.0001, now);
+        chordGain.gain.exponentialRampToValueAtTime(1, now + 0.012);
+        chordGain.gain.exponentialRampToValueAtTime(0.0001, now + pianoRelease);
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(7600, now);
+        filter.frequency.exponentialRampToValueAtTime(2200, now + pianoRelease * 0.94);
+        filter.Q.value = 0.45;
+        dryGain.gain.value = 0.92;
+        reverbSend.gain.value = 0.33;
+        chordGain.connect(filter);
+        filter.connect(dryGain).connect(masterOutput);
+        filter.connect(reverbSend).connect(concertReverb);
+
+        voicing.forEach((note, voiceIndex) => {
+          const frequency = 130.81 * Math.pow(2, note / 12);
+          [-2.3, 2.3].forEach((detune, stringIndex) => {
+            const oscillator = context.createOscillator();
+            const voiceGain = context.createGain();
+            const level = voiceIndex === 0 ? 0.09 : 0.072;
+            oscillator.setPeriodicWave(pianoWave);
+            oscillator.frequency.value = frequency;
+            oscillator.detune.value = detune;
+            voiceGain.gain.setValueAtTime(0.0001, now);
+            voiceGain.gain.exponentialRampToValueAtTime(level * (stringIndex === 0 ? 1 : 0.9), now + 0.008);
+            voiceGain.gain.exponentialRampToValueAtTime(level * 0.24, now + 0.3);
+            voiceGain.gain.exponentialRampToValueAtTime(0.0001, now + pianoRelease * 0.98);
+            oscillator.connect(voiceGain).connect(chordGain);
+            oscillator.start(now);
+            oscillator.stop(now + pianoRelease);
+          });
+        });
+
+        playStringLayer(context, voicing, now, stringRelease);
+        if (bassEnabled) playBassLayer(context, rootIndex, now, stringRelease);
+      }
+
+      function playStringLayer(context, voicing, now, release) {
+        const stringsGain = context.createGain();
+        const stringsFilter = context.createBiquadFilter();
+        const stringsReverbSend = context.createGain();
+        const stringsDryGain = context.createGain();
+
+        stringsGain.gain.setValueAtTime(0.0001, now);
+        stringsGain.gain.exponentialRampToValueAtTime(1, now + 0.18);
+        stringsGain.gain.exponentialRampToValueAtTime(0.0001, now + release);
+        stringsFilter.type = "lowpass";
+        stringsFilter.frequency.setValueAtTime(1750, now);
+        stringsFilter.Q.value = 0.35;
+        stringsDryGain.gain.value = 0.72;
+        stringsReverbSend.gain.value = 0.48;
+        stringsGain.connect(stringsFilter);
+        stringsFilter.connect(stringsDryGain).connect(masterOutput);
+        stringsFilter.connect(stringsReverbSend).connect(concertReverb);
+
+        voicing.forEach((note, voiceIndex) => {
+          const oscillator = context.createOscillator();
+          const voiceGain = context.createGain();
+          const frequency = 130.81 * Math.pow(2, note / 12);
+          oscillator.type = "sawtooth";
+          oscillator.frequency.value = frequency;
+          oscillator.detune.value = (voiceIndex - 1.5) * 1.1;
+          voiceGain.gain.value = voiceIndex === 0 ? 0.052 : 0.04;
+          oscillator.connect(voiceGain).connect(stringsGain);
+          oscillator.start(now);
+          oscillator.stop(now + release + 0.03);
+        });
+      }
+
+      function playBassLayer(context, rootIndex, now, release) {
+        const bassFrequency = 65.405 * Math.pow(2, rootIndex / 12); // C2 fins a B2
+        const bassRelease = Math.max(0.55, Math.min(2.8, release * 0.92));
+        playBassTone(context, bassFrequency, now, bassRelease);
+      }
+
+      function playBassTone(context, bassFrequency, now, bassRelease) {
+        const bassGain = context.createGain();
+        const bassFilter = context.createBiquadFilter();
+        const bassReverbSend = context.createGain();
+
+        bassGain.gain.setValueAtTime(0.0001, now);
+        bassGain.gain.exponentialRampToValueAtTime(0.58, now + 0.025);
+        bassGain.gain.exponentialRampToValueAtTime(0.31, now + 0.18);
+        bassGain.gain.exponentialRampToValueAtTime(0.0001, now + bassRelease);
+        bassFilter.type = "lowpass";
+        bassFilter.frequency.setValueAtTime(620, now);
+        bassFilter.frequency.exponentialRampToValueAtTime(190, now + bassRelease * 0.85);
+        bassFilter.Q.value = 0.7;
+        bassReverbSend.gain.value = 0.13;
+        bassGain.connect(bassFilter);
+        bassFilter.connect(masterOutput);
+        bassFilter.connect(bassReverbSend).connect(concertReverb);
+
+        [
+          { type: "triangle", multiple: 1, level: 0.72 },
+          { type: "sine", multiple: 2, level: 0.18 }
+        ].forEach(layer => {
+          const oscillator = context.createOscillator();
+          const voiceGain = context.createGain();
+          oscillator.type = layer.type;
+          oscillator.frequency.value = bassFrequency * layer.multiple;
+          voiceGain.gain.value = layer.level;
+          oscillator.connect(voiceGain).connect(bassGain);
+          oscillator.start(now);
+          oscillator.stop(now + bassRelease + 0.03);
+        });
+      }
+
+      function flash() {
+        chordCard.classList.add("beat");
+        window.setTimeout(() => chordCard.classList.remove("beat"), 85);
+      }
+
+      function tick() {
+        if (beat === 0) chooseChord();
+        clickSound(beat === 0);
+        updateDots();
+        flash();
+        beat = (beat + 1) % 4;
+      }
+
+      function interval() {
+        return 60000 / Number(tempo.value);
+      }
+
+      function schedule() {
+        window.clearInterval(timerId);
+        timerId = window.setInterval(tick, interval());
+      }
+
+      function start() {
+        applyRandomPastelPalette();
+        running = true;
+        startPracticeTimer();
+        beat = 0;
+        tick();
+        schedule();
+        toggle.textContent = "Stop";
+        toggle.classList.add("running");
+        toggle.setAttribute("aria-pressed", "true");
+      }
+
+      function stop() {
+        running = false;
+        stopPracticeTimer();
+        window.clearInterval(timerId);
+        timerId = undefined;
+        dots.forEach(dot => dot.classList.remove("active"));
+        toggle.textContent = "Start";
+        toggle.classList.remove("running");
+        toggle.setAttribute("aria-pressed", "false");
+      }
+
+      tempo.addEventListener("input", () => {
+        tempoValue.value = `${tempo.value} BPM`;
+        tempoValue.textContent = `${tempo.value} BPM`;
+        if (running) schedule();
+      });
+
+      toggle.addEventListener("click", () => running ? stop() : start());
+      transpositionButton.addEventListener("click", toggleTransposition);
+      continuityButton.addEventListener("click", toggleHarmonicContinuity);
+      bassButton.addEventListener("click", toggleBass);
+      resetPracticeButton.addEventListener("click", resetPracticeTime);
+      chordTypeButtons.forEach(button => {
+        button.addEventListener("click", () => toggleChordType(button.dataset.chordType));
+      });
+
+      window.addEventListener("keydown", event => {
+        if (event.code === "Space" && event.target.tagName !== "INPUT") {
+          event.preventDefault();
+          running ? stop() : start();
+        }
+      });
+
+      // Seed the "next chord" preview before the metronome is ever started.
+      queuedChord = createRandomChord();
+      renderNextChordSymbol();
+      renderStaff(nextChordStaffWrap, queuedChord, "next");
+    })();
+  </script>
+</body>
+</html>
