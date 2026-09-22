@@ -35,7 +35,7 @@
     }
 
     main {
-      width: min(100%, 760px);
+      width: min(96vw, 1080px);
       text-align: center;
     }
 
@@ -99,14 +99,16 @@
     }
 
     .current-chord {
+      container-type: inline-size;
       display: grid;
-      justify-items: end;
-      text-align: right;
+      justify-items: center;
+      text-align: center;
       gap: 6px;
       min-width: 0;
     }
 
     .next-chord {
+      container-type: inline-size;
       display: grid;
       justify-items: center;
       gap: 8px;
@@ -127,7 +129,8 @@
     }
 
     .next-chord #nextChord {
-      font-size: clamp(2.8rem, 13vw, 6.5rem);
+      font-size: clamp(2.2rem, 13vw, 6.5rem); /* fallback if container-query units are unsupported */
+      font-size: clamp(2.2rem, 36cqi, 7rem);
       font-weight: 800;
       color: var(--accent);
       opacity: .7;
@@ -140,7 +143,6 @@
     .staff-wrap-main svg { display: block; width: 224px; height: 124px; }
     .staff-wrap-next svg { display: block; width: 172px; height: 96px; }
 
-    .staff .clef { fill: var(--muted); }
     .staff line { stroke: var(--muted); stroke-width: 1.8; }
     .staff .ledger { stroke: var(--muted); stroke-width: 1.8; }
     .staff .notehead { fill: var(--accent); }
@@ -159,7 +161,8 @@
     }
 
     #chord {
-      font-size: clamp(8rem, 30vw, 17rem);
+      font-size: clamp(4.5rem, 30vw, 17rem); /* fallback if container-query units are unsupported */
+      font-size: clamp(4.5rem, 34cqi, 15rem);
       line-height: .8;
       font-weight: 800;
       letter-spacing: -.07em;
@@ -198,12 +201,46 @@
       transform: scale(1.35);
     }
 
-    .controls {
+    .layout {
       display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      align-items: stretch;
+      gap: clamp(16px, 3vw, 32px);
+      margin-top: 20px;
+    }
+
+    .chord-column {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 0;
+    }
+
+    .controls-column {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
       gap: 20px;
-      padding: 24px;
+      padding: 26px;
       border-radius: 22px;
       background: var(--panel);
+      text-align: left;
+      min-width: 0;
+    }
+
+    @media (max-width: 780px) {
+      .layout { grid-template-columns: 1fr; }
+      .controls-column { justify-content: flex-start; }
+    }
+
+    .tempo-panel {
+      display: grid;
+      gap: 14px;
+      margin-top: 20px;
+      padding: 20px 26px;
+      border-radius: 20px;
+      background: var(--panel);
+      text-align: left;
     }
 
     .tempo-row {
@@ -211,7 +248,6 @@
       grid-template-columns: 1fr auto;
       align-items: center;
       gap: 14px;
-      text-align: left;
     }
 
     label { font-weight: 650; }
@@ -261,18 +297,18 @@
 
     .option-buttons {
       display: grid;
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
       gap: 10px;
     }
 
     button.secondary {
       width: 100%;
       min-height: 44px;
-      padding: 0 16px;
+      padding: 0 10px;
       border: 1px solid rgba(255,255,255,.2);
       background: #30394f;
       color: var(--ink);
-      font-size: .98rem;
+      font-size: .86rem;
     }
 
     button.secondary:hover { background: #3d4965; }
@@ -289,6 +325,81 @@
     }
 
     .chord-type-section > span { font-weight: 650; }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 0;
+      color: var(--muted);
+      font-weight: 650;
+      font-size: .85rem;
+    }
+
+    .panel-header .panel-header-buttons {
+      display: flex;
+      gap: 6px;
+    }
+
+    .panel-header button.secondary {
+      width: auto;
+      min-height: 32px;
+      padding: 0 12px;
+      font-size: .8rem;
+    }
+
+    .panel-header button.secondary.selected {
+      background: #2f7d4f;
+      border-color: var(--accent);
+      color: #eafff2;
+    }
+
+    .prob-panel {
+      border-radius: 16px;
+      padding: 12px 14px 14px;
+      background: linear-gradient(160deg, #3c3c3c, #1a1a1a);
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: 0 6px 18px rgba(0,0,0,.3);
+    }
+
+    .prob-panel .panel-header:has(+ .prob-grid:not([hidden])) { margin-bottom: 10px; }
+
+    .prob-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .prob-grid[hidden] { display: none; }
+
+    .prob-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    button.prob-note {
+      flex: 1;
+      width: auto;
+      min-height: 36px;
+      padding: 0 4px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: #30394f;
+      color: var(--ink);
+      font-size: .82rem;
+    }
+
+    button.prob-note:hover { background: #3d4965; }
+
+    .prob-percent {
+      min-width: 2.6em;
+      text-align: right;
+      font-size: .64rem;
+      font-variant-numeric: tabular-nums;
+      color: var(--muted);
+    }
 
     .chord-options {
       display: grid;
@@ -329,13 +440,15 @@
     @media (max-height: 700px) {
       body { padding: 14px; }
       h1 { margin-bottom: 12px; }
-      .note-card { min-height: 39vh; }
+      .note-card { min-height: 32vh; }
       .progress { margin: 14px 0 18px; }
-      .controls { padding: 18px; gap: 14px; }
+      .controls-column, .tempo-panel { padding: 16px 18px; gap: 12px; }
       .next-chord { padding: 8px 14px; }
-      .next-chord #nextChord { font-size: clamp(2.1rem, 9vw, 4.4rem); }
+      .next-chord #nextChord { font-size: clamp(1.8rem, 28cqi, 3.6rem); }
       .staff-wrap-main svg { width: 176px; height: 98px; }
       .staff-wrap-next svg { width: 136px; height: 76px; }
+      .prob-panel { padding: 10px 12px 12px; }
+      button.prob-note { min-height: 30px; font-size: .74rem; }
     }
   </style>
 </head>
@@ -347,44 +460,62 @@
       <button id="resetPracticeTime" class="reset-btn" type="button" aria-label="Reset practice time" title="Reset practice time">⟲</button>
     </p>
 
-    <section class="note-card" id="chordCard" aria-live="polite" aria-label="Current chord">
-      <div class="current-chord">
-        <div id="chord">Ab7</div>
-        <div class="staff-wrap staff-wrap-main" id="chordStaffWrap" hidden></div>
-      </div>
-      <div class="next-chord" aria-label="Next chord">
-        <span class="next-label">Next</span>
-        <span id="nextChord">Db7</span>
-        <div class="staff-wrap staff-wrap-next" id="nextChordStaffWrap" hidden></div>
-      </div>
-    </section>
-    <p class="played-notes" id="playedNotes" aria-live="polite">—</p>
+    <div class="layout">
+      <div class="chord-column">
+        <section class="note-card" id="chordCard" aria-live="polite" aria-label="Current chord">
+          <div class="current-chord">
+            <div id="chord">Ab7</div>
+            <div class="staff-wrap staff-wrap-main" id="chordStaffWrap" hidden></div>
+          </div>
+          <div class="next-chord" aria-label="Next chord">
+            <span class="next-label">Next</span>
+            <span id="nextChord">Db7</span>
+            <div class="staff-wrap staff-wrap-next" id="nextChordStaffWrap" hidden></div>
+          </div>
+        </section>
+        <p class="played-notes" id="playedNotes" aria-live="polite">—</p>
 
-    <div class="progress" aria-label="Beats of the current bar">
-      <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <div class="progress" aria-label="Beats of the current bar">
+          <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        </div>
+      </div>
+
+      <div class="controls-column" aria-label="Metronome controls">
+        <button id="toggle" type="button" aria-pressed="false">Start</button>
+        <div class="option-buttons" aria-label="Practice options">
+          <button id="transposition" class="secondary selected" type="button" aria-pressed="true">Instrument: Bb</button>
+          <button id="continuity" class="secondary" type="button" aria-label="Toggle harmonic continuity" aria-pressed="false">C.H.</button>
+          <button id="bass" class="secondary" type="button" aria-label="Toggle acoustic bass" aria-pressed="false">BASS</button>
+        </div>
+        <div class="chord-type-section">
+          <span>Chord type</span>
+          <div class="chord-options" role="group" aria-label="Chord types to practice">
+            <button class="chord-option" type="button" data-chord-type="Maj7" aria-pressed="false">Maj7</button>
+            <button class="chord-option selected" type="button" data-chord-type="7" aria-pressed="true">7</button>
+            <button class="chord-option" type="button" data-chord-type="m7" aria-pressed="false">m7</button>
+          </div>
+        </div>
+
+        <div class="prob-panel" aria-label="Root note probabilities">
+          <div class="panel-header">
+            <span>Prob</span>
+            <div class="panel-header-buttons">
+              <button id="probReset" class="secondary" type="button" hidden>Reset</button>
+              <button id="probToggle" class="secondary" type="button" aria-expanded="false">Show</button>
+            </div>
+          </div>
+          <div class="prob-grid" id="probGrid" hidden></div>
+        </div>
+      </div>
     </div>
 
-    <section class="controls" aria-label="Metronome controls">
+    <div class="tempo-panel">
       <div class="tempo-row">
         <label for="tempo">Tempo</label>
         <output id="tempoValue" for="tempo">80 BPM</output>
       </div>
       <input id="tempo" type="range" min="40" max="240" value="80" step="5" aria-label="Metronome tempo">
-      <button id="toggle" type="button" aria-pressed="false">Start</button>
-      <div class="option-buttons" aria-label="Practice options">
-        <button id="transposition" class="secondary selected" type="button" aria-pressed="true">Instrument: Bb</button>
-        <button id="continuity" class="secondary" type="button" aria-label="Toggle harmonic continuity" aria-pressed="false">C.H.</button>
-        <button id="bass" class="secondary" type="button" aria-label="Toggle acoustic bass" aria-pressed="false">BASS</button>
-      </div>
-      <div class="chord-type-section">
-        <span>Chord type</span>
-        <div class="chord-options" role="group" aria-label="Chord types to practice">
-          <button class="chord-option" type="button" data-chord-type="Maj7" aria-pressed="false">Maj7</button>
-          <button class="chord-option selected" type="button" data-chord-type="7" aria-pressed="true">7</button>
-          <button class="chord-option" type="button" data-chord-type="m7" aria-pressed="false">m7</button>
-        </div>
-      </div>
-    </section>
+    </div>
 
     <p class="help">A new chord sounds on the first beat of every 4/4 bar. Press the space bar to start or stop.</p>
   </main>
@@ -408,6 +539,9 @@
       const chordStaffWrap = document.querySelector("#chordStaffWrap");
       const nextChordStaffWrap = document.querySelector("#nextChordStaffWrap");
       const chordTypeButtons = [...document.querySelectorAll(".chord-option")];
+      const probToggleButton = document.querySelector("#probToggle");
+      const probResetButton = document.querySelector("#probReset");
+      const probGrid = document.querySelector("#probGrid");
       const chordTypes = {
         Maj7: { suffix: "Maj7", intervals: [0, 4, 7, 11] },
         "7": { suffix: "7", intervals: [0, 4, 7, 10] },
@@ -474,6 +608,31 @@
       let practiceTimerId;
       let practiceStartedAt = 0;
       let accumulatedPracticeMs = 0;
+      // The 15 note "spellings" the Prob panel offers: 12 pitch classes, 3 of
+      // them shown twice (once flat, once sharp). Each entry is independent —
+      // boosting G# does NOT change Ab's probability, even though they're the
+      // same pitch.
+      const NOTE_SPELLINGS = [
+        { label: "C", pitchClass: 0, sharp: false },
+        { label: "Db", pitchClass: 1, sharp: false },
+        { label: "C#", pitchClass: 1, sharp: true },
+        { label: "D", pitchClass: 2, sharp: false },
+        { label: "Eb", pitchClass: 3, sharp: false },
+        { label: "E", pitchClass: 4, sharp: false },
+        { label: "F", pitchClass: 5, sharp: false },
+        { label: "Gb", pitchClass: 6, sharp: false },
+        { label: "F#", pitchClass: 6, sharp: true },
+        { label: "G", pitchClass: 7, sharp: false },
+        { label: "Ab", pitchClass: 8, sharp: false },
+        { label: "G#", pitchClass: 8, sharp: true },
+        { label: "A", pitchClass: 9, sharp: false },
+        { label: "Bb", pitchClass: 10, sharp: false },
+        { label: "B", pitchClass: 11, sharp: false }
+      ];
+      // Probability weight per spelling (index into NOTE_SPELLINGS), always
+      // summing to 100. Pressing a "Prob" button adds 10 to its own weight and
+      // proportionally shrinks the rest so the total stays 100.
+      const noteWeights = new Array(NOTE_SPELLINGS.length).fill(100 / NOTE_SPELLINGS.length);
 
       function getAudioContext() {
         if (!audioContext) {
@@ -530,23 +689,115 @@
         renderStaff(nextChordStaffWrap, queuedChord, "next");
       }
 
+      // Picks a root pitch class at random, weighted by noteWeights (percentages
+      // that sum to 100) instead of uniformly.
+      // Picks a note SPELLING at random, weighted by noteWeights (percentages
+      // that sum to 100) instead of uniformly. Returns an index into
+      // NOTE_SPELLINGS — e.g. "Ab" and "G#" are separate entries here.
+      function weightedRandomSpellingIndex() {
+        const total = noteWeights.reduce((sum, w) => sum + w, 0);
+        let r = Math.random() * total;
+        for (let i = 0; i < NOTE_SPELLINGS.length; i += 1) {
+          if (r < noteWeights[i]) return i;
+          r -= noteWeights[i];
+        }
+        return NOTE_SPELLINGS.length - 1;
+      }
+
+      // Pressing a note's "Prob" button adds 10 percentage points to its own
+      // weight and shrinks every OTHER spelling's weight proportionally so the
+      // total stays 100 — pressing the same note twice adds 20 points total,
+      // etc. Enharmonic partners (e.g. G# and Ab) are independent: boosting
+      // one shrinks the other just like any other note, it is never kept equal.
+      function boostNoteWeight(spellingIndex) {
+        const oldWeight = noteWeights[spellingIndex];
+        const newWeight = Math.min(100, oldWeight + 10);
+        const remaining = 100 - newWeight;
+        const oldRemainingSum = 100 - oldWeight;
+        const otherCount = NOTE_SPELLINGS.length - 1;
+        for (let i = 0; i < NOTE_SPELLINGS.length; i += 1) {
+          if (i === spellingIndex) continue;
+          noteWeights[i] = oldRemainingSum > 0 ? noteWeights[i] * (remaining / oldRemainingSum) : remaining / otherCount;
+        }
+        noteWeights[spellingIndex] = newWeight;
+        renderProbPercentages();
+      }
+
+      function resetProbWeights() {
+        const uniform = 100 / NOTE_SPELLINGS.length;
+        for (let i = 0; i < NOTE_SPELLINGS.length; i += 1) noteWeights[i] = uniform;
+        renderProbPercentages();
+      }
+
+      function renderProbPercentages() {
+        probGrid.querySelectorAll(".prob-percent").forEach(span => {
+          const i = Number(span.dataset.spellingIndex);
+          span.textContent = `${Math.round(noteWeights[i])}%`;
+        });
+      }
+
+      // Builds the 15 note buttons once, each with its own independent
+      // percentage badge (no sharing between enharmonic partners).
+      function buildProbGrid() {
+        const fragment = document.createDocumentFragment();
+        NOTE_SPELLINGS.forEach((spelling, index) => {
+          const item = document.createElement("div");
+          item.className = "prob-item";
+
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "prob-note";
+          button.textContent = spelling.label;
+          button.dataset.spellingIndex = String(index);
+
+          const percent = document.createElement("span");
+          percent.className = "prob-percent";
+          percent.dataset.spellingIndex = String(index);
+
+          item.appendChild(button);
+          item.appendChild(percent);
+          fragment.appendChild(item);
+        });
+        probGrid.appendChild(fragment);
+        probGrid.addEventListener("click", event => {
+          const button = event.target.closest(".prob-note");
+          if (!button) return;
+          boostNoteWeight(Number(button.dataset.spellingIndex));
+        });
+        renderProbPercentages();
+      }
+
+      function toggleProbPanel() {
+        const expanded = probToggleButton.getAttribute("aria-expanded") === "true";
+        probGrid.hidden = expanded;
+        probResetButton.hidden = expanded;
+        probToggleButton.setAttribute("aria-expanded", String(!expanded));
+        probToggleButton.textContent = expanded ? "Show" : "Hide";
+      }
+
       function createRandomChord() {
         let nextConcertRootIndex;
         let nextChordType;
+        let nextPreferSharp;
+        let attempts = 0;
         do {
-          nextConcertRootIndex = Math.floor(Math.random() * chordRoots.length);
+          // The Prob weights are about what note appears ON SCREEN (written
+          // pitch), so pick the written spelling first, then undo the current
+          // instrument's transposition to get the concert root to store.
+          const spelling = NOTE_SPELLINGS[weightedRandomSpellingIndex()];
+          nextConcertRootIndex = pitchClass(spelling.pitchClass - instruments[instrumentIndex].writtenOffset);
+          nextPreferSharp = spelling.sharp;
           const choices = [...selectedChordTypes];
           nextChordType = choices[Math.floor(Math.random() * choices.length)];
+          attempts += 1;
         } while (
           nextConcertRootIndex === currentConcertRootIndex &&
           nextChordType === currentChordType &&
-          chordRoots.length * selectedChordTypes.size > 1
+          chordRoots.length * selectedChordTypes.size > 1 &&
+          attempts < 20
         );
         const scaleDegreeIndex = Math.floor(Math.random() * 7);
-        // Decided once per chord so the symbol, the scale and the played notes
-        // all agree on flats vs. sharps (e.g. F#7 stays sharp throughout, Gb7 stays flat).
-        const preferSharp = Math.random() < 0.5;
-        return { rootIndex: nextConcertRootIndex, type: nextChordType, scaleDegreeIndex, preferSharp };
+        return { rootIndex: nextConcertRootIndex, type: nextChordType, scaleDegreeIndex, preferSharp: nextPreferSharp };
       }
 
       function noteName(pitchClassIndex, preferSharp) {
@@ -616,19 +867,20 @@
 
       function staffMarkup(tone, size) {
         const dims = size === "main"
-          ? { width: 224, height: 124, lineGap: 17, bottomY: 103, noteRx: 13, noteRy: 10.4, clefSize: 76, accidentalSize: 38 }
-          : { width: 172, height: 96, lineGap: 13, bottomY: 79, noteRx: 10, noteRy: 8, clefSize: 58, accidentalSize: 29 };
+          ? { width: 224, height: 124, lineGap: 17, bottomY: 103, noteRx: 13, noteRy: 10.4, accidentalSize: 38 }
+          : { width: 172, height: 96, lineGap: 13, bottomY: 79, noteRx: 10, noteRy: 8, accidentalSize: 29 };
+
+        const lineStartX = 10;
+        const lineEndX = dims.width - 6;
 
         const lines = [];
         for (let i = 0; i < 5; i += 1) {
           const y = dims.bottomY - i * dims.lineGap;
-          lines.push(`<line x1="${dims.clefSize * 0.62}" y1="${y}" x2="${dims.width - 6}" y2="${y}" />`);
+          lines.push(`<line x1="${lineStartX}" y1="${y}" x2="${lineEndX}" y2="${y}" />`);
         }
 
         const step = diatonicStep(tone.letter, tone.octave) - BOTTOM_LINE_STEP;
         const noteY = dims.bottomY - step * (dims.lineGap / 2);
-        const lineStartX = dims.clefSize * 0.62;
-        const lineEndX = dims.width - 6;
         const noteX = (lineStartX + lineEndX) / 2;
 
         const ledgerSteps = [];
@@ -651,9 +903,7 @@
           ? `<text class="accidental" x="${noteX - dims.noteRx - 9}" y="${noteY + dims.accidentalSize * 0.32}" font-size="${dims.accidentalSize}" text-anchor="middle">${symbol}</text>`
           : "";
 
-        const clef = `<text class="clef" x="4" y="${dims.bottomY - dims.lineGap * 0.9}" font-size="${dims.clefSize}">𝄞</text>`;
-
-        return `<svg class="staff" viewBox="0 0 ${dims.width} ${dims.height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${clef}${lines.join("")}${ledgers}${notehead}${accidentalGlyph}</svg>`;
+        return `<svg class="staff" viewBox="0 0 ${dims.width} ${dims.height}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${lines.join("")}${ledgers}${notehead}${accidentalGlyph}</svg>`;
       }
 
       function renderStaff(container, chordObj, size) {
@@ -859,7 +1109,7 @@
         renderPlayedNotes(voicing);
         const barDuration = 4 * interval() / 1000;
         const pianoRelease = Math.max(0.45, Math.min(2.35, barDuration * 0.78));
-        const stringRelease = Math.max(0.7, Math.min(3.15, barDuration * 0.94));
+        const stringRelease = Math.max(1.1, Math.min(4.2, barDuration * 1.35));
         const chordGain = context.createGain();
         const filter = context.createBiquadFilter();
         const dryGain = context.createGain();
@@ -1028,6 +1278,8 @@
       continuityButton.addEventListener("click", toggleHarmonicContinuity);
       bassButton.addEventListener("click", toggleBass);
       resetPracticeButton.addEventListener("click", resetPracticeTime);
+      probToggleButton.addEventListener("click", toggleProbPanel);
+      probResetButton.addEventListener("click", resetProbWeights);
       chordTypeButtons.forEach(button => {
         button.addEventListener("click", () => toggleChordType(button.dataset.chordType));
       });
@@ -1038,6 +1290,8 @@
           running ? stop() : start();
         }
       });
+
+      buildProbGrid();
 
       // Seed the "next chord" preview before the metronome is ever started.
       queuedChord = createRandomChord();
