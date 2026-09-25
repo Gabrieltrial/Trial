@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Scale Recognizer</title>
+<style>
+  :root {
+    --background: #171b26;
+    --panel: #232838;
+    --accent: #aee9df;
+    --accent-strong: #549d96;
+    --muted: #8993ad;
+    --ink: #eef1fa;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 0%, #232a3d, var(--background) 65%);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 24px;
+    padding-top: calc(24px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+
+  main { width: min(92vw, 460px); text-align: center; }
+
+  h1 {
+    margin: 0 0 18px;
+    font-size: 1.7rem;
+    font-weight: 800;
+    letter-spacing: .01em;
+  }
+
+  .panel {
+    border-radius: 26px;
+    padding: 22px 22px 26px;
+    background: linear-gradient(160deg, #3c3c3c, #1a1a1a);
+    border: 1px solid rgba(255,255,255,.08);
+    box-shadow: 0 24px 60px rgba(0,0,0,.45);
+  }
+
+  .instrument-row { display: flex; justify-content: center; margin-bottom: 16px; }
+
+  button.secondary {
+    min-height: 40px;
+    padding: 0 18px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.2);
+    background: #30394f;
+    color: var(--ink);
+    font-size: .92rem;
+    font-weight: 650;
+    cursor: pointer;
+  }
+
+  button.secondary:hover { background: #3d4965; }
+  button.secondary.selected { background: #2f7d4f; border-color: var(--accent); color: #eafff2; }
+
+  .live-face {
+    background: radial-gradient(circle at 50% 25%, #f6efdc, #ddcfa8 85%);
+    border-radius: 18px;
+    padding: 16px 12px;
+    box-shadow: inset 0 3px 14px rgba(0,0,0,.4), 0 3px 6px rgba(0,0,0,.35);
+  }
+
+  .live-label {
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: #6b6b6b;
+  }
+
+  .live-note {
+    font-size: 2.4rem;
+    font-weight: 800;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color: #2b2b2b;
+    line-height: 1.1;
+  }
+
+  .sequence-box {
+    margin-top: 16px;
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.08);
+    min-height: 2.6em;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .95rem;
+    color: var(--accent);
+    word-spacing: .3em;
+    line-height: 1.5;
+  }
+
+  .sequence-box.empty { color: var(--muted); font-family: inherit; font-size: .85rem; }
+
+  .controls-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+  }
+
+  .mic-btn {
+    flex: 1;
+    min-height: 54px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.2);
+    background: #30394f;
+    color: var(--ink);
+    font-size: 1rem;
+    font-weight: 650;
+    cursor: pointer;
+  }
+
+  .mic-btn:hover { background: #3d4965; }
+  .mic-btn:active { transform: scale(.98); }
+  .mic-btn.selected { background: #2f7d4f; border-color: var(--accent); color: #eafff2; }
+
+  #clear {
+    flex: none;
+    width: 84px;
+    min-height: 54px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.2);
+    background: #30394f;
+    color: var(--ink);
+    font-size: .9rem;
+    cursor: pointer;
+  }
+
+  #clear:hover { background: #3d4965; }
+
+  .status {
+    margin-top: 12px;
+    font-size: .8rem;
+    color: var(--muted);
+    min-height: 1.2em;
+  }
+
+  .result {
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 14px;
+    background: rgba(174, 233, 223, .08);
+    border: 1px solid rgba(174, 233, 223, .35);
+  }
+
+  .result[hidden] { display: none; }
+
+  .result-title {
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .result-value {
+    margin-top: 4px;
+    font-size: 1.3rem;
+    font-weight: 800;
+    color: var(--accent);
+  }
+
+  .hint {
+    margin-top: 12px;
+    font-size: .68rem;
+    color: var(--muted);
+    opacity: .75;
+  }
+</style>
+</head>
+<body>
+  <main>
+    <h1>Scale Recognizer</h1>
+    <div class="panel">
+      <div class="instrument-row">
+        <button id="instrument" class="secondary selected" type="button" aria-pressed="true">Instrument: Bb</button>
+      </div>
+
+      <div class="live-face">
+        <div class="live-label">Listening</div>
+        <div class="live-note" id="liveNote">—</div>
+      </div>
+
+      <div class="sequence-box empty" id="sequenceBox">Play a scale, one note at a time…</div>
+
+      <div class="controls-row">
+        <button id="toggle" class="mic-btn" type="button" aria-pressed="false">🎤 Tap to listen</button>
+        <button id="clear" type="button">Clear</button>
+      </div>
+
+      <div class="status" id="status">Filters out quiet background noise automatically</div>
+
+      <div class="result" id="result" hidden>
+        <div class="result-title">Detected</div>
+        <div class="result-value" id="resultValue">—</div>
+      </div>
+    </div>
+    <p class="hint">If nothing happens when you tap the mic, try opening this page in its own browser tab (mic access can be blocked inside embedded previews). Play the scale slowly, one clear note at a time, starting and ending on the tonic.</p>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const instrumentButton = document.querySelector("#instrument");
+      const liveNoteDisplay = document.querySelector("#liveNote");
+      const sequenceBox = document.querySelector("#sequenceBox");
+      const toggleButton = document.querySelector("#toggle");
+      const clearButton = document.querySelector("#clear");
+      const statusDisplay = document.querySelector("#status");
+      const resultBox = document.querySelector("#result");
+      const resultValue = document.querySelector("#resultValue");
+
+      const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
+      // Same transposing-instrument convention as Chord Practice: the
+      // microphone always hears the actual (concert) pitch; what's shown is
+      // that pitch written for the selected instrument.
+      const instruments = [
+        { label: "C", writtenOffset: 0 },
+        { label: "Bb", writtenOffset: 2 },
+        { label: "Eb", writtenOffset: 9 }
+      ];
+      let instrumentIndex = 1; // default: Bb
+
+      // The six scales this tool can recognize, as semitone intervals from
+      // the root (root always included as 0).
+      const SCALES = [
+        { name: "Major", intervals: [0, 2, 4, 5, 7, 9, 11] },
+        { name: "Mixolydian", intervals: [0, 2, 4, 5, 7, 9, 10] },
+        { name: "Dorian", intervals: [0, 2, 3, 5, 7, 9, 10] },
+        { name: "Melodic minor", intervals: [0, 2, 3, 5, 7, 9, 11] },
+        { name: "Harmonic minor", intervals: [0, 2, 3, 5, 7, 8, 11] },
+        { name: "Mixolydian \u266d9 \u266d13", intervals: [0, 1, 4, 5, 7, 8, 10] }
+      ];
+
+      let audioContext = null;
+      let analyser = null;
+      let micStream = null;
+      let running = false;
+      let rafId = null;
+
+      // Adaptive noise-floor gate, same approach as the Afinador tuner: only
+      // a signal clearly louder than the recent ambient level counts as a
+      // note; quieter background sound (which could itself be musical) is
+      // filtered out automatically.
+      let noiseFloor = 0.01;
+      const ABSOLUTE_SILENCE = 0.0025;
+      const SIGNAL_ABOVE_FLOOR_RATIO = 2.3;
+      const FLOOR_ADAPT_RATE = 0.08;
+
+      // A note only gets appended to the captured sequence once the same
+      // pitch has been seen for several consecutive frames, so brief
+      // glissando between notes or a stray glitch never counts as a note.
+      const STABLE_FRAMES_REQUIRED = 4;
+      // If nothing is heard for this long after at least 3 notes have been
+      // captured, assume the scale is finished and analyze automatically.
+      const SILENCE_TIMEOUT_MS = 1600;
+
+      let capturedMidiNotes = [];
+      let candidateMidi = null;
+      let candidateStableFrames = 0;
+      let lastAppendedMidi = null;
+      let lastSoundAt = 0;
+
+      function updateNoiseFloor(rms) {
+        const target = Math.max(rms, ABSOLUTE_SILENCE);
+        noiseFloor += (target - noiseFloor) * FLOOR_ADAPT_RATE;
+      }
+
+      // Classic autocorrelation pitch detector (ACF2+), identical approach to
+      // the Afinador tuner.
+      function autoCorrelate(buffer, sampleRate) {
+        const size = buffer.length;
+        let rms = 0;
+        for (let i = 0; i < size; i += 1) rms += buffer[i] * buffer[i];
+        rms = Math.sqrt(rms / size);
+
+        if (rms < ABSOLUTE_SILENCE || rms < noiseFloor * SIGNAL_ABOVE_FLOOR_RATIO) {
+          updateNoiseFloor(rms);
+          return -1;
+        }
+
+        const threshold = 0.2;
+        let start = 0;
+        let end = size - 1;
+        for (let i = 0; i < size / 2; i += 1) {
+          if (Math.abs(buffer[i]) < threshold) { start = i; break; }
+        }
+        for (let i = 1; i < size / 2; i += 1) {
+          if (Math.abs(buffer[size - i]) < threshold) { end = size - i; break; }
+        }
+        const trimmed = buffer.slice(start, end);
+        const n = trimmed.length;
+        if (n < 8) return -1;
+
+        const correlation = new Array(n).fill(0);
+        for (let lag = 0; lag < n; lag += 1) {
+          for (let i = 0; i < n - lag; i += 1) {
+            correlation[lag] += trimmed[i] * trimmed[i + lag];
+          }
+        }
+
+        let d = 0;
+        while (d < n - 1 && correlation[d] > correlation[d + 1]) d += 1;
+
+        let bestLag = -1;
+        let bestValue = -Infinity;
+        for (let i = d; i < n; i += 1) {
+          if (correlation[i] > bestValue) { bestValue = correlation[i]; bestLag = i; }
+        }
+        if (bestLag <= 0) return -1;
+
+        const prev = correlation[bestLag - 1] ?? correlation[bestLag];
+        const curr = correlation[bestLag];
+        const next = correlation[bestLag + 1] ?? correlation[bestLag];
+        const a = (prev + next - 2 * curr) / 2;
+        const b = (next - prev) / 2;
+        const refinedLag = a ? bestLag - b / (2 * a) : bestLag;
+
+        const frequency = sampleRate / refinedLag;
+        if (!Number.isFinite(frequency) || frequency < 50 || frequency > 1500) return -1;
+        return frequency;
+      }
+
+      function writtenMidi(concertMidi) {
+        return concertMidi + instruments[instrumentIndex].writtenOffset;
+      }
+
+      function noteNameFor(concertMidi) {
+        const midi = writtenMidi(concertMidi);
+        const pitchClass = ((midi % 12) + 12) % 12;
+        const octave = Math.floor(midi / 12) - 1;
+        return `${NOTE_NAMES[pitchClass]}${octave}`;
+      }
+
+      function renderSequence() {
+        if (capturedMidiNotes.length === 0) {
+          sequenceBox.textContent = "Play a scale, one note at a time…";
+          sequenceBox.classList.add("empty");
+          return;
+        }
+        sequenceBox.classList.remove("empty");
+        sequenceBox.textContent = capturedMidiNotes.map(noteNameFor).join(" ");
+      }
+
+      function appendNote(midi) {
+        capturedMidiNotes.push(midi);
+        renderSequence();
+      }
+
+      function resetCapture() {
+        capturedMidiNotes = [];
+        candidateMidi = null;
+        candidateStableFrames = 0;
+        lastAppendedMidi = null;
+        renderSequence();
+      }
+
+      function clearAll() {
+        resetCapture();
+        resultBox.hidden = true;
+      }
+
+      // Scores each candidate scale by how many of the notes actually played
+      // (as intervals from the root, ignoring octave and repeats) belong to
+      // it, penalizing missing/extra notes lightly so one imperfect or
+      // mis-heard note doesn't derail the match.
+      function identifyScale(midiNotes) {
+        const root = midiNotes[0];
+        const last = midiNotes[midiNotes.length - 1];
+        const ascending = last >= root;
+        const playedIntervals = new Set(midiNotes.map(m => (((m - root) % 12) + 12) % 12));
+
+        let best = null;
+        SCALES.forEach(scale => {
+          const scaleSet = new Set(scale.intervals);
+          let matches = 0;
+          playedIntervals.forEach(iv => { if (scaleSet.has(iv)) matches += 1; });
+          const missing = scale.intervals.filter(iv => !playedIntervals.has(iv)).length;
+          const extra = [...playedIntervals].filter(iv => !scaleSet.has(iv)).length;
+          const score = matches - 0.5 * missing - 0.5 * extra;
+          if (!best || score > best.score) best = { scale, score };
+        });
+
+        return {
+          rootName: noteNameFor(root).replace(/\d+$/, ""),
+          scaleName: best.scale.name,
+          ascending
+        };
+      }
+
+      function showResult() {
+        if (capturedMidiNotes.length < 3) {
+          resultValue.textContent = "Not enough notes captured — try again, one note at a time";
+          resultBox.hidden = false;
+          return;
+        }
+        const { rootName, scaleName, ascending } = identifyScale(capturedMidiNotes);
+        resultValue.textContent = `${rootName} ${scaleName} — ${ascending ? "ascending" : "descending"}`;
+        resultBox.hidden = false;
+      }
+
+      function loop() {
+        if (!running || !analyser) return;
+        const buffer = new Float32Array(analyser.fftSize);
+        analyser.getFloatTimeDomainData(buffer);
+        const frequency = autoCorrelate(buffer, audioContext.sampleRate);
+        const now = Date.now();
+
+        if (frequency !== -1) {
+          lastSoundAt = now;
+          const midiFloat = 69 + 12 * Math.log2(frequency / 440);
+          const midi = Math.round(midiFloat);
+          liveNoteDisplay.textContent = noteNameFor(midi);
+          statusDisplay.textContent = "Listening…";
+
+          if (candidateMidi === midi) {
+            candidateStableFrames += 1;
+          } else {
+            candidateMidi = midi;
+            candidateStableFrames = 1;
+          }
+          if (candidateStableFrames === STABLE_FRAMES_REQUIRED && midi !== lastAppendedMidi) {
+            appendNote(midi);
+            lastAppendedMidi = midi;
+          }
+        } else {
+          liveNoteDisplay.textContent = "—";
+        }
+
+        if (capturedMidiNotes.length >= 3 && now - lastSoundAt > SILENCE_TIMEOUT_MS) {
+          showResult();
+          resetCapture();
+          statusDisplay.textContent = "Ready for another scale — keep playing";
+        }
+
+        rafId = window.requestAnimationFrame(loop);
+      }
+
+      async function start() {
+        if (window.isSecureContext === false) {
+          statusDisplay.textContent = "Mic needs a secure page (https) — try opening this page in its own browser tab";
+          return;
+        }
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          statusDisplay.textContent = "Microphone not available in this browser/frame";
+          return;
+        }
+        toggleButton.textContent = "🎤 Requesting access…";
+        statusDisplay.textContent = "Requesting microphone access…";
+        try {
+          micStream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }
+          });
+        } catch (error) {
+          const name = error && error.name;
+          if (name === "NotAllowedError" || name === "SecurityError") {
+            statusDisplay.textContent = "Microphone blocked — check the site/browser permission, or open this page in its own tab";
+          } else if (name === "NotFoundError") {
+            statusDisplay.textContent = "No microphone found on this device";
+          } else {
+            statusDisplay.textContent = `Couldn't access the microphone (${name || "unknown error"})`;
+          }
+          toggleButton.textContent = "🎤 Tap to listen";
+          return;
+        }
+
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(micStream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+
+        noiseFloor = 0.01;
+        clearAll();
+        running = true;
+        lastSoundAt = Date.now();
+        toggleButton.textContent = "🎤 Listening — tap to stop";
+        toggleButton.classList.add("selected");
+        toggleButton.setAttribute("aria-pressed", "true");
+        statusDisplay.textContent = "Listening…";
+        loop();
+      }
+
+      function stop() {
+        if (capturedMidiNotes.length > 0) showResult();
+        running = false;
+        if (rafId) window.cancelAnimationFrame(rafId);
+        rafId = null;
+        if (micStream) {
+          micStream.getTracks().forEach(track => track.stop());
+          micStream = null;
+        }
+        analyser = null;
+        if (audioContext) {
+          audioContext.close && audioContext.close();
+          audioContext = null;
+        }
+        toggleButton.textContent = "🎤 Tap to listen";
+        toggleButton.classList.remove("selected");
+        toggleButton.setAttribute("aria-pressed", "false");
+        statusDisplay.textContent = "Filters out quiet background noise automatically";
+        liveNoteDisplay.textContent = "—";
+        resetCapture();
+      }
+
+      function toggle() {
+        if (running) stop(); else start();
+      }
+
+      function cycleInstrument() {
+        instrumentIndex = (instrumentIndex + 1) % instruments.length;
+        instrumentButton.textContent = `Instrument: ${instruments[instrumentIndex].label}`;
+        renderSequence();
+      }
+
+      toggleButton.addEventListener("click", toggle);
+      instrumentButton.addEventListener("click", cycleInstrument);
+      clearButton.addEventListener("click", clearAll);
+      window.addEventListener("beforeunload", () => { if (running) stop(); });
+    })();
+  </script>
+</body>
+</html>
