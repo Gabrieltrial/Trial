@@ -262,18 +262,53 @@
       const FLOOR_ADAPT_RATE = 0.08;
 
       // A note only gets appended to the captured sequence once the same
-      // pitch has been seen for several consecutive frames, so brief
-      // glissando between notes or a stray glitch never counts as a note.
-      const STABLE_FRAMES_REQUIRED = 4;
+      // pitch has held for this long (in real time, not a frame count — rAF
+      // timing isn't perfectly regular), so a brief glissando between notes
+      // or a stray glitch never counts as a note.
+      const STABLE_DURATION_MS = 110;
+      // A jump bigger than this from the last confirmed note is either a big
+      // scale skip or, more often, a pitch-detector octave error — either
+      // way it's asked to hold noticeably longer before being trusted.
+      const MEDIUM_JUMP_SEMITONES = 4;
+      const LARGE_JUMP_SEMITONES = 15;
+      // A scale is played with a fairly steady pulse, so once we've heard a
+      // couple of notes we know roughly how far apart they should be; a
+      // "new note" arriving much sooner than that is more likely noise than
+      // a real note played twice as fast.
+      const DEFAULT_MIN_GAP_MS = 140;
+      const ONSET_HISTORY_SIZE = 4;
+      // A scale is usually around 8 notes (7 degrees + the octave), but this
+      // is just a generous safety ceiling — not a strict cutoff — so a scale
+      // with 9 or a few more notes still gets captured in full. Reaching it
+      // analyzes immediately instead of waiting for silence; shorter scales
+      // are still completed via the silence timeout below.
+      const MAX_SCALE_NOTES = 13;
       // If nothing is heard for this long after at least 3 notes have been
-      // captured, assume the scale is finished and analyze automatically.
+      // captured, assume the scale is finished (used for shorter attempts
+      // that never reach the 8-note cap).
       const SILENCE_TIMEOUT_MS = 1600;
 
       let capturedMidiNotes = [];
       let candidateMidi = null;
-      let candidateStableFrames = 0;
+      let candidateSince = 0;
       let lastAppendedMidi = null;
+      let lastOnsetAt = 0;
+      let onsetIntervals = [];
       let lastSoundAt = 0;
+
+      function requiredStabilityFor(midi) {
+        if (lastAppendedMidi === null) return STABLE_DURATION_MS;
+        const jump = Math.abs(midi - lastAppendedMidi);
+        if (jump > LARGE_JUMP_SEMITONES) return STABLE_DURATION_MS * 2.2;
+        if (jump > MEDIUM_JUMP_SEMITONES) return STABLE_DURATION_MS * 1.5;
+        return STABLE_DURATION_MS;
+      }
+
+      function estimatedMinGap() {
+        if (onsetIntervals.length === 0) return DEFAULT_MIN_GAP_MS;
+        const avg = onsetIntervals.reduce((a, b) => a + b, 0) / onsetIntervals.length;
+        return Math.max(140, avg * 0.5);
+      }
 
       function updateNoiseFloor(rms) {
         const target = Math.max(rms, ABSOLUTE_SILENCE);
@@ -356,16 +391,31 @@
         sequenceBox.textContent = capturedMidiNotes.map(noteNameFor).join(" ");
       }
 
-      function appendNote(midi) {
+      function appendNote(midi, now) {
+        if (lastOnsetAt) {
+          onsetIntervals.push(now - lastOnsetAt);
+          if (onsetIntervals.length > ONSET_HISTORY_SIZE) onsetIntervals.shift();
+        }
+        lastOnsetAt = now;
+        lastAppendedMidi = midi;
         capturedMidiNotes.push(midi);
         renderSequence();
+        if (capturedMidiNotes.length >= MAX_SCALE_NOTES) {
+          showResult();
+          resetCapture();
+          statusDisplay.textContent = "Scale complete — ready for another";
+        } else {
+          statusDisplay.textContent = `Listening… (${capturedMidiNotes.length}/${MAX_SCALE_NOTES} notes)`;
+        }
       }
 
       function resetCapture() {
         capturedMidiNotes = [];
         candidateMidi = null;
-        candidateStableFrames = 0;
+        candidateSince = 0;
         lastAppendedMidi = null;
+        lastOnsetAt = 0;
+        onsetIntervals = [];
         renderSequence();
       }
 
@@ -425,23 +475,31 @@
           const midiFloat = 69 + 12 * Math.log2(frequency / 440);
           const midi = Math.round(midiFloat);
           liveNoteDisplay.textContent = noteNameFor(midi);
-          statusDisplay.textContent = "Listening…";
 
-          if (candidateMidi === midi) {
-            candidateStableFrames += 1;
-          } else {
+          if (candidateMidi !== midi) {
             candidateMidi = midi;
-            candidateStableFrames = 1;
+            candidateSince = now;
           }
-          if (candidateStableFrames === STABLE_FRAMES_REQUIRED && midi !== lastAppendedMidi) {
-            appendNote(midi);
-            lastAppendedMidi = midi;
+
+          const heldFor = now - candidateSince;
+          const readyToAppend = midi !== lastAppendedMidi
+            && capturedMidiNotes.length < MAX_SCALE_NOTES
+            && heldFor >= requiredStabilityFor(midi)
+            && (now - lastOnsetAt) >= estimatedMinGap();
+
+          if (readyToAppend) {
+            appendNote(midi, now);
+          } else if (capturedMidiNotes.length < MAX_SCALE_NOTES) {
+            statusDisplay.textContent = capturedMidiNotes.length > 0
+              ? `Listening… (${capturedMidiNotes.length}/${MAX_SCALE_NOTES} notes)`
+              : "Listening…";
           }
         } else {
           liveNoteDisplay.textContent = "—";
         }
 
-        if (capturedMidiNotes.length >= 3 && now - lastSoundAt > SILENCE_TIMEOUT_MS) {
+        if (capturedMidiNotes.length >= 3 && capturedMidiNotes.length < MAX_SCALE_NOTES
+            && now - lastSoundAt > SILENCE_TIMEOUT_MS) {
           showResult();
           resetCapture();
           statusDisplay.textContent = "Ready for another scale — keep playing";
