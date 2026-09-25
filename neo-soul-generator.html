@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Neo Soul Generator</title>
+<style>
+  :root {
+    --background: #171b26;
+    --panel: #232838;
+    --accent: #f0c987;
+    --accent-strong: #d9a44e;
+    --muted: #8993ad;
+    --ink: #eef1fa;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+
+  body {
+    margin: 0;
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 0%, #2a2438, var(--background) 65%);
+    color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    padding: 24px;
+    padding-top: calc(24px + env(safe-area-inset-top, 0px));
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+
+  main { width: min(92vw, 460px); text-align: center; }
+
+  h1 {
+    margin: 0 0 6px;
+    font-size: 1.7rem;
+    font-weight: 800;
+    letter-spacing: .01em;
+  }
+
+  .subtitle {
+    margin: 0 0 18px;
+    font-size: .8rem;
+    color: var(--muted);
+  }
+
+  .panel {
+    border-radius: 26px;
+    padding: 22px 22px 26px;
+    background: linear-gradient(160deg, #3c3630, #1a1712);
+    border: 1px solid rgba(255,255,255,.08);
+    box-shadow: 0 24px 60px rgba(0,0,0,.45);
+  }
+
+  .display-face {
+    background: radial-gradient(circle at 50% 25%, #2b2620, #17140f 85%);
+    border-radius: 18px;
+    padding: 22px 12px;
+    box-shadow: inset 0 3px 14px rgba(0,0,0,.5), 0 3px 6px rgba(0,0,0,.35);
+  }
+
+  .chord-label {
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .chord-name {
+    font-size: 3rem;
+    font-weight: 800;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    color: var(--accent);
+    line-height: 1.15;
+    min-height: 1.3em;
+  }
+
+  .progression-name {
+    margin-top: 4px;
+    font-size: .78rem;
+    color: var(--muted);
+    min-height: 1.2em;
+  }
+
+  .beat-dots {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-top: 18px;
+  }
+
+  .beat-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.15);
+    transition: background .05s ease, transform .05s ease;
+  }
+
+  .beat-dot.active {
+    background: var(--accent);
+    transform: scale(1.25);
+  }
+
+  .generate-btn {
+    width: 100%;
+    min-height: 58px;
+    margin-top: 20px;
+    border-radius: 14px;
+    border: 1px solid rgba(255,255,255,.2);
+    background: #4a3d2a;
+    color: var(--ink);
+    font-size: 1.05rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  .generate-btn:hover { background: #5a4a33; }
+  .generate-btn:active { transform: scale(.98); }
+  .generate-btn.playing { background: #7d5a2f; border-color: var(--accent); color: #fff3e0; }
+
+  .status {
+    margin-top: 12px;
+    font-size: .78rem;
+    color: var(--muted);
+    min-height: 1.2em;
+  }
+
+  .hint {
+    margin-top: 14px;
+    font-size: .68rem;
+    color: var(--muted);
+    opacity: .75;
+  }
+
+  .patterns-panel {
+    margin-top: 16px;
+    padding: 18px 20px;
+    text-align: left;
+  }
+
+  .pattern-list {
+    list-style: none;
+    margin: 8px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 6px;
+  }
+
+  .pattern-list li {
+    font-size: .82rem;
+    color: var(--ink);
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: rgba(255,255,255,.04);
+  }
+
+  .pattern-groove {
+    color: var(--muted);
+    font-size: .76rem;
+  }
+</style>
+</head>
+<body>
+  <main>
+    <h1>Neo Soul Generator</h1>
+    <p class="subtitle">Glasper-inspired progressions &middot; rootless voicings &middot; swung groove</p>
+    <div class="panel">
+      <div class="display-face">
+        <div class="chord-label">Now playing</div>
+        <div class="chord-name" id="chordName">—</div>
+        <div class="progression-name" id="progressionName"></div>
+      </div>
+      <div class="beat-dots" id="beatDots">
+        <span class="beat-dot"></span><span class="beat-dot"></span><span class="beat-dot"></span><span class="beat-dot"></span>
+      </div>
+      <button id="generate" class="generate-btn" type="button" aria-pressed="false">Generate</button>
+      <div class="status" id="status">Tap Generate for a new neo-soul progression</div>
+    </div>
+    <p class="hint">Chord names are shown transposed up a whole step (written for a B&#9837; instrument), while the piano plays at concert pitch.</p>
+
+    <div class="panel patterns-panel">
+      <div class="chord-label">Patterns in the pool</div>
+      <ul class="pattern-list" id="patternList"></ul>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const chordNameEl = document.querySelector("#chordName");
+      const progressionNameEl = document.querySelector("#progressionName");
+      const generateButton = document.querySelector("#generate");
+      const statusEl = document.querySelector("#status");
+      const beatDots = [...document.querySelectorAll(".beat-dot")];
+      const patternListEl = document.querySelector("#patternList");
+
+      const NOTE_NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "G#", "A", "Bb", "B"];
+      const DISPLAY_TRANSPOSE = 2; // "up a whole step" — same convention as a Bb instrument
+
+      // Extended chord qualities used throughout — neo-soul/Glasper harmony
+      // avoids plain triads; everything is a 9th, 11th, or 13th at minimum.
+      // Intervals are absolute semitones from the root (so 14 = 9th an
+      // octave up, 21 = 13th, etc.), which also fixes their register.
+      const QUALITIES = {
+        maj9: { symbol: "maj9", intervals: [0, 4, 7, 11, 14] },
+        maj7s11: { symbol: "maj7(#11)", intervals: [0, 4, 7, 11, 18] },
+        six9: { symbol: "6/9", intervals: [0, 4, 7, 9, 14] },
+        m9: { symbol: "m9", intervals: [0, 3, 7, 10, 14] },
+        m11: { symbol: "m11", intervals: [0, 3, 7, 10, 14, 17] },
+        m6_9: { symbol: "m6/9", intervals: [0, 3, 7, 9, 14] },
+        dom9: { symbol: "9", intervals: [0, 4, 7, 10, 14] },
+        dom13: { symbol: "13", intervals: [0, 4, 7, 10, 14, 21] },
+        dom7b9: { symbol: "7(\u266d9)", intervals: [0, 4, 7, 10, 13] },
+        dom9sus: { symbol: "9sus4", intervals: [0, 5, 7, 10, 14] },
+        quartal: { symbol: "(4ths)", intervals: [0, 5, 10, 15] }
+      };
+
+      // Named groove profiles: each is a distinct drum feel (kick-pattern
+      // pool, backbeat placement, hi-hat density, swing amount, and ghost-
+      // note frequency). Every progression below picks one, so the rhythm
+      // section changes character along with the harmony instead of one
+      // groove being reused everywhere.
+      const GROOVES = {
+        dillaPocket: {
+          name: "Dilla pocket",
+          kickPatterns: [new Set([0, 10]), new Set([0, 6, 10]), new Set([0, 3, 10]), new Set([0, 10, 13])],
+          snareSteps: new Set([4, 12]),
+          hihatEvery: 2,
+          swingAmount: 0.58,
+          ghostChance: 0.06
+        },
+        halfTimeLaidBack: {
+          name: "Half-time laid back",
+          kickPatterns: [new Set([0]), new Set([0, 6]), new Set([0, 9])],
+          snareSteps: new Set([8]),
+          hihatEvery: 4,
+          swingAmount: 0.55,
+          ghostChance: 0.04
+        },
+        syncopatedBroken: {
+          name: "Syncopated / broken",
+          kickPatterns: [new Set([0, 3, 10]), new Set([0, 7, 10, 13]), new Set([0, 3, 6, 10])],
+          snareSteps: new Set([4, 12]),
+          hihatEvery: 1,
+          swingAmount: 0.6,
+          ghostChance: 0.1
+        },
+        straightGospel: {
+          name: "Straight soul/gospel",
+          kickPatterns: [new Set([0, 8]), new Set([0, 6, 8])],
+          snareSteps: new Set([4, 12]),
+          hihatEvery: 2,
+          swingAmount: 0.52,
+          ghostChance: 0.03
+        },
+        sparseBallad: {
+          name: "Sparse / atmospheric",
+          kickPatterns: [new Set([0]), new Set([0, 10])],
+          snareSteps: new Set([8]),
+          hihatEvery: 4,
+          swingAmount: 0.55,
+          ghostChance: 0.02
+        },
+        busyFunky: {
+          name: "Busy / funky",
+          kickPatterns: [new Set([0, 3, 6, 10, 13]), new Set([0, 6, 10, 14]), new Set([0, 3, 10, 12])],
+          snareSteps: new Set([4, 10, 12]),
+          hihatEvery: 1,
+          swingAmount: 0.6,
+          ghostChance: 0.12
+        }
+      };
+
+      // Progression "cells", in scale degrees (semitones from the key
+      // center) — a cross-section of real neo-soul/Glasper harmonic moves:
+      // extended ii-V-I-vi turnarounds, static minor-9th vamps, modal
+      // bVII colour chords, a half-step-descending ii-V chain, quartal
+      // planing (McCoy Tyner/Glasper's non-functional stacked 4ths sliding
+      // to a new root), and a V7(b9) resolving to a minor 9 resting point.
+      // Each entry also names which GROOVES profile it plays with.
+      const PROGRESSIONS = [
+        {
+          name: "ii-V-I-vi turnaround",
+          groove: "dillaPocket",
+          cells: [
+            { degree: 2, quality: "m9", bars: 1 },
+            { degree: 7, quality: "dom13", bars: 1 },
+            { degree: 0, quality: "maj9", bars: 1 },
+            { degree: 9, quality: "dom7b9", bars: 1 }
+          ]
+        },
+        {
+          name: "Static minor-9 vamp",
+          groove: "sparseBallad",
+          cells: [
+            { degree: 0, quality: "m9", bars: 2 },
+            { degree: 5, quality: "m9", bars: 2 }
+          ]
+        },
+        {
+          name: "Modal \u266dVII colour",
+          groove: "syncopatedBroken",
+          cells: [
+            { degree: 0, quality: "maj9", bars: 2 },
+            { degree: 10, quality: "maj9", bars: 2 }
+          ]
+        },
+        {
+          name: "Chromatic ii-V descent",
+          groove: "busyFunky",
+          cells: [
+            { degree: 4, quality: "m9", bars: 0.5 },
+            { degree: 9, quality: "dom7b9", bars: 0.5 },
+            { degree: 3, quality: "m9", bars: 0.5 },
+            { degree: 8, quality: "dom7b9", bars: 0.5 },
+            { degree: 2, quality: "m9", bars: 1 },
+            { degree: 7, quality: "dom13", bars: 1 },
+            { degree: 0, quality: "maj9", bars: 2 }
+          ]
+        },
+        {
+          name: "Quartal planing",
+          groove: "sparseBallad",
+          cells: [
+            { degree: 2, quality: "quartal", bars: 1 },
+            { degree: 0, quality: "quartal", bars: 1 },
+            { degree: 2, quality: "quartal", bars: 1 },
+            { degree: 0, quality: "quartal", bars: 1 }
+          ]
+        },
+        {
+          name: "Maj9 - #11 turnaround",
+          groove: "dillaPocket",
+          cells: [
+            { degree: 0, quality: "maj9", bars: 1 },
+            { degree: 5, quality: "maj7s11", bars: 1 },
+            { degree: 4, quality: "m9", bars: 1 },
+            { degree: 9, quality: "dom7b9", bars: 1 }
+          ]
+        },
+        {
+          name: "V(\u266d9) to minor rest",
+          groove: "halfTimeLaidBack",
+          cells: [
+            { degree: 7, quality: "dom7b9", bars: 1 },
+            { degree: 0, quality: "m9", bars: 3 }
+          ]
+        },
+        {
+          name: "9sus loop",
+          groove: "syncopatedBroken",
+          cells: [
+            { degree: 0, quality: "dom9sus", bars: 1 },
+            { degree: 10, quality: "dom9sus", bars: 1 },
+            { degree: 8, quality: "six9", bars: 2 }
+          ]
+        },
+        {
+          // The "Amen"/church cadence (IV-I): soft subdominant-to-tonic
+          // resolution with no dominant tension, a soul/gospel cornerstone
+          // and a defining neo-soul cadential move.
+          name: "Amen (plagal) cadence",
+          groove: "straightGospel",
+          cells: [
+            { degree: 5, quality: "maj9", bars: 2 },
+            { degree: 0, quality: "maj9", bars: 2 }
+          ]
+        },
+        {
+          // Stevie Wonder / classic soul move ("Isn't She Lovely"): tonic,
+          // then the secondary dominant of ii, then ii-V back home.
+          name: "Secondary-dominant turnaround",
+          groove: "busyFunky",
+          cells: [
+            { degree: 0, quality: "maj9", bars: 1 },
+            { degree: 9, quality: "dom7b9", bars: 1 },
+            { degree: 2, quality: "m9", bars: 1 },
+            { degree: 7, quality: "dom13", bars: 1 }
+          ]
+        },
+        {
+          // Smooth stepwise root motion (I-ii-iii-IV), each chord a step
+          // apart with heavy note overlap between shapes — the "loop it for
+          // a whole verse" neo-soul feel.
+          name: "Stepwise ascending loop",
+          groove: "dillaPocket",
+          cells: [
+            { degree: 0, quality: "maj9", bars: 1 },
+            { degree: 2, quality: "m9", bars: 1 },
+            { degree: 4, quality: "m11", bars: 1 },
+            { degree: 5, quality: "maj9", bars: 1 }
+          ]
+        },
+        {
+          // Bluesy triple-plagal chain (bIII-bVII-IV-I) — the same root
+          // movement behind "Jumpin' Jack Flash" and "People in the Front
+          // Row", reharmonized with neo-soul extensions.
+          name: "Blues plagal chain",
+          groove: "straightGospel",
+          cells: [
+            { degree: 3, quality: "dom9", bars: 1 },
+            { degree: 10, quality: "dom9", bars: 1 },
+            { degree: 5, quality: "maj9", bars: 1 },
+            { degree: 0, quality: "maj9", bars: 1 }
+          ]
+        },
+        {
+          // Gospel-rooted vi-IV-I-V: starts on the relative minor before
+          // resolving through the plagal move and out to a suspended V.
+          name: "Gospel vi-IV-I-V",
+          groove: "straightGospel",
+          cells: [
+            { degree: 9, quality: "m9", bars: 1 },
+            { degree: 5, quality: "maj9", bars: 1 },
+            { degree: 0, quality: "maj9", bars: 1 },
+            { degree: 7, quality: "dom9sus", bars: 1 }
+          ]
+        },
+        {
+          // The extended plagal chain behind "Hey Joe" (bVI-bIII-bVI-IV-I),
+          // reharmonized with neo-soul maj9 colour throughout.
+          name: "Extended plagal chain",
+          groove: "halfTimeLaidBack",
+          cells: [
+            { degree: 8, quality: "maj9", bars: 1 },
+            { degree: 3, quality: "maj9", bars: 1 },
+            { degree: 8, quality: "maj9", bars: 1 },
+            { degree: 5, quality: "maj9", bars: 1 },
+            { degree: 0, quality: "maj9", bars: 2 }
+          ]
+        }
+      ];
+
+      const BPM = 86; // a relaxed neo-soul / Dilla-ish pocket
+      const SIXTEENTHS_PER_BAR = 16;
+
+      let audioContext = null;
+      let masterOutput = null;
+      let running = false;
+      let schedulerTimer = null;
+      let current16th = 0;
+      let nextStepTime = 0;
+      let barsElapsedInCell = 0;
+      let cellIndex = 0;
+      let activeProgression = null;
+      let keyRoot = 0;
+      let currentAnchorMidi = 64;
+      let lastDisplayedChord = "";
+      const LOOKAHEAD_MS = 25;
+      const SCHEDULE_AHEAD_S = 0.12;
+
+      function noteNameFor(pitchClass) {
+        return NOTE_NAMES[((pitchClass % 12) + 12) % 12];
+      }
+
+      function secondsPer16th() {
+        return (60 / BPM) / 4;
+      }
+
+      // --- Synthesis -----------------------------------------------------
+
+      function getAudioContext() {
+        if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          masterOutput = audioContext.createDynamicsCompressor();
+          masterOutput.threshold.value = -18;
+          masterOutput.knee.value = 14;
+          masterOutput.ratio.value = 4;
+          masterOutput.attack.value = 0.004;
+          masterOutput.release.value = 0.2;
+          masterOutput.connect(audioContext.destination);
+        }
+        if (audioContext.state === "suspended") audioContext.resume();
+        return audioContext;
+      }
+
+      function midiToFreq(midi) {
+        return 440 * Math.pow(2, (midi - 69) / 12);
+      }
+
+      function playPianoNote(context, midi, time, velocity, duration) {
+        const frequency = midiToFreq(midi);
+        const gain = context.createGain();
+        const filter = context.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(4200, time);
+        filter.frequency.exponentialRampToValueAtTime(1400, time + duration * 0.9);
+        filter.Q.value = 0.4;
+        gain.connect(filter);
+        filter.connect(masterOutput);
+
+        const level = 0.1 * velocity;
+        gain.gain.setValueAtTime(0.0001, time);
+        gain.gain.exponentialRampToValueAtTime(level, time + 0.008);
+        gain.gain.exponentialRampToValueAtTime(level * 0.35, time + duration * 0.4);
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+        [-2.2, 2.2].forEach(detune => {
+          const osc = context.createOscillator();
+          osc.type = "triangle";
+          osc.frequency.value = frequency;
+          osc.detune.value = detune;
+          osc.connect(gain);
+          osc.start(time);
+          osc.stop(time + duration + 0.05);
+        });
+        const osc2 = context.createOscillator();
+        osc2.type = "sine";
+        osc2.frequency.value = frequency / 2;
+        const subGain = context.createGain();
+        subGain.gain.value = 0.35;
+        osc2.connect(subGain).connect(gain);
+        osc2.start(time);
+        osc2.stop(time + duration + 0.05);
+      }
+
+      function playBassNote(context, midi, time, velocity, duration) {
+        const frequency = midiToFreq(midi);
+        const osc = context.createOscillator();
+        const gain = context.createGain();
+        const filter = context.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = 900;
+        filter.Q.value = 0.6;
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(frequency, time);
+        const level = 0.22 * velocity;
+        gain.gain.setValueAtTime(0.0001, time);
+        gain.gain.exponentialRampToValueAtTime(level, time + 0.012);
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+        osc.connect(gain).connect(filter).connect(masterOutput);
+        osc.start(time);
+        osc.stop(time + duration + 0.03);
+      }
+
+      function playKick(context, time, velocity) {
+        const osc = context.createOscillator();
+        const gain = context.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(150, time);
+        osc.frequency.exponentialRampToValueAtTime(48, time + 0.09);
+        const level = 0.9 * velocity;
+        gain.gain.setValueAtTime(level, time);
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.22);
+        osc.connect(gain).connect(masterOutput);
+        osc.start(time);
+        osc.stop(time + 0.24);
+      }
+
+      function playSnare(context, time, velocity) {
+        const length = Math.max(1, Math.floor(context.sampleRate * 0.15));
+        const buffer = context.createBuffer(1, length, context.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < length; i += 1) {
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 1.6);
+        }
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        const bandpass = context.createBiquadFilter();
+        bandpass.type = "bandpass";
+        bandpass.frequency.value = 1800;
+        bandpass.Q.value = 0.7;
+        const gain = context.createGain();
+        gain.gain.value = 0.5 * velocity;
+        source.connect(bandpass).connect(gain).connect(masterOutput);
+        source.start(time);
+
+        const osc = context.createOscillator();
+        const oscGain = context.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(190, time);
+        oscGain.gain.setValueAtTime(0.25 * velocity, time);
+        oscGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.09);
+        osc.connect(oscGain).connect(masterOutput);
+        osc.start(time);
+        osc.stop(time + 0.1);
+      }
+
+      function playHiHat(context, time, velocity, open) {
+        const duration = open ? 0.22 : 0.045;
+        const length = Math.max(1, Math.floor(context.sampleRate * duration));
+        const buffer = context.createBuffer(1, length, context.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < length; i += 1) {
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, open ? 1.2 : 2.6);
+        }
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        const highpass = context.createBiquadFilter();
+        highpass.type = "highpass";
+        highpass.frequency.value = 7000;
+        const gain = context.createGain();
+        gain.gain.value = (open ? 0.16 : 0.13) * velocity;
+        source.connect(highpass).connect(gain).connect(masterOutput);
+        source.start(time);
+      }
+
+      function playCrash(context, time, velocity) {
+        const duration = 1.1;
+        const length = Math.max(1, Math.floor(context.sampleRate * duration));
+        const buffer = context.createBuffer(1, length, context.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < length; i += 1) {
+          data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 0.7);
+        }
+        const source = context.createBufferSource();
+        source.buffer = buffer;
+        const bandpass = context.createBiquadFilter();
+        bandpass.type = "bandpass";
+        bandpass.frequency.value = 6500;
+        bandpass.Q.value = 0.5;
+        const highpass = context.createBiquadFilter();
+        highpass.type = "highpass";
+        highpass.frequency.value = 4500;
+        const gain = context.createGain();
+        gain.gain.setValueAtTime(0.22 * velocity, time);
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+        source.connect(bandpass).connect(highpass).connect(gain).connect(masterOutput);
+        source.start(time);
+      }
+
+      // --- Harmony ---------------------------------------------------------
+
+      // Rootless, close-clustered voicing: places every extension (no root —
+      // the bass carries that) in whichever octave keeps it nearest the
+      // given anchor pitch, so chords "clump" together instead of spreading
+      // out, and successive chords barely move — both hallmarks of
+      // neo-soul/Glasper comping.
+      function voiceRootless(rootPitchClass, intervals, anchorMidi) {
+        const upperIntervals = intervals.filter(iv => iv !== 0);
+        const notes = upperIntervals.map(iv => {
+          const pitchClass = ((rootPitchClass + iv) % 12 + 12) % 12;
+          let candidate = pitchClass + 60;
+          while (candidate - anchorMidi > 6) candidate -= 12;
+          while (anchorMidi - candidate > 6) candidate += 12;
+          return candidate;
+        });
+        return [...new Set(notes)].sort((a, b) => a - b);
+      }
+
+      function buildProgressionPlan(progression, root) {
+        return progression.cells.map(cell => ({
+          rootPitchClass: (root + cell.degree + 120) % 12,
+          quality: cell.quality,
+          bars: cell.bars
+        }));
+      }
+
+      function pickProgression() {
+        const progression = PROGRESSIONS[Math.floor(Math.random() * PROGRESSIONS.length)];
+        const root = Math.floor(Math.random() * 12);
+        const groove = GROOVES[progression.groove];
+        return { progression, root, groove, plan: buildProgressionPlan(progression, root) };
+      }
+
+      function currentCell() {
+        return activeProgression.plan[cellIndex];
+      }
+
+      function advanceCellIfNeeded() {
+        const cell = currentCell();
+        if (barsElapsedInCell >= cell.bars) {
+          cellIndex = (cellIndex + 1) % activeProgression.plan.length;
+          barsElapsedInCell = 0;
+          return true;
+        }
+        return false;
+      }
+
+      function updateChordDisplay() {
+        const cell = currentCell();
+        const writtenPitchClass = (cell.rootPitchClass + DISPLAY_TRANSPOSE) % 12;
+        const symbol = `${noteNameFor(writtenPitchClass)}${QUALITIES[cell.quality].symbol}`;
+        if (symbol !== lastDisplayedChord) {
+          chordNameEl.textContent = symbol;
+          lastDisplayedChord = symbol;
+        }
+        progressionNameEl.textContent = `${activeProgression.progression.name} \u00b7 ${activeProgression.groove.name} groove`;
+      }
+
+      // --- Groove ----------------------------------------------------------
+
+      const FILL_TAIL_STEPS = new Set([10, 12, 13, 14, 15]); // pickup fill into the next phrase
+
+      let currentKickPattern = null;
+      let totalBars = 0;
+      let currentBarIsFill = false;
+
+      function humanizeTiming(baseTime, isSwingPartner) {
+        const swing = activeProgression.groove.swingAmount;
+        const swingOffset = isSwingPartner ? (swing - 0.5) * 2 * secondsPer16th() : 0;
+        const jitter = (Math.random() - 0.5) * 0.012;
+        return baseTime + swingOffset + jitter;
+      }
+
+      function scheduleStep(step, time) {
+        const context = audioContext;
+        const isOffbeat16th = step % 2 === 1;
+        const hitTime = humanizeTiming(time, isOffbeat16th);
+
+        const groove = activeProgression.groove;
+
+        if (step === 0) {
+          totalBars += 1;
+          // A fresh kick-pattern variant every 4-bar phrase, drawn from this
+          // pattern's own groove profile.
+          if ((totalBars - 1) % 4 === 0) {
+            currentKickPattern = groove.kickPatterns[Math.floor(Math.random() * groove.kickPatterns.length)];
+          }
+          // This bar is the 4th of its phrase — its tail gets a pickup fill.
+          currentBarIsFill = totalBars % 4 === 0;
+          // Bigger structural accents every 8 and (more so) every 16 bars.
+          if (totalBars > 1 && (totalBars - 1) % 16 === 0) {
+            playCrash(context, hitTime, 0.95);
+          } else if (totalBars > 1 && (totalBars - 1) % 8 === 0) {
+            playCrash(context, hitTime, 0.62);
+          }
+
+          const cell = currentCell();
+          const anchor = currentAnchorMidi;
+          const voicing = voiceRootless(cell.rootPitchClass, QUALITIES[cell.quality].intervals, anchor);
+          if (voicing.length) {
+            currentAnchorMidi = voicing.reduce((a, b) => a + b, 0) / voicing.length;
+          }
+          const barDuration = secondsPer16th() * SIXTEENTHS_PER_BAR;
+          voicing.forEach(midi => playPianoNote(context, midi, hitTime, 0.85, barDuration * Math.min(2, cell.bars) * 0.95));
+          playBassNote(context, cell.rootPitchClass + 36, hitTime, 1, secondsPer16th() * 3.5);
+        }
+
+        if (step === 6) {
+          const cell = currentCell();
+          const voicing = voiceRootless(cell.rootPitchClass, QUALITIES[cell.quality].intervals, currentAnchorMidi);
+          voicing.forEach(midi => playPianoNote(context, midi, hitTime, 0.4, secondsPer16th() * 2));
+        }
+
+        if (step === 14) {
+          // Chromatic (or scale-wise) approach into the next chord's root,
+          // matching the bass motion that underpins so much neo-soul harmony.
+          const cell = currentCell();
+          const nextCellIndex = barsElapsedInCell + 1 >= cell.bars
+            ? (cellIndex + 1) % activeProgression.plan.length
+            : cellIndex;
+          const nextRoot = activeProgression.plan[nextCellIndex].rootPitchClass;
+          const approach = nextRoot - 1;
+          playBassNote(context, approach + 36, hitTime, 0.7, secondsPer16th() * 1.4);
+        }
+
+        const isFillTail = currentBarIsFill && step >= 10;
+        const kickHit = !isFillTail && currentKickPattern.has(step);
+        const snareHit = isFillTail ? FILL_TAIL_STEPS.has(step) : groove.snareSteps.has(step);
+
+        if (kickHit) playKick(context, hitTime, 0.85 + Math.random() * 0.1);
+        if (snareHit) {
+          const velocity = isFillTail ? 0.5 + (step - 10) * 0.09 : 0.8 + Math.random() * 0.15;
+          playSnare(context, hitTime + 0.012, velocity);
+        } else if (!kickHit && Math.random() < groove.ghostChance) {
+          // A quiet ghost snare for a more human, less mechanical pocket.
+          playSnare(context, hitTime, 0.1 + Math.random() * 0.08);
+        }
+
+        if (step % groove.hihatEvery === 0) {
+          playHiHat(context, hitTime, 0.55 + Math.random() * 0.25, step === 14 && Math.random() < 0.3);
+        }
+
+        if (step === 0) {
+          updateChordDisplay();
+          updateBeatDots(0);
+        } else if (step % 4 === 0) {
+          updateBeatDots(step / 4);
+        }
+      }
+
+      function updateBeatDots(beatIndex) {
+        beatDots.forEach((dot, i) => dot.classList.toggle("active", i === beatIndex));
+      }
+
+      function advanceStep() {
+        nextStepTime += secondsPer16th();
+        current16th += 1;
+        if (current16th >= SIXTEENTHS_PER_BAR) {
+          current16th = 0;
+          barsElapsedInCell += 1;
+          advanceCellIfNeeded();
+        }
+      }
+
+      function scheduler() {
+        if (!running) return;
+        while (nextStepTime < audioContext.currentTime + SCHEDULE_AHEAD_S) {
+          scheduleStep(current16th, nextStepTime);
+          advanceStep();
+        }
+        schedulerTimer = window.setTimeout(scheduler, LOOKAHEAD_MS);
+      }
+
+      // --- Transport ---------------------------------------------------------
+
+      function start() {
+        const context = getAudioContext();
+        activeProgression = pickProgression();
+        cellIndex = 0;
+        barsElapsedInCell = 0;
+        current16th = 0;
+        currentAnchorMidi = 64;
+        lastDisplayedChord = "";
+        totalBars = 0;
+        currentKickPattern = activeProgression.groove.kickPatterns[0];
+        currentBarIsFill = false;
+        nextStepTime = context.currentTime + 0.06;
+        running = true;
+        generateButton.textContent = "Stop";
+        generateButton.classList.add("playing");
+        generateButton.setAttribute("aria-pressed", "true");
+        statusEl.textContent = "Playing…";
+        scheduler();
+      }
+
+      function stop() {
+        running = false;
+        if (schedulerTimer) window.clearTimeout(schedulerTimer);
+        schedulerTimer = null;
+        generateButton.textContent = "Generate";
+        generateButton.classList.remove("playing");
+        generateButton.setAttribute("aria-pressed", "false");
+        statusEl.textContent = "Tap Generate for a new neo-soul progression";
+        chordNameEl.textContent = "—";
+        progressionNameEl.textContent = "";
+        updateBeatDots(-1);
+      }
+
+      function toggle() {
+        if (running) stop(); else start();
+      }
+
+      function renderPatternList() {
+        patternListEl.innerHTML = PROGRESSIONS
+          .map(p => `<li>${p.name} <span class="pattern-groove">\u2014 ${GROOVES[p.groove].name}</span></li>`)
+          .join("");
+      }
+
+      generateButton.addEventListener("click", toggle);
+      window.addEventListener("beforeunload", () => { if (running) stop(); });
+      renderPatternList();
+    })();
+  </script>
+</body>
+</html>
