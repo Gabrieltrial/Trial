@@ -15,13 +15,13 @@
   }
 
   * { box-sizing: border-box; }
-  html, body { height: 100%; }
+  html { min-height: 100%; }
 
   body {
     margin: 0;
-    min-height: 100%;
+    min-height: 100vh;
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
     background: radial-gradient(circle at 50% 0%, #2a2438, var(--background) 65%);
     color: var(--ink);
@@ -194,10 +194,11 @@
         <span class="beat-dot"></span><span class="beat-dot"></span><span class="beat-dot"></span><span class="beat-dot"></span>
       </div>
       <button id="generate" class="generate-btn" type="button" aria-pressed="false">Generate</button>
+      <button id="instrument" class="generate-btn midi-btn" type="button" aria-pressed="true">Instrument: Bb</button>
       <button id="midiToggle" class="generate-btn midi-btn" type="button" aria-pressed="false">MIDI: Off</button>
       <div class="status" id="status">Tap Generate for a new neo-soul progression</div>
     </div>
-    <p class="hint">Chord names are shown transposed up a whole step (written for a B&#9837; instrument), while the piano plays at concert pitch. Drums use real sampled one-shots (CC0-licensed). Optional MIDI output sends piano on channel 1, bass on channel 2, and drums on channel 10 to any MIDI device connected to this computer.</p>
+    <p class="hint">Chord names are shown transposed for the selected instrument (tap "Instrument" to switch between C, B&#9837; and E&#9837;), while the piano always plays at concert pitch. Drums use real sampled one-shots (CC0-licensed). Optional MIDI output sends piano on channel 1, bass on channel 2, and drums on channel 10 to any MIDI device connected to this computer.</p>
 
     <div class="panel patterns-panel">
       <div class="chord-label">Style (tap to choose, or leave on Random)</div>
@@ -212,13 +213,22 @@
       const chordNameEl = document.querySelector("#chordName");
       const progressionNameEl = document.querySelector("#progressionName");
       const generateButton = document.querySelector("#generate");
+      const instrumentButton = document.querySelector("#instrument");
       const midiToggleButton = document.querySelector("#midiToggle");
       const statusEl = document.querySelector("#status");
       const beatDots = [...document.querySelectorAll(".beat-dot")];
       const patternListEl = document.querySelector("#patternList");
 
       const NOTE_NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "G#", "A", "Bb", "B"];
-      const DISPLAY_TRANSPOSE = 2; // "up a whole step" — same convention as a Bb instrument
+      // Same transposing-instrument convention as Chord Practice / Scale
+      // Recognizer: the piano always plays at concert pitch; the chord name
+      // shown is written for whichever instrument is selected.
+      const instruments = [
+        { label: "C", writtenOffset: 0 },
+        { label: "Bb", writtenOffset: 2 },
+        { label: "Eb", writtenOffset: 9 }
+      ];
+      let instrumentIndex = 1; // default: Bb
 
       // Extended chord qualities used throughout — neo-soul/Glasper harmony
       // avoids plain triads; everything is a 9th, 11th, or 13th at minimum.
@@ -473,6 +483,7 @@
       const SCHEDULE_AHEAD_S = 0.12;
 
       let selectedStyleIndex = -1; // -1 = Random
+      let styleChangePending = false;
       let midiEnabled = false;
       let midiOutput = null;
       let audioToPerfOffsetMs = 0;
@@ -752,9 +763,18 @@
         return false;
       }
 
+      function cycleInstrument() {
+        instrumentIndex = (instrumentIndex + 1) % instruments.length;
+        instrumentButton.textContent = `Instrument: ${instruments[instrumentIndex].label}`;
+        if (activeProgression) {
+          lastDisplayedChord = "";
+          updateChordDisplay();
+        }
+      }
+
       function updateChordDisplay() {
         const cell = currentCell();
-        const writtenPitchClass = (cell.rootPitchClass + DISPLAY_TRANSPOSE) % 12;
+        const writtenPitchClass = (cell.rootPitchClass + instruments[instrumentIndex].writtenOffset) % 12;
         const symbol = `${noteNameFor(writtenPitchClass)}${QUALITIES[cell.quality].symbol}`;
         if (symbol !== lastDisplayedChord) {
           chordNameEl.textContent = symbol;
@@ -783,10 +803,25 @@
         const isOffbeat16th = step % 2 === 1;
         const hitTime = humanizeTiming(time, isOffbeat16th);
 
+        if (step === 0) {
+          totalBars += 1;
+          const isPhraseStart = (totalBars - 1) % 4 === 0;
+          // A style change requested from the pattern list while already
+          // playing takes effect right here, at the next 4-bar phrase
+          // boundary — so the current phrase always finishes in its own
+          // style before the new one begins.
+          if (isPhraseStart && styleChangePending && totalBars > 1) {
+            activeProgression = pickProgression();
+            cellIndex = 0;
+            barsElapsedInCell = 0;
+            styleChangePending = false;
+            statusEl.textContent = "Playing…";
+          }
+        }
+
         const groove = activeProgression.groove;
 
         if (step === 0) {
-          totalBars += 1;
           // A fresh kick-pattern variant every 4-bar phrase, drawn from this
           // pattern's own groove profile.
           if ((totalBars - 1) % 4 === 0) {
@@ -957,6 +992,7 @@
 
       function stop() {
         running = false;
+        styleChangePending = false;
         if (schedulerTimer) window.clearTimeout(schedulerTimer);
         schedulerTimer = null;
         generateButton.textContent = "Generate";
@@ -998,10 +1034,15 @@
           [...patternListEl.querySelectorAll(".pattern-item")].forEach(b => {
             b.classList.toggle("selected", b === button);
           });
+          if (running) {
+            styleChangePending = true;
+            statusEl.textContent = `Switching to "${button.textContent.trim()}" after this phrase…`;
+          }
         });
       }
 
       generateButton.addEventListener("click", toggle);
+      instrumentButton.addEventListener("click", cycleInstrument);
       midiToggleButton.addEventListener("click", toggleMidi);
       window.addEventListener("beforeunload", () => { if (running) stop(); });
       renderPatternList();

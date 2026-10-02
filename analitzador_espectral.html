@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analitzador espectral amb feedback</title>
+<style>
+  :root {
+    --bg:#101317; --panel:#181d23; --grid:#2a313a; --text:#d8dee6; --muted:#8a95a3;
+    --line:#4fc3f7; --up:#43c06a; --down:#e5534b;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font:14px/1.4 system-ui,sans-serif; }
+  main { max-width:1100px; margin:0 auto; padding:16px; display:grid; gap:14px; }
+  h1 { font-size:18px; margin:0; font-weight:600; }
+  .panel { background:var(--panel); border-radius:10px; padding:12px; }
+  canvas { width:100%; display:block; border-radius:6px; background:#0c0f12; }
+  #spec { height:340px; }
+  #prof { height:200px; }
+  #diff { height:150px; }
+  .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+  button { font:inherit; color:var(--text); background:#242b33; border:1px solid #333c47;
+           border-radius:8px; padding:8px 14px; cursor:pointer; }
+  button:hover { background:#2d363f; }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  .big { font-size:22px; padding:10px 28px; }
+  #up { border-color:var(--up); } #down { border-color:var(--down); }
+  #up:hover:not(:disabled) { background:rgba(67,192,106,.2); }
+  #down:hover:not(:disabled) { background:rgba(229,83,75,.2); }
+  .muted { color:var(--muted); }
+  #status { min-height:1.4em; }
+  .spacer { flex:1; }
+  .legend span { display:inline-block; width:10px; height:10px; border-radius:2px; margin:0 4px 0 12px; }
+  label { color:var(--muted); }
+  select { background:#242b33; color:var(--text); border:1px solid #333c47; border-radius:6px; padding:4px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Analitzador espectral (20 Hz – 20 kHz)</h1>
+
+  <div class="panel">
+    <div class="row" style="margin-bottom:10px">
+      <button id="start">Activa el micròfon</button>
+      <label>Suavitzat
+        <select id="smooth">
+          <option value="0.5">baix</option>
+          <option value="0.8" selected>mitjà</option>
+          <option value="0.92">alt</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="peak"> mostra pics màxims</label>
+      <span class="spacer"></span>
+      <span class="muted" id="info"></span>
+    </div>
+    <canvas id="spec"></canvas>
+  </div>
+
+  <div class="panel">
+    <div class="row">
+      <button id="up" class="big" disabled title="Tecla ↑">👍</button>
+      <button id="down" class="big" disabled title="Tecla ↓">👎</button>
+      <span class="muted">(també amb les tecles ↑ / ↓)</span>
+      <span class="spacer"></span>
+      <span id="counts" class="muted"></span>
+    </div>
+    <div id="status" class="muted" style="margin-top:8px"></div>
+  </div>
+
+  <div class="panel">
+    <div class="row" style="margin-bottom:8px">
+      <strong>Perfil après (bandes de 1/3 d'octava, nivell relatiu)</strong>
+      <span class="legend muted"><span style="background:var(--up)"></span>m'agrada
+        <span style="background:var(--down)"></span>no m'agrada</span>
+    </div>
+    <canvas id="prof"></canvas>
+    <div style="margin:12px 0 8px"><strong>Diferència: m'agrada − no m'agrada (dB)</strong>
+      <span class="muted"> · verd = més energia en els sons que t'agraden</span></div>
+    <canvas id="diff"></canvas>
+  </div>
+
+  <div class="panel row">
+    <button id="exportJson">Exporta JSON</button>
+    <button id="exportCsv">Exporta CSV</button>
+    <button id="importBtn">Importa JSON</button>
+    <input type="file" id="importFile" accept=".json" hidden>
+    <span class="spacer"></span>
+    <button id="clear">Esborra dades</button>
+  </div>
+</main>
+
+<script>
+(() => {
+  const FMIN = 20, FMAX = 20000, DB_MIN = -110, DB_MAX = 0;
+  const KEY = 'spectral-feedback-v1';
+
+  // 31 bandes de 1/3 d'octava (~20 Hz ... ~20 kHz)
+  const centers = [];
+  for (let k = -17; k <= 13; k++) centers.push(1000 * Math.pow(2, k / 3));
+  const edges = centers.map(c => [c / Math.pow(2, 1/6), c * Math.pow(2, 1/6)]);
+  const NB = centers.length;
+
+  let ctx, analyser, data, peaks, running = false, samples = [];
+
+  const $ = id => document.getElementById(id);
+  const specC = $('spec'), profC = $('prof'), diffC = $('diff');
+
+  // ---------- persistència ----------
+  function load() {
+    try { samples = JSON.parse(localStorage.getItem(KEY)) || []; } catch { samples = []; }
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(samples)); } catch {}
+  }
+
+  // ---------- utilitats de dibuix ----------
+  function fit(c) {
+    const dpr = window.devicePixelRatio || 1;
+    const w = c.clientWidth, h = c.clientHeight;
+    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
+      c.width = Math.round(w * dpr); c.height = Math.round(h * dpr);
+    }
+    const g = c.getContext('2d');
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { g, w, h };
+  }
+  const M = { l: 44, r: 10, t: 8, b: 22 };
+  const xOf = (f, w) => M.l + (Math.log(f / FMIN) / Math.log(FMAX / FMIN)) * (w - M.l - M.r);
+  const yOf = (v, h, lo, hi) => M.t + (1 - (v - lo) / (hi - lo)) * (h - M.t - M.b);
+
+  function axes(g, w, h, lo, hi, step, unit) {
+    g.clearRect(0, 0, w, h);
+    g.font = '11px system-ui'; g.fillStyle = '#8a95a3'; g.strokeStyle = '#2a313a'; g.lineWidth = 1;
+    g.textAlign = 'center';
+    const fs = [20,50,100,200,500,1000,2000,5000,10000,20000];
+    for (const f of fs) {
+      const x = Math.round(xOf(f, w)) + .5;
+      g.beginPath(); g.moveTo(x, M.t); g.lineTo(x, h - M.b); g.stroke();
+      g.fillText(f >= 1000 ? (f / 1000) + 'k' : f, x, h - 7);
+    }
+    for (const f of [30,40,60,70,80,90,300,400,600,700,800,900,3000,4000,6000,7000,8000,9000,15000]) {
+      const x = Math.round(xOf(f, w)) + .5;
+      g.save(); g.globalAlpha = .35;
+      g.beginPath(); g.moveTo(x, M.t); g.lineTo(x, h - M.b); g.stroke(); g.restore();
+    }
+    g.textAlign = 'right';
+    for (let v = Math.ceil(lo / step) * step; v <= hi; v += step) {
+      const y = Math.round(yOf(v, h, lo, hi)) + .5;
+      g.beginPath(); g.moveTo(M.l, y); g.lineTo(w - M.r, y); g.stroke();
+      g.fillText(v + unit, M.l - 5, y + 4);
+    }
+  }
+
+  // ---------- espectre en directe ----------
+  function drawSpec() {
+    const { g, w, h } = fit(specC);
+    axes(g, w, h, DB_MIN, DB_MAX, 10, '');
+    if (running) {
+      analyser.getFloatFrequencyData(data);
+      const nyq = ctx.sampleRate / 2, n = data.length;
+      const i0 = Math.max(1, Math.floor(FMIN / nyq * n));
+      const i1 = Math.min(n - 1, Math.ceil(FMAX / nyq * n));
+
+      const path = (arr) => {
+        g.beginPath();
+        for (let i = i0; i <= i1; i++) {
+          const f = i * nyq / n;
+          const x = xOf(Math.max(f, FMIN), w);
+          const y = yOf(Math.max(DB_MIN, Math.min(DB_MAX, arr[i])), h, DB_MIN, DB_MAX);
+          i === i0 ? g.moveTo(x, y) : g.lineTo(x, y);
+        }
+      };
+
+      if ($('peak').checked) {
+        for (let i = 0; i < n; i++) peaks[i] = Math.max(data[i], peaks[i] - 0.15);
+        g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 1; path(peaks); g.stroke();
+      }
+      path(data);
+      g.strokeStyle = '#4fc3f7'; g.lineWidth = 1.5; g.stroke();
+      g.lineTo(xOf(FMAX, w), h - M.b); g.lineTo(xOf(FMIN, w), h - M.b); g.closePath();
+      const grad = g.createLinearGradient(0, M.t, 0, h - M.b);
+      grad.addColorStop(0, 'rgba(79,195,247,.35)'); grad.addColorStop(1, 'rgba(79,195,247,0)');
+      g.fillStyle = grad; g.fill();
+    } else {
+      g.fillStyle = '#8a95a3'; g.textAlign = 'center'; g.font = '14px system-ui';
+      g.fillText('Prem «Activa el micròfon» per començar', w / 2, h / 2);
+    }
+    g.fillStyle = '#8a95a3'; g.font = '11px system-ui'; g.textAlign = 'left';
+    g.fillText('dBFS', 4, 12);
+    requestAnimationFrame(drawSpec);
+  }
+
+  // ---------- captura d'una mostra (bandes 1/3 d'octava, relativa) ----------
+  function snapshot() {
+    analyser.getFloatFrequencyData(data);
+    const nyq = ctx.sampleRate / 2, n = data.length;
+    const pw = new Array(NB).fill(0);
+    let maxDb = -Infinity;
+    for (let b = 0; b < NB; b++) {
+      const lo = Math.max(1, Math.floor(edges[b][0] / nyq * n));
+      const hi = Math.min(n - 1, Math.max(lo, Math.ceil(edges[b][1] / nyq * n)));
+      let s = 0, c = 0;
+      for (let i = lo; i <= hi; i++) { s += Math.pow(10, data[i] / 10); c++; maxDb = Math.max(maxDb, data[i]); }
+      pw[b] = s / c;
+    }
+    if (maxDb < -75) return null; // massa silenci
+    const bandsDb = pw.map(p => 10 * Math.log10(p + 1e-20));
+    const total = 10 * Math.log10(pw.reduce((a, b) => a + b, 0) + 1e-20);
+    return { bands: bandsDb.map(v => v - total), level: total };
+  }
+
+  function rate(label) {
+    if (!running) return;
+    const s = snapshot();
+    if (!s) { setStatus('Senyal massa feble: no s\'ha desat.'); return; }
+    samples.push({ t: Date.now(), label, bands: s.bands.map(v => +v.toFixed(2)) });
+    save(); refreshStats();
+    setStatus(label > 0 ? '👍 desat' : '👎 desat');
+  }
+
+  let statusTimer;
+  function setStatus(t) {
+    $('status').textContent = t;
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => $('status').textContent = '', 2500);
+  }
+
+  // ---------- perfils apresos ----------
+  function mean(list) {
+    if (!list.length) return null;
+    const m = new Array(NB).fill(0);
+    for (const s of list) for (let i = 0; i < NB; i++) m[i] += s.bands[i];
+    return m.map(v => v / list.length);
+  }
+
+  function refreshStats() {
+    const up = samples.filter(s => s.label > 0), dn = samples.filter(s => s.label < 0);
+    $('counts').textContent = `👍 ${up.length} · 👎 ${dn.length}`;
+    drawProfiles(mean(up), mean(dn));
+  }
+
+  function bandX(i, w) { return xOf(centers[i], w); }
+
+  function drawProfiles(mu, md) {
+    // perfils
+    let { g, w, h } = fit(profC);
+    const all = [...(mu || []), ...(md || [])];
+    let lo = -50, hi = 0;
+    if (all.length) { lo = Math.floor((Math.min(...all) - 3) / 10) * 10; hi = Math.ceil((Math.max(...all) + 3) / 10) * 10; }
+    axes(g, w, h, lo, hi, 10, '');
+    const line = (arr, col) => {
+      if (!arr) return;
+      g.beginPath();
+      arr.forEach((v, i) => { const x = bandX(i, w), y = yOf(v, h, lo, hi); i ? g.lineTo(x, y) : g.moveTo(x, y); });
+      g.strokeStyle = col; g.lineWidth = 2; g.stroke();
+    };
+    line(md, '#e5534b'); line(mu, '#43c06a');
+    if (!mu && !md) { g.fillStyle = '#8a95a3'; g.textAlign = 'center'; g.fillText('Encara no hi ha dades', w / 2, h / 2); }
+
+    // diferència
+    ({ g, w, h } = fit(diffC));
+    if (mu && md) {
+      const d = mu.map((v, i) => v - md[i]);
+      const m = Math.max(3, Math.ceil(Math.max(...d.map(Math.abs))));
+      axes(g, w, h, -m, m, m > 8 ? 5 : 2, '');
+      const y0 = yOf(0, h, -m, m);
+      const bw = Math.max(3, (w - M.l - M.r) / NB * 0.7);
+      d.forEach((v, i) => {
+        const x = bandX(i, w), y = yOf(v, h, -m, m);
+        g.fillStyle = v >= 0 ? '#43c06a' : '#e5534b';
+        g.fillRect(x - bw / 2, Math.min(y, y0), bw, Math.abs(y - y0));
+      });
+    } else {
+      axes(g, w, h, -6, 6, 2, '');
+      g.fillStyle = '#8a95a3'; g.textAlign = 'center';
+      g.fillText('Cal almenys una mostra 👍 i una 👎', w / 2, h / 2);
+    }
+  }
+
+  // ---------- micròfon ----------
+  async function start() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false, channelCount: 1 }
+      });
+      ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const src = ctx.createMediaStreamSource(stream);
+      analyser = ctx.createAnalyser();
+      analyser.fftSize = 32768;
+      analyser.minDecibels = -120; analyser.maxDecibels = 0;
+      analyser.smoothingTimeConstant = parseFloat($('smooth').value);
+      src.connect(analyser);
+      data = new Float32Array(analyser.frequencyBinCount);
+      peaks = new Float32Array(analyser.frequencyBinCount).fill(-200);
+      running = true;
+      $('start').disabled = true; $('up').disabled = false; $('down').disabled = false;
+      $('info').textContent = `${ctx.sampleRate} Hz · resolució ${(ctx.sampleRate / analyser.fftSize).toFixed(2)} Hz/bin`;
+    } catch (e) {
+      setStatus('No s\'ha pogut accedir al micròfon: ' + e.message);
+    }
+  }
+
+  // ---------- import / export ----------
+  function download(name, text, type) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([text], { type }));
+    a.download = name; a.click(); URL.revokeObjectURL(a.href);
+  }
+
+  $('start').onclick = start;
+  $('up').onclick = () => rate(1);
+  $('down').onclick = () => rate(-1);
+  $('smooth').onchange = () => { if (analyser) analyser.smoothingTimeConstant = parseFloat($('smooth').value); };
+  addEventListener('keydown', e => {
+    if (e.key === 'ArrowUp') { e.preventDefault(); rate(1); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); rate(-1); }
+  });
+  $('exportJson').onclick = () => download('feedback_espectral.json',
+    JSON.stringify({ centers: centers.map(c => +c.toFixed(1)), samples }, null, 1), 'application/json');
+  $('exportCsv').onclick = () => {
+    const head = ['timestamp', 'label', ...centers.map(c => c.toFixed(0) + 'Hz')].join(',');
+    const rows = samples.map(s => [new Date(s.t).toISOString(), s.label, ...s.bands].join(','));
+    download('feedback_espectral.csv', [head, ...rows].join('\n'), 'text/csv');
+  };
+  $('importBtn').onclick = () => $('importFile').click();
+  $('importFile').onchange = async e => {
+    try {
+      const j = JSON.parse(await e.target.files[0].text());
+      const arr = Array.isArray(j) ? j : j.samples;
+      if (!Array.isArray(arr) || arr.some(s => !s.bands || s.bands.length !== NB)) throw new Error('format invàlid');
+      samples = samples.concat(arr); save(); refreshStats(); setStatus(`Importades ${arr.length} mostres`);
+    } catch (err) { setStatus('Error important: ' + err.message); }
+    e.target.value = '';
+  };
+  $('clear').onclick = () => {
+    if (confirm('Segur que vols esborrar totes les mostres?')) { samples = []; save(); refreshStats(); }
+  };
+  addEventListener('resize', refreshStats);
+
+  load(); refreshStats(); drawSpec();
+})();
+</script>
+</body>
+</html>
