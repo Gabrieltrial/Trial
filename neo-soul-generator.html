@@ -21,8 +21,9 @@
     margin: 0;
     min-height: 100vh;
     display: flex;
-    align-items: flex-start;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
     background: radial-gradient(circle at 50% 0%, #2a2438, var(--background) 65%);
     color: var(--ink);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -178,9 +179,91 @@
     color: var(--muted);
     font-size: .76rem;
   }
+
+  /* Every chord of the pattern being played, in one horizontal line. */
+  .chord-strip {
+    position: relative;
+    width: min(96vw, 940px);
+    display: flex;
+    gap: 8px;
+    margin-bottom: 18px;
+    padding: 6px 2px 10px;
+    overflow-x: auto;
+  }
+
+  .chord-strip-empty {
+    margin: 0 auto;
+    font-size: .8rem;
+    color: var(--muted);
+  }
+
+  .chord-chip {
+    flex: 0 0 auto;
+    padding: 9px 14px;
+    border-radius: 12px;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--ink);
+    background: rgba(255,255,255,.07);
+    border: 1px solid rgba(255,255,255,.1);
+    white-space: nowrap;
+  }
+
+  .chord-chip:first-child { margin-left: auto; }
+  .chord-chip:last-child { margin-right: auto; }
+  .chord-chip.active { background: var(--accent); color: #2a1f0c; border-color: var(--accent); }
+
+  .tempo-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-top: 18px;
+    font-size: .8rem;
+    color: var(--muted);
+  }
+
+  .tempo-row output { color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  #tempo {
+    width: 100%;
+    margin-top: 6px;
+    accent-color: var(--accent-strong);
+    cursor: pointer;
+  }
+
+  .midi-ch-panel {
+    margin-top: 8px;
+    padding: 10px 14px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.05);
+    border: 1px solid rgba(255,255,255,.08);
+    text-align: left;
+  }
+
+  .midi-ch-panel[hidden] { display: none; }
+
+  .midi-ch-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 0;
+    font-size: .88rem;
+  }
+
+  .midi-ch-row select {
+    min-width: 5.5em;
+    padding: 5px 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,.2);
+    background: #33394a;
+    color: var(--ink);
+    font-size: .88rem;
+  }
 </style>
 </head>
 <body>
+  <div class="chord-strip" id="chordStrip" aria-label="Chords of the current pattern"><span class="chord-strip-empty">The chords of the pattern will show here</span></div>
   <main>
     <h1>Neo Soul Generator</h1>
     <p class="subtitle">Glasper-inspired progressions &middot; rootless voicings &middot; swung groove</p>
@@ -193,12 +276,16 @@
       <div class="beat-dots" id="beatDots">
         <span class="beat-dot"></span><span class="beat-dot"></span><span class="beat-dot"></span><span class="beat-dot"></span>
       </div>
+      <div class="tempo-row"><label for="tempo">Tempo</label><output id="tempoValue" for="tempo">86 BPM</output></div>
+      <input id="tempo" type="range" min="50" max="140" step="1" value="86" aria-label="Tempo in beats per minute">
       <button id="generate" class="generate-btn" type="button" aria-pressed="false">Generate</button>
       <button id="instrument" class="generate-btn midi-btn" type="button" aria-pressed="true">Instrument: Bb</button>
       <button id="midiToggle" class="generate-btn midi-btn" type="button" aria-pressed="false">MIDI: Off</button>
+      <button id="midiChToggle" class="generate-btn midi-btn" type="button" aria-expanded="false">MIDI ch &#9662;</button>
+      <div class="midi-ch-panel" id="midiChPanel" hidden></div>
       <div class="status" id="status">Tap Generate for a new neo-soul progression</div>
     </div>
-    <p class="hint">Chord names are shown transposed for the selected instrument (tap "Instrument" to switch between C, B&#9837; and E&#9837;), while the piano always plays at concert pitch. Drums use real sampled one-shots (CC0-licensed). Optional MIDI output sends piano on channel 1, bass on channel 2, and drums on channel 10 to any MIDI device connected to this computer.</p>
+    <p class="hint">Chord names are shown transposed for the selected instrument (tap "Instrument" to switch between C, B&#9837; and E&#9837;), while the piano always plays at concert pitch. Drums use real sampled one-shots (CC0-licensed). With MIDI turned on, this page stops making any sound and only sends MIDI to the first MIDI device connected to this computer — by default piano on channel 1, bass on 2, strings on 3 and drums on 10; change them under "MIDI ch".</p>
 
     <div class="panel patterns-panel">
       <div class="chord-label">Style (tap to choose, or leave on Random)</div>
@@ -218,6 +305,11 @@
       const statusEl = document.querySelector("#status");
       const beatDots = [...document.querySelectorAll(".beat-dot")];
       const patternListEl = document.querySelector("#patternList");
+      const chordStripEl = document.querySelector("#chordStrip");
+      const tempoSlider = document.querySelector("#tempo");
+      const tempoValueEl = document.querySelector("#tempoValue");
+      const midiChToggle = document.querySelector("#midiChToggle");
+      const midiChPanel = document.querySelector("#midiChPanel");
 
       const NOTE_NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "G#", "A", "Bb", "B"];
       // Same transposing-instrument convention as Chord Practice / Scale
@@ -464,7 +556,7 @@
         }
       ];
 
-      const BPM = 86; // a relaxed neo-soul / Dilla-ish pocket
+      let bpm = 86; // a relaxed neo-soul / Dilla-ish pocket (adjustable with the slider)
       const SIXTEENTHS_PER_BAR = 16;
 
       let audioContext = null;
@@ -491,6 +583,18 @@
       // GM percussion map for the drum channel.
       const MIDI_DRUM_NOTES = { kick: 36, snare: 38, hihatClosed: 42, hihatOpen: 46, crash: 49 };
 
+      // The instruments this page plays, each with a MIDI channel that can be
+      // reassigned from the "MIDI ch" panel (defaults: piano 1, bass 2,
+      // strings 3, drums 10).
+      const MIDI_PARTS = [
+        { key: "piano", label: "Piano" },
+        { key: "bass", label: "Bass" },
+        { key: "drums", label: "Drums" },
+        { key: "strings", label: "Strings" }
+      ];
+      const midiChannels = { piano: 1, bass: 2, drums: 10, strings: 3 };
+      const usedMidiChannels = new Set();
+
       function midiTimeFor(audioTime) {
         return audioTime * 1000 + audioToPerfOffsetMs;
       }
@@ -501,6 +605,7 @@
         const offTime = midiTimeFor(audioTime + duration);
         const vel = Math.max(1, Math.min(127, Math.round(velocity * 127)));
         const statusNibble = channel - 1;
+        usedMidiChannels.add(channel);
         try {
           midiOutput.send([0x90 | statusNibble, note, vel], onTime);
           midiOutput.send([0x80 | statusNibble, note, 0], offTime);
@@ -509,13 +614,30 @@
         }
       }
 
+      // Releases anything still sounding on every channel this page has used
+      // (long string pads and piano chords have their note-offs scheduled
+      // seconds ahead, so Stop would otherwise leave them hanging).
+      function sendAllNotesOff() {
+        if (!midiOutput) return;
+        usedMidiChannels.forEach(channel => {
+          try {
+            midiOutput.send([0xB0 | (channel - 1), 123, 0]);
+            midiOutput.send([0xB0 | (channel - 1), 120, 0]);
+          } catch (err) {
+            // ignore
+          }
+        });
+      }
+
       async function toggleMidi() {
         if (midiEnabled) {
+          sendAllNotesOff();
           midiEnabled = false;
           midiOutput = null;
           midiToggleButton.textContent = "MIDI: Off";
           midiToggleButton.classList.remove("selected");
           midiToggleButton.setAttribute("aria-pressed", "false");
+          statusEl.textContent = running ? "MIDI off — sound is back on this page" : "Tap Generate for a new neo-soul progression";
           return;
         }
         if (!navigator.requestMIDIAccess) {
@@ -534,9 +656,43 @@
           midiToggleButton.textContent = `MIDI: ${midiOutput.name}`;
           midiToggleButton.classList.add("selected");
           midiToggleButton.setAttribute("aria-pressed", "true");
+          statusEl.textContent = "MIDI on — this page is silent, everything goes to the MIDI device";
         } catch (err) {
           statusEl.textContent = "MIDI access was denied";
         }
+      }
+
+      function buildMidiChannelPanel() {
+        midiChPanel.innerHTML = "";
+        MIDI_PARTS.forEach(part => {
+          const row = document.createElement("div");
+          row.className = "midi-ch-row";
+          const label = document.createElement("span");
+          label.textContent = part.label;
+          const select = document.createElement("select");
+          select.dataset.part = part.key;
+          select.setAttribute("aria-label", `${part.label} MIDI channel`);
+          for (let channel = 1; channel <= 16; channel += 1) {
+            const option = document.createElement("option");
+            option.value = String(channel);
+            option.textContent = `ch ${channel}`;
+            select.appendChild(option);
+          }
+          select.value = String(midiChannels[part.key]);
+          select.addEventListener("change", () => {
+            midiChannels[part.key] = Number(select.value);
+          });
+          row.appendChild(label);
+          row.appendChild(select);
+          midiChPanel.appendChild(row);
+        });
+      }
+
+      function toggleMidiChPanel() {
+        const willOpen = midiChPanel.hidden;
+        midiChPanel.hidden = !willOpen;
+        midiChToggle.setAttribute("aria-expanded", String(willOpen));
+        midiChToggle.innerHTML = willOpen ? "MIDI ch &#9652;" : "MIDI ch &#9662;";
       }
 
       function noteNameFor(pitchClass) {
@@ -544,7 +700,7 @@
       }
 
       function secondsPer16th() {
-        return (60 / BPM) / 4;
+        return (60 / bpm) / 4;
       }
 
       // --- Synthesis -----------------------------------------------------
@@ -713,6 +869,68 @@
         playSampleHit(context, "crash", time, 0.55 * velocity, 0.02);
       }
 
+      // Soft string pad: two slightly detuned sawtooths through a gentle
+      // low-pass with a slow swell — the same warm, unobtrusive character as
+      // the strings in Chord Practice.
+      function playStringsNote(context, midi, time, velocity, duration) {
+        const frequency = midiToFreq(midi);
+        const gain = context.createGain();
+        const filter = context.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(1750, time);
+        filter.Q.value = 0.35;
+        gain.connect(filter);
+        filter.connect(masterOutput);
+
+        const level = 0.045 * velocity;
+        const attack = Math.min(0.35, duration * 0.3);
+        const release = Math.min(0.5, duration * 0.3);
+        gain.gain.setValueAtTime(0.0001, time);
+        gain.gain.exponentialRampToValueAtTime(level, time + attack);
+        gain.gain.setValueAtTime(level, time + Math.max(attack, duration - release));
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+        [-6, 6].forEach(detune => {
+          const osc = context.createOscillator();
+          osc.type = "sawtooth";
+          osc.frequency.value = frequency;
+          osc.detune.value = detune;
+          osc.connect(gain);
+          osc.start(time);
+          osc.stop(time + duration + 0.05);
+        });
+      }
+
+      // Every instrument goes through one of these: with MIDI on they only
+      // send MIDI (no sound from the page); otherwise they play the page's own
+      // synthesized/sampled sound.
+      function emitPiano(midi, time, velocity, duration) {
+        if (midiEnabled) sendMidiNote(midiChannels.piano, Math.round(midi), velocity, time, duration);
+        else playPianoNote(audioContext, midi, time, velocity, duration);
+      }
+
+      function emitBass(midi, time, velocity, duration) {
+        if (midiEnabled) sendMidiNote(midiChannels.bass, Math.round(midi), velocity, time, duration);
+        else playBassNote(audioContext, midi, time, velocity, duration);
+      }
+
+      function emitStrings(midi, time, velocity, duration) {
+        if (midiEnabled) sendMidiNote(midiChannels.strings, Math.round(midi), velocity, time, duration);
+        else playStringsNote(audioContext, midi, time, velocity, duration);
+      }
+
+      function emitDrum(name, time, velocity, duration) {
+        if (midiEnabled) {
+          sendMidiNote(midiChannels.drums, MIDI_DRUM_NOTES[name], velocity, time, duration);
+          return;
+        }
+        if (name === "kick") playKick(audioContext, time, velocity);
+        else if (name === "snare") playSnare(audioContext, time, velocity);
+        else if (name === "hihatClosed") playHiHat(audioContext, time, velocity, false);
+        else if (name === "hihatOpen") playHiHat(audioContext, time, velocity, true);
+        else if (name === "crash") playCrash(audioContext, time, velocity);
+      }
+
       // --- Harmony ---------------------------------------------------------
 
       // Rootless, close-clustered voicing: places every extension (no root —
@@ -746,7 +964,8 @@
           : PROGRESSIONS[Math.floor(Math.random() * PROGRESSIONS.length)];
         const root = Math.floor(Math.random() * 12);
         const groove = GROOVES[progression.groove];
-        return { progression, root, groove, plan: buildProgressionPlan(progression, root) };
+        const bassLine = BASS_LINES[progression.groove];
+        return { progression, root, groove, bassLine, plan: buildProgressionPlan(progression, root) };
       }
 
       function currentCell() {
@@ -763,24 +982,235 @@
         return false;
       }
 
+      function chordSymbolFor(cell) {
+        const writtenPitchClass = (cell.rootPitchClass + instruments[instrumentIndex].writtenOffset) % 12;
+        return `${noteNameFor(writtenPitchClass)}${QUALITIES[cell.quality].symbol}`;
+      }
+
+      // The whole pattern on one horizontal line, with the chord currently
+      // sounding highlighted.
+      let stripProgression = null;
+
+      function clearChordStrip() {
+        stripProgression = null;
+        chordStripEl.innerHTML = '<span class="chord-strip-empty">The chords of the pattern will show here</span>';
+      }
+
+      function renderChordStrip() {
+        chordStripEl.innerHTML = "";
+        activeProgression.plan.forEach((cell, index) => {
+          const chip = document.createElement("span");
+          chip.className = "chord-chip";
+          chip.dataset.index = String(index);
+          chip.textContent = chordSymbolFor(cell);
+          chordStripEl.appendChild(chip);
+        });
+        stripProgression = activeProgression;
+      }
+
+      function highlightChordStrip() {
+        let activeChip = null;
+        [...chordStripEl.querySelectorAll(".chord-chip")].forEach(chip => {
+          const isActive = Number(chip.dataset.index) === cellIndex;
+          chip.classList.toggle("active", isActive);
+          if (isActive) activeChip = chip;
+        });
+        // Keep the sounding chord in view if the strip has to scroll.
+        if (activeChip && chordStripEl.scrollWidth > chordStripEl.clientWidth) {
+          chordStripEl.scrollLeft = activeChip.offsetLeft - (chordStripEl.clientWidth - activeChip.offsetWidth) / 2;
+        }
+      }
+
       function cycleInstrument() {
         instrumentIndex = (instrumentIndex + 1) % instruments.length;
         instrumentButton.textContent = `Instrument: ${instruments[instrumentIndex].label}`;
-        if (activeProgression) {
+        if (running && activeProgression) {
           lastDisplayedChord = "";
+          renderChordStrip();
           updateChordDisplay();
         }
       }
 
       function updateChordDisplay() {
         const cell = currentCell();
-        const writtenPitchClass = (cell.rootPitchClass + instruments[instrumentIndex].writtenOffset) % 12;
-        const symbol = `${noteNameFor(writtenPitchClass)}${QUALITIES[cell.quality].symbol}`;
+        const symbol = chordSymbolFor(cell);
         if (symbol !== lastDisplayedChord) {
           chordNameEl.textContent = symbol;
           lastDisplayedChord = symbol;
         }
         progressionNameEl.textContent = `${activeProgression.progression.name} \u00b7 ${activeProgression.groove.name} groove`;
+        if (stripProgression !== activeProgression) renderChordStrip();
+        highlightChordStrip();
+      }
+
+      let pendingProgression = null;
+      let lastBassRoot = 40;
+      let currentStringsAnchor = 72;
+      let currentBassEvents = [];
+      let phraseBassVariant = 0;
+      let phraseAltVariant = 0;
+
+      function humanizeTiming(baseTime, isSwingPartner) {
+        const swing = activeProgression.groove.swingAmount;
+        const swingOffset = isSwingPartner ? (swing - 0.5) * 2 * secondsPer16th() : 0;
+        const jitter = (Math.random() - 0.5) * 0.018;
+        return baseTime + swingOffset + jitter;
+      }
+
+      // --- Bass line -----------------------------------------------------------
+      //
+      // Each groove has its own bar-long bass patterns plus pickup fills for the
+      // last bar of every 4-bar phrase. Events are [step (16ths), tone, length
+      // (16ths), velocity]. Tones: R root, O octave, 5 fifth, 3 third, 7 seventh,
+      // g ghost note (muted root), A approach into the next chord (chromatic from
+      // below or above — or a fifth-below pickup when the chord isn't changing),
+      // A+ / A- force the approach from above / below, so A+ then A- makes an
+      // "enclosure" that lands on the next root. Patterns are tuned to sit with
+      // that groove's kick patterns.
+      const BASS_LINES = {
+        dillaPocket: {
+          patterns: [
+            [[0, "R", 5, 1], [6, "5", 2, 0.7], [10, "R", 3, 0.9], [14, "A", 2, 0.75]],
+            [[0, "R", 4, 1], [4, "g", 1, 0.4], [6, "R", 2, 0.75], [10, "7", 3, 0.85], [13, "5", 1, 0.6], [14, "A", 2, 0.75]],
+            [[0, "R", 6, 1], [7, "O", 2, 0.75], [10, "5", 2, 0.85], [12, "3", 2, 0.75], [14, "A", 2, 0.75]]
+          ],
+          fills: [
+            [[8, "R", 2, 0.9], [10, "5", 1, 0.75], [11, "7", 1, 0.7], [12, "O", 2, 0.9], [14, "7", 1, 0.75], [15, "A", 1, 0.85]],
+            [[8, "O", 2, 0.9], [10, "7", 1, 0.7], [11, "5", 1, 0.7], [12, "3", 2, 0.8], [14, "A+", 1, 0.75], [15, "A-", 1, 0.85]]
+          ]
+        },
+        halfTimeLaidBack: {
+          patterns: [
+            [[0, "R", 8, 1], [10, "5", 3, 0.8], [14, "A", 2, 0.7]],
+            [[0, "R", 7, 1], [8, "5", 4, 0.75], [13, "7", 1, 0.55], [14, "A", 2, 0.7]],
+            [[0, "R", 6, 1], [6, "g", 1, 0.35], [9, "R", 3, 0.85], [13, "O", 1, 0.65], [14, "A", 2, 0.7]]
+          ],
+          fills: [
+            [[8, "R", 3, 0.85], [12, "5", 2, 0.8], [14, "A", 2, 0.85]],
+            [[10, "5", 2, 0.8], [12, "7", 2, 0.8], [14, "A+", 1, 0.8], [15, "A-", 1, 0.85]]
+          ]
+        },
+        syncopatedBroken: {
+          patterns: [
+            [[0, "R", 3, 1], [3, "R", 2, 0.8], [6, "5", 2, 0.75], [10, "R", 2, 0.9], [13, "7", 1, 0.7], [14, "A", 2, 0.75]],
+            [[0, "R", 2, 1], [3, "g", 1, 0.4], [5, "O", 1, 0.7], [7, "5", 2, 0.8], [10, "7", 2, 0.85], [13, "R", 1, 0.65], [14, "A", 2, 0.75]],
+            [[0, "R", 3, 1], [3, "3", 2, 0.75], [6, "R", 1, 0.55], [7, "5", 2, 0.8], [10, "R", 3, 0.9], [14, "A+", 1, 0.7], [15, "A-", 1, 0.8]]
+          ],
+          fills: [
+            [[8, "5", 1, 0.8], [9, "g", 1, 0.4], [10, "R", 1, 0.85], [11, "3", 1, 0.7], [12, "5", 1, 0.8], [13, "7", 1, 0.75], [14, "O", 1, 0.85], [15, "A", 1, 0.9]]
+          ]
+        },
+        straightGospel: {
+          patterns: [
+            [[0, "R", 4, 1], [4, "R", 2, 0.7], [8, "5", 4, 0.85], [12, "R", 2, 0.75], [14, "A", 2, 0.8]],
+            [[0, "R", 3, 1], [4, "5", 2, 0.7], [6, "R", 2, 0.7], [8, "O", 3, 0.85], [12, "5", 2, 0.75], [14, "A", 2, 0.8]],
+            [[0, "R", 4, 1], [6, "3", 2, 0.65], [8, "5", 4, 0.85], [12, "R", 2, 0.75], [14, "A", 2, 0.8]]
+          ],
+          fills: [
+            [[8, "R", 2, 0.9], [10, "3", 2, 0.75], [12, "5", 2, 0.85], [14, "7", 1, 0.75], [15, "A", 1, 0.9]]
+          ]
+        },
+        sparseBallad: {
+          patterns: [
+            [[0, "R", 10, 1], [12, "5", 4, 0.6]],
+            [[0, "R", 8, 1], [8, "5", 5, 0.7], [14, "A", 2, 0.65]],
+            [[0, "R", 14, 1], [14, "A", 2, 0.6]]
+          ],
+          fills: [
+            [[10, "5", 3, 0.7], [14, "A", 2, 0.8]]
+          ]
+        },
+        busyFunky: {
+          patterns: [
+            [[0, "R", 2, 1], [2, "g", 1, 0.4], [3, "R", 1, 0.8], [6, "5", 1, 0.7], [7, "g", 1, 0.4], [10, "R", 2, 0.95], [12, "O", 1, 0.75], [13, "7", 1, 0.7], [14, "A", 2, 0.8]],
+            [[0, "R", 3, 1], [3, "3", 1, 0.7], [5, "g", 1, 0.35], [6, "5", 2, 0.8], [9, "g", 1, 0.4], [10, "R", 2, 0.9], [13, "R", 1, 0.7], [14, "A", 2, 0.8]],
+            [[0, "R", 2, 1], [3, "R", 1, 0.8], [4, "g", 1, 0.4], [6, "O", 1, 0.75], [7, "7", 1, 0.7], [10, "5", 2, 0.85], [12, "R", 1, 0.75], [14, "A+", 1, 0.7], [15, "A-", 1, 0.85]]
+          ],
+          fills: [
+            [[8, "R", 1, 0.9], [9, "g", 1, 0.45], [10, "5", 1, 0.8], [11, "7", 1, 0.75], [12, "O", 1, 0.9], [13, "7", 1, 0.75], [14, "5", 1, 0.8], [15, "A", 1, 0.9]],
+            [[8, "O", 1, 0.9], [9, "7", 1, 0.7], [10, "5", 1, 0.75], [11, "3", 1, 0.7], [12, "R", 2, 0.9], [14, "A+", 1, 0.75], [15, "A-", 1, 0.9]]
+          ]
+        }
+      };
+
+      const BASS_LOW = 28;
+      const BASS_HIGH = 60;
+
+      // The octave of a chord root nearest to where the bass line just was, so
+      // the line moves smoothly instead of leaping around the register.
+      function nearestBassRoot(pitchClass, referenceMidi) {
+        let best = null;
+        for (let midi = 24 + pitchClass; midi <= 52; midi += 12) {
+          if (midi < 31) continue;
+          if (best === null || Math.abs(midi - referenceMidi) < Math.abs(best - referenceMidi)) best = midi;
+        }
+        return best;
+      }
+
+      function foldIntoBassRange(midi) {
+        while (midi > BASS_HIGH) midi -= 12;
+        while (midi < BASS_LOW) midi += 12;
+        return midi;
+      }
+
+      function bassToneOffset(quality, tone) {
+        const intervals = QUALITIES[quality].intervals;
+        switch (tone) {
+          case "R": return 0;
+          case "O": return 12;
+          case "5": return 7;
+          case "3": return intervals.includes(3) ? 3 : (intervals.includes(4) ? 4 : 5);
+          case "7": return intervals.includes(10) ? 10 : (intervals.includes(11) ? 11 : (intervals.includes(9) ? 9 : 10));
+          default: return 0;
+        }
+      }
+
+      function buildBassBar(cell, nextCell, rootMidi, nextRootMidi, bassLine, barInPhrase, isFillBar) {
+        const patternCount = bassLine.patterns.length;
+        if (barInPhrase === 0) {
+          // Each phrase leans on one pattern, with a second one for contrast.
+          phraseBassVariant = Math.floor(Math.random() * patternCount);
+          phraseAltVariant = patternCount > 1
+            ? (phraseBassVariant + 1 + Math.floor(Math.random() * (patternCount - 1))) % patternCount
+            : 0;
+        }
+        const pattern = (barInPhrase === 0 || barInPhrase === 2)
+          ? bassLine.patterns[phraseBassVariant]
+          : bassLine.patterns[phraseAltVariant];
+
+        let events = pattern.map(event => event.slice());
+        if (isFillBar) {
+          // The last bar of the phrase: keep the start of the pattern, then
+          // swap its tail for a pickup run that leads into the next chord.
+          const fill = bassLine.fills[Math.floor(Math.random() * bassLine.fills.length)];
+          const fillStart = fill[0][0];
+          events = events.filter(event => event[0] < fillStart).concat(fill.map(event => event.slice()));
+        }
+
+        const sameRoot = nextCell.rootPitchClass === cell.rootPitchClass;
+        const resolved = events.map(([step, tone, length, velocity]) => {
+          let midi;
+          if (tone === "A" || tone === "A+" || tone === "A-") {
+            if (tone === "A" && sameRoot) {
+              midi = foldIntoBassRange(rootMidi - 5);
+            } else {
+              const direction = tone === "A+" ? 1 : (tone === "A-" ? -1 : (Math.random() < 0.65 ? -1 : 1));
+              midi = nextRootMidi + direction;
+            }
+          } else if (tone === "g") {
+            midi = rootMidi;
+          } else {
+            midi = foldIntoBassRange(rootMidi + bassToneOffset(cell.quality, tone));
+          }
+          return { step, midi, length, velocity };
+        }).sort((a, b) => a.step - b.step);
+
+        // No overlaps: a note is cut where the next one starts.
+        resolved.forEach((event, index) => {
+          const nextStep = index + 1 < resolved.length ? resolved[index + 1].step : SIXTEENTHS_PER_BAR;
+          event.length = Math.max(1, Math.min(event.length, nextStep - event.step));
+        });
+        return resolved;
       }
 
       // --- Groove ----------------------------------------------------------
@@ -790,13 +1220,6 @@
       let currentKickPattern = null;
       let totalBars = 0;
       let currentBarIsFill = false;
-
-      function humanizeTiming(baseTime, isSwingPartner) {
-        const swing = activeProgression.groove.swingAmount;
-        const swingOffset = isSwingPartner ? (swing - 0.5) * 2 * secondsPer16th() : 0;
-        const jitter = (Math.random() - 0.5) * 0.018;
-        return baseTime + swingOffset + jitter;
-      }
 
       function scheduleStep(step, time) {
         const context = audioContext;
@@ -811,73 +1234,88 @@
           // boundary — so the current phrase always finishes in its own
           // style before the new one begins.
           if (isPhraseStart && styleChangePending && totalBars > 1) {
-            activeProgression = pickProgression();
+            activeProgression = pendingProgression || pickProgression();
+            pendingProgression = null;
             cellIndex = 0;
             barsElapsedInCell = 0;
             styleChangePending = false;
-            statusEl.textContent = "Playing…";
+            statusEl.textContent = midiEnabled ? "Playing… (MIDI only)" : "Playing…";
+          }
+          // On the last bar of a phrase with a switch queued, choose the next
+          // style now so the bass can lead into its first chord.
+          if (totalBars % 4 === 0 && styleChangePending && !pendingProgression) {
+            pendingProgression = pickProgression();
           }
         }
 
         const groove = activeProgression.groove;
 
         if (step === 0) {
+          const barInPhrase = (totalBars - 1) % 4;
           // A fresh kick-pattern variant every 4-bar phrase, drawn from this
           // pattern's own groove profile.
-          if ((totalBars - 1) % 4 === 0) {
+          if (barInPhrase === 0) {
             currentKickPattern = groove.kickPatterns[Math.floor(Math.random() * groove.kickPatterns.length)];
           }
           // This bar is the 4th of its phrase — its tail gets a pickup fill.
           currentBarIsFill = totalBars % 4 === 0;
           // Bigger structural accents every 8 and (more so) every 16 bars.
           if (totalBars > 1 && (totalBars - 1) % 16 === 0) {
-            playCrash(context, hitTime, 0.95);
-            sendMidiNote(10, MIDI_DRUM_NOTES.crash, 0.95, hitTime, 1.2);
+            emitDrum("crash", hitTime, 0.95, 1.2);
           } else if (totalBars > 1 && (totalBars - 1) % 8 === 0) {
-            playCrash(context, hitTime, 0.62);
-            sendMidiNote(10, MIDI_DRUM_NOTES.crash, 0.62, hitTime, 1.2);
+            emitDrum("crash", hitTime, 0.62, 1.2);
           }
 
           const cell = currentCell();
-          const anchor = currentAnchorMidi;
-          const voicing = voiceRootless(cell.rootPitchClass, QUALITIES[cell.quality].intervals, anchor);
+          const intervals = QUALITIES[cell.quality].intervals;
+          const barDuration = secondsPer16th() * SIXTEENTHS_PER_BAR;
+
+          // Piano: rootless close voicing, re-struck every bar.
+          const voicing = voiceRootless(cell.rootPitchClass, intervals, currentAnchorMidi);
           if (voicing.length) {
             currentAnchorMidi = voicing.reduce((a, b) => a + b, 0) / voicing.length;
           }
-          const barDuration = secondsPer16th() * SIXTEENTHS_PER_BAR;
           const chordDuration = barDuration * Math.min(2, cell.bars) * 0.95;
-          voicing.forEach(midi => {
-            playPianoNote(context, midi, hitTime, 0.85, chordDuration);
-            sendMidiNote(1, Math.round(midi), 0.85, hitTime, chordDuration);
-          });
-          const bassDuration = secondsPer16th() * 3.5;
-          playBassNote(context, cell.rootPitchClass + 36, hitTime, 1, bassDuration);
-          sendMidiNote(2, cell.rootPitchClass + 36, 1, hitTime, bassDuration);
+          voicing.forEach(midi => emitPiano(midi, hitTime, 0.85, chordDuration));
+
+          // Strings: a soft sustained pad that holds the chord for the rest
+          // of its cell (never past the end of the 4-bar phrase, so a style
+          // change always lands on a clean pad boundary).
+          const barsLeftInCell = Math.max(1, Math.ceil(cell.bars - barsElapsedInCell));
+          const barsToPhraseEnd = 4 - barInPhrase;
+          if (barsElapsedInCell === 0 || barInPhrase === 0) {
+            const padDuration = barDuration * Math.min(barsLeftInCell, barsToPhraseEnd) * 0.98;
+            const padVoicing = voiceRootless(cell.rootPitchClass, intervals, currentStringsAnchor);
+            if (padVoicing.length) {
+              currentStringsAnchor = padVoicing.reduce((a, b) => a + b, 0) / padVoicing.length;
+            }
+            padVoicing.forEach(midi => emitStrings(midi, hitTime, 0.55, padDuration));
+          }
+
+          // Bass line for this bar.
+          const rootMidi = nearestBassRoot(cell.rootPitchClass, lastBassRoot);
+          lastBassRoot = rootMidi;
+          const lastBarOfCell = barsElapsedInCell + 1 >= cell.bars;
+          let nextCell = lastBarOfCell
+            ? activeProgression.plan[(cellIndex + 1) % activeProgression.plan.length]
+            : cell;
+          if (currentBarIsFill && pendingProgression) nextCell = pendingProgression.plan[0];
+          const nextRootMidi = nearestBassRoot(nextCell.rootPitchClass, rootMidi);
+          currentBassEvents = buildBassBar(cell, nextCell, rootMidi, nextRootMidi, activeProgression.bassLine, barInPhrase, currentBarIsFill);
         }
 
         if (step === 6) {
           const cell = currentCell();
           const voicing = voiceRootless(cell.rootPitchClass, QUALITIES[cell.quality].intervals, currentAnchorMidi);
           const duration = secondsPer16th() * 2;
-          voicing.forEach(midi => {
-            playPianoNote(context, midi, hitTime, 0.4, duration);
-            sendMidiNote(1, Math.round(midi), 0.4, hitTime, duration);
-          });
+          voicing.forEach(midi => emitPiano(midi, hitTime, 0.4, duration));
         }
 
-        if (step === 14) {
-          // Chromatic (or scale-wise) approach into the next chord's root,
-          // matching the bass motion that underpins so much neo-soul harmony.
-          const cell = currentCell();
-          const nextCellIndex = barsElapsedInCell + 1 >= cell.bars
-            ? (cellIndex + 1) % activeProgression.plan.length
-            : cellIndex;
-          const nextRoot = activeProgression.plan[nextCellIndex].rootPitchClass;
-          const approach = nextRoot - 1;
-          const duration = secondsPer16th() * 1.4;
-          playBassNote(context, approach + 36, hitTime, 0.7, duration);
-          sendMidiNote(2, approach + 36, 0.7, hitTime, duration);
-        }
+        currentBassEvents.forEach(event => {
+          if (event.step !== step) return;
+          const velocity = Math.min(1, event.velocity * (currentKickPattern.has(step) ? 1.08 : 1));
+          emitBass(event.midi, hitTime, velocity, event.length * secondsPer16th() * 0.92);
+        });
 
         const isFillTail = currentBarIsFill && step >= 10;
         const kickHit = !isFillTail && currentKickPattern.has(step);
@@ -889,29 +1327,21 @@
         const snareDragSeconds = isBackbeat ? 0.022 : 0.012;
 
         if (kickHit) {
-          const velocity = 0.85 + Math.random() * 0.1;
-          playKick(context, hitTime, velocity);
-          sendMidiNote(10, MIDI_DRUM_NOTES.kick, velocity, hitTime, 0.08);
+          emitDrum("kick", hitTime, 0.85 + Math.random() * 0.1, 0.08);
         }
         if (snareHit) {
           const velocity = isFillTail
             ? 0.5 + (step - 10) * 0.09
             : (isBackbeat ? 0.95 + Math.random() * 0.15 : 0.8 + Math.random() * 0.15);
-          const snareTime = hitTime + snareDragSeconds;
-          playSnare(context, snareTime, velocity);
-          sendMidiNote(10, MIDI_DRUM_NOTES.snare, velocity, snareTime, 0.08);
+          emitDrum("snare", hitTime + snareDragSeconds, velocity, 0.08);
         } else if (!kickHit && Math.random() < groove.ghostChance) {
           // A quiet ghost snare for a more human, less mechanical pocket.
-          const velocity = 0.1 + Math.random() * 0.08;
-          playSnare(context, hitTime, velocity);
-          sendMidiNote(10, MIDI_DRUM_NOTES.snare, velocity, hitTime, 0.05);
+          emitDrum("snare", hitTime, 0.1 + Math.random() * 0.08, 0.05);
         }
 
         if (step % groove.hihatEvery === 0) {
           const isOpen = step === 14 && Math.random() < 0.3;
-          const velocity = 0.55 + Math.random() * 0.25;
-          playHiHat(context, hitTime, velocity, isOpen);
-          sendMidiNote(10, isOpen ? MIDI_DRUM_NOTES.hihatOpen : MIDI_DRUM_NOTES.hihatClosed, velocity, hitTime, isOpen ? 0.2 : 0.05);
+          emitDrum(isOpen ? "hihatOpen" : "hihatClosed", hitTime, 0.55 + Math.random() * 0.25, isOpen ? 0.2 : 0.05);
         }
 
         if (step === 0) {
@@ -980,19 +1410,31 @@
         totalBars = 0;
         currentKickPattern = activeProgression.groove.kickPatterns[0];
         currentBarIsFill = false;
+        pendingProgression = null;
+        lastBassRoot = 40;
+        currentStringsAnchor = 72;
+        currentBassEvents = [];
+        phraseBassVariant = 0;
+        phraseAltVariant = 0;
+        stripProgression = null;
         nextStepTime = context.currentTime + 0.06;
         running = true;
         starting = false;
         generateButton.textContent = "Stop";
         generateButton.classList.add("playing");
         generateButton.setAttribute("aria-pressed", "true");
-        statusEl.textContent = "Playing…";
+        statusEl.textContent = midiEnabled ? "Playing… (MIDI only)" : "Playing…";
         scheduler();
       }
 
       function stop() {
         running = false;
         styleChangePending = false;
+        pendingProgression = null;
+        sendAllNotesOff();
+        // Anything scheduled inside the look-ahead window may still land.
+        window.setTimeout(() => { if (!running) sendAllNotesOff(); }, 300);
+        clearChordStrip();
         if (schedulerTimer) window.clearTimeout(schedulerTimer);
         schedulerTimer = null;
         generateButton.textContent = "Generate";
@@ -1036,6 +1478,7 @@
           });
           if (running) {
             styleChangePending = true;
+            pendingProgression = null;
             statusEl.textContent = `Switching to "${button.textContent.trim()}" after this phrase…`;
           }
         });
@@ -1044,7 +1487,13 @@
       generateButton.addEventListener("click", toggle);
       instrumentButton.addEventListener("click", cycleInstrument);
       midiToggleButton.addEventListener("click", toggleMidi);
+      midiChToggle.addEventListener("click", toggleMidiChPanel);
+      tempoSlider.addEventListener("input", () => {
+        bpm = Number(tempoSlider.value);
+        tempoValueEl.textContent = `${bpm} BPM`;
+      });
       window.addEventListener("beforeunload", () => { if (running) stop(); });
+      buildMidiChannelPanel();
       renderPatternList();
     })();
   </script>
