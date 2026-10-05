@@ -32,7 +32,20 @@
     padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   }
 
-  main { width: min(92vw, 460px); text-align: center; }
+  main { width: min(92vw, 480px); text-align: center; }
+
+  .page-title { text-align: center; margin-bottom: 16px; }
+
+  /* Controls on the left, the style list to the side (it wraps underneath
+     on narrow screens). */
+  .layout {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 22px;
+    justify-content: center;
+    align-items: flex-start;
+    width: 100%;
+  }
 
   h1 {
     margin: 0 0 6px;
@@ -148,7 +161,8 @@
   }
 
   .patterns-panel {
-    margin-top: 16px;
+    width: min(92vw, 400px);
+    margin-top: 0;
     padding: 18px 20px;
     text-align: left;
   }
@@ -243,30 +257,67 @@
 
   .midi-ch-panel[hidden] { display: none; }
 
-  .midi-ch-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 5px 0;
-    font-size: .88rem;
+  .midi-part {
+    padding: 10px 0;
+    border-top: 1px solid rgba(255,255,255,.08);
   }
 
-  .midi-ch-row select {
-    min-width: 5.5em;
+  .midi-part:first-child { border-top: 0; padding-top: 2px; }
+
+  .midi-part-title {
+    display: block;
+    font-size: .85rem;
+    font-weight: 700;
+    color: var(--accent);
+  }
+
+  .midi-part-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 7px;
+  }
+
+  .midi-part select {
     padding: 5px 8px;
     border-radius: 8px;
     border: 1px solid rgba(255,255,255,.2);
     background: #33394a;
     color: var(--ink);
-    font-size: .88rem;
+    font-size: .84rem;
+  }
+
+  .midi-program { flex: 1 1 auto; min-width: 0; }
+  .midi-channel { flex: 0 0 5.4em; }
+
+  .midi-slider {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1 1 0;
+    min-width: 0;
+    font-size: .78rem;
+    color: var(--muted);
+  }
+
+  .midi-slider input { flex: 1 1 auto; min-width: 0; accent-color: var(--accent-strong); cursor: pointer; }
+
+  .midi-slider output {
+    min-width: 2.7em;
+    text-align: right;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
   }
 </style>
 </head>
 <body>
   <div class="chord-strip" id="chordStrip" aria-label="Chords of the current pattern"><span class="chord-strip-empty">The chords of the pattern will show here</span></div>
-  <main>
+  <header class="page-title">
     <h1>Neo Soul Generator</h1>
     <p class="subtitle">Glasper-inspired progressions &middot; rootless voicings &middot; swung groove</p>
+  </header>
+  <div class="layout">
+  <main>
     <div class="panel">
       <div class="display-face">
         <div class="chord-label">Now playing</div>
@@ -281,17 +332,18 @@
       <button id="generate" class="generate-btn" type="button" aria-pressed="false">Generate</button>
       <button id="instrument" class="generate-btn midi-btn" type="button" aria-pressed="true">Instrument: Bb</button>
       <button id="midiToggle" class="generate-btn midi-btn" type="button" aria-pressed="false">MIDI: Off</button>
-      <button id="midiChToggle" class="generate-btn midi-btn" type="button" aria-expanded="false">MIDI ch &#9662;</button>
+      <button id="midiChToggle" class="generate-btn midi-btn" type="button" aria-expanded="false">MIDI CONF. &#9662;</button>
       <div class="midi-ch-panel" id="midiChPanel" hidden></div>
       <div class="status" id="status">Tap Generate for a new neo-soul progression</div>
     </div>
-    <p class="hint">Chord names are shown transposed for the selected instrument (tap "Instrument" to switch between C, B&#9837; and E&#9837;), while the piano always plays at concert pitch. Drums use real sampled one-shots (CC0-licensed). With MIDI turned on, this page stops making any sound and only sends MIDI to the first MIDI device connected to this computer — by default piano on channel 1, bass on 2, strings on 3 and drums on 10; change them under "MIDI ch".</p>
+    <p class="hint">Chord names are shown transposed for the selected instrument (tap "Instrument" to switch between C, B&#9837; and E&#9837;), while the piano always plays at concert pitch. Drums use real sampled one-shots (CC0-licensed). With MIDI turned on, this page stops making any sound and only sends MIDI to the first MIDI device connected to this computer — by default piano on channel 1, bass on 2, strings on 3 and drums on 10; change them under "MIDI CONF.", where each instrument also gets its own sound, volume and pan (sent as MIDI messages).</p>
+  </main>
 
-    <div class="panel patterns-panel">
+    <aside class="panel patterns-panel">
       <div class="chord-label">Style (tap to choose, or leave on Random)</div>
       <div class="pattern-list" id="patternList"></div>
-    </div>
-  </main>
+    </aside>
+  </div>
 
   <script>
     (() => {
@@ -583,17 +635,50 @@
       // GM percussion map for the drum channel.
       const MIDI_DRUM_NOTES = { kick: 36, snare: 38, hihatClosed: 42, hihatOpen: 46, crash: 49 };
 
-      // The instruments this page plays, each with a MIDI channel that can be
-      // reassigned from the "MIDI ch" panel (defaults: piano 1, bass 2,
-      // strings 3, drums 10).
+      // The instruments this page plays. Each one has its own MIDI channel,
+      // sound (a Program Change from the standard Roland GM/GS list), volume
+      // (CC 7) and pan (CC 10), all editable from "MIDI CONF.".
+      // Defaults: piano 1, bass 2, strings 3, drums 10.
       const MIDI_PARTS = [
-        { key: "piano", label: "Piano" },
-        { key: "bass", label: "Bass" },
-        { key: "drums", label: "Drums" },
-        { key: "strings", label: "Strings" }
+        { key: "piano", label: "Piano", kind: "melodic" },
+        { key: "bass", label: "Bass", kind: "melodic" },
+        { key: "drums", label: "Drums", kind: "drums" },
+        { key: "strings", label: "Strings", kind: "melodic" }
       ];
       const midiChannels = { piano: 1, bass: 2, drums: 10, strings: 3 };
+      // Program numbers are 0-based as sent on the wire (Roland lists them 1-128);
+      // -1 means "leave whatever sound the device already has".
+      const midiPrograms = { piano: 0, bass: 33, drums: 0, strings: 48 };
+      const midiVolumes = { piano: 100, bass: 100, drums: 100, strings: 100 };
+      const midiPans = { piano: 64, bass: 64, drums: 64, strings: 64 };
       const usedMidiChannels = new Set();
+
+      // The 128 standard General MIDI instruments (the Roland GM/GS list), by family.
+      const GM_FAMILIES = [
+        ["Piano", ["Acoustic Grand Piano", "Bright Acoustic Piano", "Electric Grand Piano", "Honky-tonk Piano", "Electric Piano 1", "Electric Piano 2", "Harpsichord", "Clavinet"]],
+        ["Chromatic Percussion", ["Celesta", "Glockenspiel", "Music Box", "Vibraphone", "Marimba", "Xylophone", "Tubular Bells", "Dulcimer"]],
+        ["Organ", ["Drawbar Organ", "Percussive Organ", "Rock Organ", "Church Organ", "Reed Organ", "Accordion", "Harmonica", "Tango Accordion"]],
+        ["Guitar", ["Acoustic Guitar (nylon)", "Acoustic Guitar (steel)", "Electric Guitar (jazz)", "Electric Guitar (clean)", "Electric Guitar (muted)", "Overdriven Guitar", "Distortion Guitar", "Guitar Harmonics"]],
+        ["Bass", ["Acoustic Bass", "Electric Bass (finger)", "Electric Bass (pick)", "Fretless Bass", "Slap Bass 1", "Slap Bass 2", "Synth Bass 1", "Synth Bass 2"]],
+        ["Strings", ["Violin", "Viola", "Cello", "Contrabass", "Tremolo Strings", "Pizzicato Strings", "Orchestral Harp", "Timpani"]],
+        ["Ensemble", ["String Ensemble 1", "String Ensemble 2", "Synth Strings 1", "Synth Strings 2", "Choir Aahs", "Voice Oohs", "Synth Voice", "Orchestra Hit"]],
+        ["Brass", ["Trumpet", "Trombone", "Tuba", "Muted Trumpet", "French Horn", "Brass Section", "Synth Brass 1", "Synth Brass 2"]],
+        ["Reed", ["Soprano Sax", "Alto Sax", "Tenor Sax", "Baritone Sax", "Oboe", "English Horn", "Bassoon", "Clarinet"]],
+        ["Pipe", ["Piccolo", "Flute", "Recorder", "Pan Flute", "Blown Bottle", "Shakuhachi", "Whistle", "Ocarina"]],
+        ["Synth Lead", ["Lead 1 (square)", "Lead 2 (sawtooth)", "Lead 3 (calliope)", "Lead 4 (chiff)", "Lead 5 (charang)", "Lead 6 (voice)", "Lead 7 (fifths)", "Lead 8 (bass + lead)"]],
+        ["Synth Pad", ["Pad 1 (new age)", "Pad 2 (warm)", "Pad 3 (polysynth)", "Pad 4 (choir)", "Pad 5 (bowed)", "Pad 6 (metallic)", "Pad 7 (halo)", "Pad 8 (sweep)"]],
+        ["Synth Effects", ["FX 1 (rain)", "FX 2 (soundtrack)", "FX 3 (crystal)", "FX 4 (atmosphere)", "FX 5 (brightness)", "FX 6 (goblins)", "FX 7 (echoes)", "FX 8 (sci-fi)"]],
+        ["Ethnic", ["Sitar", "Banjo", "Shamisen", "Koto", "Kalimba", "Bagpipe", "Fiddle", "Shanai"]],
+        ["Percussive", ["Tinkle Bell", "Agogo", "Steel Drums", "Woodblock", "Taiko Drum", "Melodic Tom", "Synth Drum", "Reverse Cymbal"]],
+        ["Sound Effects", ["Guitar Fret Noise", "Breath Noise", "Seashore", "Bird Tweet", "Telephone Ring", "Helicopter", "Applause", "Gunshot"]]
+      ];
+
+      // Channel 10 doesn't use the melodic list: a Program Change there picks a
+      // drum kit (Roland GS kit numbers).
+      const GS_DRUM_KITS = [
+        [0, "Standard Set"], [8, "Room Set"], [16, "Power Set"], [24, "Electronic Set"], [25, "TR-808 Set"],
+        [26, "Dance Set"], [32, "Jazz Set"], [40, "Brush Set"], [48, "Orchestra Set"], [56, "SFX Set"]
+      ];
 
       function midiTimeFor(audioTime) {
         return audioTime * 1000 + audioToPerfOffsetMs;
@@ -629,6 +714,34 @@
         });
       }
 
+      // Sends a part's sound, volume and pan to its current channel. A Program
+      // Change picks the instrument (preceded by Bank Select 0 so melodic parts
+      // get the plain GM sound); volume is CC 7 and pan is CC 10.
+      function sendMidiSetup(partKey) {
+        if (!midiEnabled || !midiOutput) return;
+        const part = MIDI_PARTS.find(candidate => candidate.key === partKey);
+        const channel = midiChannels[partKey];
+        const nibble = channel - 1;
+        usedMidiChannels.add(channel);
+        try {
+          if (midiPrograms[partKey] >= 0) {
+            if (part.kind === "melodic") {
+              midiOutput.send([0xB0 | nibble, 0, 0]);
+              midiOutput.send([0xB0 | nibble, 32, 0]);
+            }
+            midiOutput.send([0xC0 | nibble, midiPrograms[partKey]]);
+          }
+          midiOutput.send([0xB0 | nibble, 7, midiVolumes[partKey]]);
+          midiOutput.send([0xB0 | nibble, 10, midiPans[partKey]]);
+        } catch (err) {
+          // ignore a device that vanished
+        }
+      }
+
+      function sendAllMidiSetup() {
+        MIDI_PARTS.forEach(part => sendMidiSetup(part.key));
+      }
+
       async function toggleMidi() {
         if (midiEnabled) {
           sendAllNotesOff();
@@ -656,35 +769,124 @@
           midiToggleButton.textContent = `MIDI: ${midiOutput.name}`;
           midiToggleButton.classList.add("selected");
           midiToggleButton.setAttribute("aria-pressed", "true");
+          sendAllMidiSetup();
           statusEl.textContent = "MIDI on — this page is silent, everything goes to the MIDI device";
         } catch (err) {
           statusEl.textContent = "MIDI access was denied";
         }
       }
 
-      function buildMidiChannelPanel() {
+      function panLabel(value) {
+        if (value === 64) return "C";
+        return value < 64 ? `L${64 - value}` : `R${value - 64}`;
+      }
+
+      function buildInstrumentSelect(part) {
+        const select = document.createElement("select");
+        select.className = "midi-program";
+        select.dataset.part = part.key;
+        select.setAttribute("aria-label", `${part.label} sound`);
+        const keep = document.createElement("option");
+        keep.value = "-1";
+        keep.textContent = part.kind === "drums" ? "(keep the device's current kit)" : "(keep the device's current sound)";
+        select.appendChild(keep);
+        if (part.kind === "drums") {
+          GS_DRUM_KITS.forEach(([program, name]) => {
+            const option = document.createElement("option");
+            option.value = String(program);
+            option.textContent = `${program + 1} \u00b7 ${name}`;
+            select.appendChild(option);
+          });
+        } else {
+          let program = 0;
+          GM_FAMILIES.forEach(([family, names]) => {
+            const group = document.createElement("optgroup");
+            group.label = family;
+            names.forEach(name => {
+              const option = document.createElement("option");
+              option.value = String(program);
+              option.textContent = `${program + 1} \u00b7 ${name}`;
+              group.appendChild(option);
+              program += 1;
+            });
+            select.appendChild(group);
+          });
+        }
+        select.value = String(midiPrograms[part.key]);
+        select.addEventListener("change", () => {
+          midiPrograms[part.key] = Number(select.value);
+          sendMidiSetup(part.key);
+        });
+        return select;
+      }
+
+      function buildSlider(part, label, store, onShow) {
+        const wrapper = document.createElement("label");
+        wrapper.className = "midi-slider";
+        const text = document.createElement("span");
+        text.textContent = label;
+        const input = document.createElement("input");
+        input.type = "range";
+        input.min = "0";
+        input.max = "127";
+        input.step = "1";
+        input.value = String(store[part.key]);
+        input.dataset.part = part.key;
+        input.dataset.control = label.toLowerCase();
+        input.setAttribute("aria-label", `${part.label} ${label.toLowerCase()}`);
+        const output = document.createElement("output");
+        output.textContent = onShow(store[part.key]);
+        input.addEventListener("input", () => {
+          store[part.key] = Number(input.value);
+          output.textContent = onShow(store[part.key]);
+          sendMidiSetup(part.key);
+        });
+        wrapper.appendChild(text);
+        wrapper.appendChild(input);
+        wrapper.appendChild(output);
+        return wrapper;
+      }
+
+      function buildMidiConfPanel() {
         midiChPanel.innerHTML = "";
         MIDI_PARTS.forEach(part => {
-          const row = document.createElement("div");
-          row.className = "midi-ch-row";
-          const label = document.createElement("span");
-          label.textContent = part.label;
-          const select = document.createElement("select");
-          select.dataset.part = part.key;
-          select.setAttribute("aria-label", `${part.label} MIDI channel`);
+          const block = document.createElement("div");
+          block.className = "midi-part";
+
+          const title = document.createElement("span");
+          title.className = "midi-part-title";
+          title.textContent = part.label;
+          block.appendChild(title);
+
+          const soundRow = document.createElement("div");
+          soundRow.className = "midi-part-row";
+          soundRow.appendChild(buildInstrumentSelect(part));
+
+          const channelSelect = document.createElement("select");
+          channelSelect.className = "midi-channel";
+          channelSelect.dataset.part = part.key;
+          channelSelect.setAttribute("aria-label", `${part.label} MIDI channel`);
           for (let channel = 1; channel <= 16; channel += 1) {
             const option = document.createElement("option");
             option.value = String(channel);
             option.textContent = `ch ${channel}`;
-            select.appendChild(option);
+            channelSelect.appendChild(option);
           }
-          select.value = String(midiChannels[part.key]);
-          select.addEventListener("change", () => {
-            midiChannels[part.key] = Number(select.value);
+          channelSelect.value = String(midiChannels[part.key]);
+          channelSelect.addEventListener("change", () => {
+            midiChannels[part.key] = Number(channelSelect.value);
+            sendMidiSetup(part.key);
           });
-          row.appendChild(label);
-          row.appendChild(select);
-          midiChPanel.appendChild(row);
+          soundRow.appendChild(channelSelect);
+          block.appendChild(soundRow);
+
+          const mixRow = document.createElement("div");
+          mixRow.className = "midi-part-row";
+          mixRow.appendChild(buildSlider(part, "Vol", midiVolumes, value => String(value)));
+          mixRow.appendChild(buildSlider(part, "Pan", midiPans, panLabel));
+          block.appendChild(mixRow);
+
+          midiChPanel.appendChild(block);
         });
       }
 
@@ -692,7 +894,7 @@
         const willOpen = midiChPanel.hidden;
         midiChPanel.hidden = !willOpen;
         midiChToggle.setAttribute("aria-expanded", String(willOpen));
-        midiChToggle.innerHTML = willOpen ? "MIDI ch &#9652;" : "MIDI ch &#9662;";
+        midiChToggle.innerHTML = willOpen ? "MIDI CONF. &#9652;" : "MIDI CONF. &#9662;";
       }
 
       function noteNameFor(pitchClass) {
@@ -965,7 +1167,8 @@
         const root = Math.floor(Math.random() * 12);
         const groove = GROOVES[progression.groove];
         const bassLine = BASS_LINES[progression.groove];
-        return { progression, root, groove, bassLine, plan: buildProgressionPlan(progression, root) };
+        const drumProfile = DRUM_PROFILES[progression.groove];
+        return { progression, root, groove, bassLine, drumProfile, plan: buildProgressionPlan(progression, root) };
       }
 
       function currentCell() {
@@ -1051,7 +1254,9 @@
       let phraseAltVariant = 0;
 
       function humanizeTiming(baseTime, isSwingPartner) {
-        const swing = activeProgression.groove.swingAmount;
+        // The 16th-note upbeats are pushed late a little more than the groove's
+        // own swing, for a lazier, more laid-back pocket.
+        const swing = activeProgression.groove.swingAmount + 0.03;
         const swingOffset = isSwingPartner ? (swing - 0.5) * 2 * secondsPer16th() : 0;
         const jitter = (Math.random() - 0.5) * 0.018;
         return baseTime + swingOffset + jitter;
@@ -1215,11 +1420,54 @@
 
       // --- Groove ----------------------------------------------------------
 
-      const FILL_TAIL_STEPS = new Set([10, 12, 13, 14, 15]); // pickup fill into the next phrase
+      // Pickup fills for the last bar of a phrase, from short to big.
+      const FILL_VARIANTS = [
+        [10, 12, 13, 14, 15],
+        [12, 13, 14, 15],
+        [11, 12, 14, 15],
+        [8, 10, 12, 13, 14, 15]
+      ];
+
+      // How far behind the grid each drum sits, as a fraction of a 16th note
+      // (the kick stays on the grid; the snare backbeat drags the most). This is
+      // the "laid back" feel — at 86 BPM the backbeat lands ~45 ms late.
+      const LAID_BACK = { kick: 0, hat: 0.08, snare: 0.12, backbeat: 0.26, crash: 0.1 };
+
+      // The drums don't repeat bar for bar: every 4-bar phrase has its own
+      // intensity (following a 16-bar arc — sparse, building, peak, settling —
+      // with a little randomness), its own hi-hat accent shape, and every bar
+      // gets small random variations (an extra pushed kick, ghost notes, open
+      // hats, hat "ticks", hats dropping out). Each groove has its own
+      // activity level and the places an extra kick is allowed to land.
+      const INTENSITY_ARC = [0.35, 0.6, 0.85, 0.65];
+      const DRUM_PROFILES = {
+        dillaPocket: { activity: 1.0, kickExtras: [3, 7, 13, 15] },
+        halfTimeLaidBack: { activity: 0.6, kickExtras: [7, 13] },
+        syncopatedBroken: { activity: 1.1, kickExtras: [5, 9, 14] },
+        straightGospel: { activity: 0.7, kickExtras: [6, 14] },
+        sparseBallad: { activity: 0.4, kickExtras: [7, 14] },
+        busyFunky: { activity: 1.3, kickExtras: [2, 8, 11, 15] }
+      };
 
       let currentKickPattern = null;
       let totalBars = 0;
       let currentBarIsFill = false;
+      let currentBarInPhrase = 0;
+      let phraseIntensity = 0.4;
+      let hatAccentVariant = 0;
+      let barExtraKickStep = -1;
+      let currentFillSteps = FILL_VARIANTS[0];
+      let drumDrift = 0; // slow wobble of the whole drum kit against the grid, in 16ths
+
+      function clamp(value, low, high) {
+        return Math.max(low, Math.min(high, value));
+      }
+
+      function hatAccent(step) {
+        if (hatAccentVariant === 0) return step % 4 === 0 ? 0.14 : 0;
+        if (hatAccentVariant === 1) return step % 4 === 2 ? 0.14 : (step % 4 === 0 ? -0.04 : 0);
+        return step % 8 === 0 ? 0.12 : (step % 2 === 1 ? -0.1 : 0);
+      }
 
       function scheduleStep(step, time) {
         const context = audioContext;
@@ -1252,18 +1500,42 @@
 
         if (step === 0) {
           const barInPhrase = (totalBars - 1) % 4;
+          const profile = activeProgression.drumProfile;
+          currentBarInPhrase = barInPhrase;
           // A fresh kick-pattern variant every 4-bar phrase, drawn from this
           // pattern's own groove profile.
           if (barInPhrase === 0) {
             currentKickPattern = groove.kickPatterns[Math.floor(Math.random() * groove.kickPatterns.length)];
+            // Where this phrase sits in the 16-bar arc sets how busy it is.
+            const phraseIndex = Math.floor((totalBars - 1) / 4);
+            phraseIntensity = clamp(INTENSITY_ARC[phraseIndex % 4] + (Math.random() - 0.5) * 0.14, 0.15, 1);
+            hatAccentVariant = Math.floor(Math.random() * 3);
           }
-          // This bar is the 4th of its phrase — its tail gets a pickup fill.
+          // This bar is the 4th of its phrase — its tail gets a pickup fill
+          // (longer and bigger when the phrase is intense, shorter when calm).
           currentBarIsFill = totalBars % 4 === 0;
+          if (currentBarIsFill) {
+            const pool = phraseIntensity > 0.75 ? [0, 3, 3, 0] : (phraseIntensity < 0.5 ? [1, 2] : [0, 1, 2]);
+            currentFillSteps = FILL_VARIANTS[pool[Math.floor(Math.random() * pool.length)]];
+          }
+          // Small per-bar variation: sometimes one extra, softer kick lands on a
+          // syncopated spot — more often in busier phrases and busier grooves.
+          barExtraKickStep = -1;
+          if (!currentBarIsFill) {
+            const chance = (0.08 + 0.4 * phraseIntensity) * profile.activity * (barInPhrase === 0 ? 0.4 : 1);
+            if (Math.random() < chance) {
+              const candidates = profile.kickExtras.filter(candidate => !currentKickPattern.has(candidate));
+              if (candidates.length) barExtraKickStep = candidates[Math.floor(Math.random() * candidates.length)];
+            }
+          }
+          // The kit wobbles slowly against the grid from bar to bar.
+          drumDrift = clamp(drumDrift + (Math.random() - 0.5) * 0.05, -0.07, 0.07);
           // Bigger structural accents every 8 and (more so) every 16 bars.
+          const crashTime = hitTime + (drumDrift + LAID_BACK.crash) * secondsPer16th();
           if (totalBars > 1 && (totalBars - 1) % 16 === 0) {
-            emitDrum("crash", hitTime, 0.95, 1.2);
+            emitDrum("crash", crashTime, 0.95, 1.2);
           } else if (totalBars > 1 && (totalBars - 1) % 8 === 0) {
-            emitDrum("crash", hitTime, 0.62, 1.2);
+            emitDrum("crash", crashTime, 0.62, 1.2);
           }
 
           const cell = currentCell();
@@ -1317,31 +1589,59 @@
           emitBass(event.midi, hitTime, velocity, event.length * secondsPer16th() * 0.92);
         });
 
-        const isFillTail = currentBarIsFill && step >= 10;
-        const kickHit = !isFillTail && currentKickPattern.has(step);
+        // ---- Drums --------------------------------------------------------
+        const sec16 = secondsPer16th();
+        const drumTime = hitTime + drumDrift * sec16;
+        const profile = activeProgression.drumProfile;
+        const fillStart = currentFillSteps[0];
+        const isFillTail = currentBarIsFill && step >= fillStart;
+        const isExtraKick = !isFillTail && step === barExtraKickStep;
+        const kickHit = !isFillTail && (currentKickPattern.has(step) || isExtraKick);
         // Backbeat (steps 4 and 12, beats 2 and 4) is the emphasis point of
-        // the whole groove: it's dragged noticeably later than the grid and
-        // hits louder than anything else, per real soul/funk drumming.
+        // the whole groove: it's dragged well behind the grid and hits louder
+        // than anything else, per real soul/funk drumming.
         const isBackbeat = groove.snareSteps.has(step) && (step === 4 || step === 12);
-        const snareHit = isFillTail ? FILL_TAIL_STEPS.has(step) : groove.snareSteps.has(step);
-        const snareDragSeconds = isBackbeat ? 0.022 : 0.012;
+        const snareHit = isFillTail ? currentFillSteps.includes(step) : groove.snareSteps.has(step);
 
         if (kickHit) {
-          emitDrum("kick", hitTime, 0.85 + Math.random() * 0.1, 0.08);
+          const velocity = isExtraKick ? 0.5 + Math.random() * 0.15 : 0.85 + Math.random() * 0.1;
+          emitDrum("kick", drumTime + LAID_BACK.kick * sec16, velocity, 0.08);
         }
+        const ghostChance = Math.min(0.5, groove.ghostChance * 2 * (0.5 + 1.5 * phraseIntensity) * profile.activity);
         if (snareHit) {
-          const velocity = isFillTail
-            ? 0.5 + (step - 10) * 0.09
-            : (isBackbeat ? 0.95 + Math.random() * 0.15 : 0.8 + Math.random() * 0.15);
-          emitDrum("snare", hitTime + snareDragSeconds, velocity, 0.08);
-        } else if (!kickHit && Math.random() < groove.ghostChance) {
-          // A quiet ghost snare for a more human, less mechanical pocket.
-          emitDrum("snare", hitTime, 0.1 + Math.random() * 0.08, 0.05);
+          let velocity;
+          if (isFillTail) {
+            const position = currentFillSteps.indexOf(step) / Math.max(1, currentFillSteps.length - 1);
+            velocity = 0.5 + 0.42 * position;
+          } else if (isBackbeat) {
+            velocity = 0.9 + 0.08 * phraseIntensity + Math.random() * 0.12;
+          } else {
+            velocity = 0.8 + Math.random() * 0.15;
+          }
+          const drag = isBackbeat ? LAID_BACK.backbeat : LAID_BACK.snare;
+          emitDrum("snare", drumTime + drag * sec16, velocity, 0.08);
+        } else if (!kickHit && !isFillTail && step % 2 === 1 && Math.random() < ghostChance) {
+          // A quiet ghost snare on a 16th upbeat for a more human, less mechanical pocket.
+          emitDrum("snare", drumTime + LAID_BACK.snare * sec16, 0.1 + Math.random() * 0.08, 0.05);
         }
 
+        const hatTime = drumTime + LAID_BACK.hat * sec16;
         if (step % groove.hihatEvery === 0) {
-          const isOpen = step === 14 && Math.random() < 0.3;
-          emitDrum(isOpen ? "hihatOpen" : "hihatClosed", hitTime, 0.55 + Math.random() * 0.25, isOpen ? 0.2 : 0.05);
+          // In calmer phrases the "and" hats sometimes drop out so the groove breathes.
+          const breathes = phraseIntensity < 0.5 && groove.hihatEvery <= 2 && step % 4 === 2 && Math.random() < 0.4;
+          if (!breathes) {
+            const openChance = 0.1 + 0.3 * phraseIntensity;
+            const isOpen = (step === 14 && Math.random() < openChance)
+              || (step === 6 && currentBarInPhrase === 1 && Math.random() < 0.12 * phraseIntensity);
+            const velocity = clamp(0.5 + Math.random() * 0.18 + hatAccent(step), 0.3, 1);
+            emitDrum(isOpen ? "hihatOpen" : "hihatClosed", hatTime, velocity, isOpen ? 0.2 : 0.05);
+          }
+        } else if (!isFillTail) {
+          // Busier phrases add soft in-between hat ticks.
+          const isTickSpot = (groove.hihatEvery === 2 && step % 2 === 1) || (groove.hihatEvery === 4 && step % 4 === 2);
+          if (isTickSpot && Math.random() < 0.3 * phraseIntensity * profile.activity) {
+            emitDrum("hihatClosed", hatTime, 0.22 + Math.random() * 0.12, 0.04);
+          }
         }
 
         if (step === 0) {
@@ -1387,6 +1687,7 @@
         // clock (performance.now()) are different timelines; this offset
         // lets MIDI note timestamps be computed from audio-scheduled times.
         audioToPerfOffsetMs = performance.now() - context.currentTime * 1000;
+        if (midiEnabled) sendAllMidiSetup();
 
         if (!samplesLoaded) {
           generateButton.textContent = "Loading…";
@@ -1411,6 +1712,12 @@
         currentKickPattern = activeProgression.groove.kickPatterns[0];
         currentBarIsFill = false;
         pendingProgression = null;
+        drumDrift = 0;
+        phraseIntensity = 0.4;
+        hatAccentVariant = 0;
+        barExtraKickStep = -1;
+        currentFillSteps = FILL_VARIANTS[0];
+        currentBarInPhrase = 0;
         lastBassRoot = 40;
         currentStringsAnchor = 72;
         currentBassEvents = [];
@@ -1493,7 +1800,7 @@
         tempoValueEl.textContent = `${bpm} BPM`;
       });
       window.addEventListener("beforeunload", () => { if (running) stop(); });
-      buildMidiChannelPanel();
+      buildMidiConfPanel();
       renderPatternList();
     })();
   </script>
