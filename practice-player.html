@@ -46,7 +46,23 @@ h1{font-size:18px;margin:0 6px 0 0;font-weight:650;white-space:nowrap}
 
 #wavewrap{position:relative;flex:1;min-height:110px;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#101216}
 canvas#wave{position:absolute;inset:0;width:100%;height:100%;cursor:pointer;touch-action:none}
-.transport{display:flex;gap:10px;align-items:center}
+.transport{display:flex;gap:10px;align-items:center;position:relative}
+.seg{display:flex;gap:3px;flex:1}
+.seg button{flex:1;padding:3px 0;min-width:28px}
+.seg button[aria-pressed=true]{background:var(--accent2);border-color:var(--accent2);color:#06201c;font-weight:650}
+#plBtns{flex:none}
+#plBtns button{flex:none;min-width:28px;padding:3px 8px}
+#saxInfo{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+#plPanel{position:absolute;right:0;top:36px;width:min(620px,94vw);max-height:60vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px;z-index:20;box-shadow:0 12px 40px rgba(0,0,0,.55);display:grid;gap:5px;align-content:start}
+#plPanel[hidden]{display:none}
+#plPanel .rhead{display:flex;gap:8px;align-items:center}
+#plPanel .rhead input{width:160px}
+#plPanel .row{display:flex;gap:6px;align-items:center;border-radius:7px;padding:1px 3px}
+#plPanel .row.cur{background:var(--panel2)}
+#plPanel .row b{width:18px;text-align:center;font-size:12px;color:var(--muted)}
+#plPanel .item{display:flex;justify-content:space-between;gap:12px;text-align:left;flex:1;min-width:0;padding:4px 10px}
+#plPanel .item span{overflow:hidden;text-overflow:ellipsis}
+#plPanel .item small{color:var(--muted);white-space:nowrap}
 #time{font-variant-numeric:tabular-nums;font-size:16px;min-width:170px}
 .keys{font-size:12px;color:var(--muted);min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .transport select{padding:4px 6px;border-radius:7px}
@@ -113,7 +129,10 @@ output{font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
     <option value="1">1 s</option>
   </select>
   <span class="spacer"></span>
-  <span class="keys">Space play · ←/→ ±5 s · 1–9, 0 loops · S sax</span>
+  <span class="keys">Space · ←/→ ±5 s · 1–0 loops · S sax</span>
+  <span class="muted">Lists</span>
+  <div class="seg" id="plBtns" role="group" aria-label="Track lists"></div>
+  <div id="plPanel" hidden></div>
   <label class="muted" for="vol">Volume</label>
   <input type="range" id="vol" min="0" max="1" step="0.01" value="0.9" style="accent-color:var(--accent2);width:110px">
 </div>
@@ -152,7 +171,12 @@ output{font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
   <div class="box">
     <div class="sl">
       <span class="lbl">Sax focus</span>
-      <button id="saxBtn" class="toggle" aria-pressed="false" title="Makes the saxophone stand out: boosts its frequency range, favours the centre of the stereo image and reduces bass and wide-panned instruments. It is an EQ-style emphasis, not a true separation of instruments (S)">Off</button>
+      <div class="seg" id="saxSeg" role="group" aria-label="Sax focus level">
+        <button data-l="0" aria-pressed="true" title="Original mix (S cycles the levels)">Off</button>
+        <button data-l="1" aria-pressed="false" title="Level 1: everything except the tracked saxophone melody is reduced by about 6 dB">1</button>
+        <button data-l="2" aria-pressed="false" title="Level 2: everything except the tracked saxophone melody is reduced by about 15 dB">2</button>
+        <button data-l="3" aria-pressed="false" title="Level 3: everything except the tracked saxophone melody is reduced by about 30 dB">3</button>
+      </div>
       <select id="saxType" title="Type of saxophone">
         <option value="soprano">Soprano</option>
         <option value="alto">Alto</option>
@@ -161,14 +185,228 @@ output{font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
       </select>
     </div>
     <div class="sl">
-      <span class="lbl">Amount</span>
-      <input type="range" id="saxAmt" min="0" max="100" step="1" value="60">
-      <output id="saxAmtV">60%</output>
+      <span class="lbl"></span>
+      <span id="saxInfo" class="muted"></span>
     </div>
   </div>
 </div>
 
 <div id="loops"></div>
+
+<script id="sax-src" type="text/plain">
+function* saxJob(L, R, sr, cfg) {
+  const guide = cfg.guide || null;
+  const XL = L, XR = R || L;
+  const GL = guide ? guide.L : L, GR = guide ? (guide.R || guide.L) : (R || L);
+  const len = L.length;
+  const N = 1 << Math.round(Math.log2(sr * 0.093));
+  const H = N >> 2, half = N >> 1;
+  const nF = Math.ceil(len / H) + 3;
+  const binHz = sr / N;
+  const win = new Float64Array(N);
+  let winEnergy = 0;
+  for (let n = 0; n < N; n++) { win[n] = 0.5 - 0.5 * Math.cos(2 * Math.PI * n / N); winEnergy += win[n] * win[n]; }
+  const cosT = new Float64Array(half), sinT = new Float64Array(half);
+  for (let k = 0; k < half; k++) { cosT[k] = Math.cos(2 * Math.PI * k / N); sinT[k] = Math.sin(2 * Math.PI * k / N); }
+  const bits = Math.round(Math.log2(N));
+  const rev = new Uint32Array(N);
+  for (let i = 0; i < N; i++) { let r = 0, x = i; for (let b = 0; b < bits; b++) { r = (r << 1) | (x & 1); x >>= 1; } rev[i] = r; }
+  const re = new Float64Array(N), im = new Float64Array(N);
+  function fft(sgn) {
+    for (let i = 0; i < N; i++) {
+      const j = rev[i];
+      if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+    }
+    for (let size = 2; size <= N; size <<= 1) {
+      const hs = size >> 1, step = N / size;
+      for (let start = 0; start < N; start += size) {
+        for (let k = 0, tw = 0; k < hs; k++, tw += step) {
+          const wr = cosT[tw], wi = sgn * sinT[tw];
+          const a = start + k, b = a + hs;
+          const xr = re[b] * wr - im[b] * wi, xi = re[b] * wi + im[b] * wr;
+          re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+        }
+      }
+    }
+  }
+  function loadFrame(a, b, t) {
+    const s0 = t * H - (N - H);
+    for (let n = 0; n < N; n++) {
+      const i = s0 + n;
+      if (i >= 0 && i < len) { re[n] = a[i] * win[n]; im[n] = b[i] * win[n]; } else { re[n] = 0; im[n] = 0; }
+    }
+  }
+  const A = new Float64Array(half + 1), B = new Float64Array(half + 1), Pk = new Float64Array(half + 1), cum = new Float64Array(half + 2);
+  function midMag() {
+    let e = 0;
+    for (let k = 0; k <= half; k++) {
+      const k2 = (N - k) & (N - 1);
+      const zr = re[k], zi = im[k], wr = re[k2], wi = im[k2];
+      const lr = (zr + wr) * 0.5, li = (zi - wi) * 0.5;
+      const rr = (zi + wi) * 0.5, ri = (wr - zr) * 0.5;
+      const mr = (lr + rr) * 0.5, mi = (li + ri) * 0.5;
+      A[k] = Math.sqrt(mr * mr + mi * mi);
+      e += A[k] * A[k];
+    }
+    return 2 * e / (N * winEnergy);
+  }
+  const fmin = cfg.fmin, fmax = cfg.fmax, stepC = 20, HM = 14, fTop = 8000;
+  const P = Math.floor(1200 * Math.log2(fmax / fmin) / stepC) + 1;
+  const hbin = new Float32Array(P * HM), hcnt = new Uint8Array(P), bias = new Float32Array(P), hw = new Float32Array(HM);
+  for (let h = 0; h < HM; h++) hw[h] = Math.pow(0.86, h);
+  for (let p = 0; p < P; p++) {
+    const f = fmin * Math.pow(2, p * stepC / 1200);
+    let c = 0;
+    for (let h = 1; h <= HM; h++) {
+      const fh = f * h;
+      if (fh > fTop || fh / binHz >= half - 2) break;
+      hbin[p * HM + c] = fh / binHz; c++;
+    }
+    hcnt[p] = c;
+    bias[p] = 1 + 0.08 * (1 - p / Math.max(1, P - 1));
+  }
+  const Wb = Math.max(8, Math.round(600 / binHz));
+  const kTop = Math.min(half, Math.ceil(fTop / binHz) + 2);
+  const sal = new Float32Array(nF * P);
+  const gated = new Uint8Array(nF);
+  const peaksT = [];
+  for (let t = 0; t < nF; t++) {
+    loadFrame(GL, GR, t); fft(-1);
+    const ms = midMag();
+    if (ms > 1e-8) {
+      gated[t] = 1;
+      cum[0] = 0;
+      for (let k = 0; k <= half; k++) { B[k] = Math.sqrt(A[k]); cum[k + 1] = cum[k] + B[k]; }
+      for (let k = 0; k <= half; k++) {
+        if (k > kTop) { Pk[k] = 0; continue; }
+        const lo = k - Wb < 0 ? 0 : k - Wb, hi = k + Wb > half ? half : k + Wb;
+        const v = B[k] / ((cum[hi + 1] - cum[lo]) / (hi - lo + 1) + 1e-12) - 1;
+        Pk[k] = v > 0 ? (v < 3 ? v : 3) : 0;
+      }
+      let mx = 0;
+      for (let p = 0; p < P; p++) {
+        let s = 0, ws = 0;
+        const c = hcnt[p], o = p * HM;
+        for (let h = 0; h < c; h++) {
+          const i = Math.round(hbin[o + h]);
+          let v = Pk[i];
+          if (Pk[i - 1] > v) v = Pk[i - 1];
+          if (Pk[i + 1] > v) v = Pk[i + 1];
+          s += hw[h] * v; ws += hw[h];
+        }
+        const val = ws > 0 ? s / ws * bias[p] : 0;
+        sal[t * P + p] = val;
+        if (val > mx) mx = val;
+      }
+      peaksT.push(mx);
+    }
+    if ((t & 63) === 0) yield 0.35 * t / nF;
+  }
+  peaksT.sort((a, b) => a - b);
+  const ref = peaksT.length ? Math.max(peaksT[Math.floor(0.9 * (peaksT.length - 1))], 1e-6) : 1;
+  const tau = cfg.tau, lam = cfg.lam, jumpC = cfg.jump, vPen = cfg.vpen;
+  const S1 = P + 1;
+  const bp = new Int16Array(nF * S1);
+  let prev = new Float32Array(S1), cur = new Float32Array(S1);
+  const fw = new Float32Array(P), fs = new Int16Array(P), bw = new Float32Array(P), bs = new Int16Array(P);
+  for (let j = 0; j < P; j++) prev[j] = gated[0] ? sal[j] / ref : 0;
+  prev[P] = tau;
+  for (let t = 1; t < nF; t++) {
+    let gm = -1e9, gi = 0;
+    for (let j = 0; j < P; j++) if (prev[j] > gm) { gm = prev[j]; gi = j; }
+    for (let j = 0; j < P; j++) {
+      if (j > 0 && fw[j - 1] - lam > prev[j]) { fw[j] = fw[j - 1] - lam; fs[j] = fs[j - 1]; } else { fw[j] = prev[j]; fs[j] = j; }
+    }
+    for (let j = P - 1; j >= 0; j--) {
+      if (j < P - 1 && bw[j + 1] - lam > fw[j]) { bw[j] = bw[j + 1] - lam; bs[j] = bs[j + 1]; } else { bw[j] = fw[j]; bs[j] = fs[j]; }
+    }
+    const fromU = prev[P] - vPen, o = t * S1, g = gated[t];
+    for (let j = 0; j < P; j++) {
+      let best = bw[j], src = bs[j];
+      if (gm - jumpC > best) { best = gm - jumpC; src = gi; }
+      if (fromU > best) { best = fromU; src = P; }
+      cur[j] = best + (g ? sal[t * P + j] / ref : 0);
+      bp[o + j] = src;
+    }
+    let ub = prev[P], us = P;
+    if (gm - vPen > ub) { ub = gm - vPen; us = gi; }
+    cur[P] = ub + tau;
+    bp[o + P] = us;
+    const sw = prev; prev = cur; cur = sw;
+    if ((t & 255) === 0) yield 0.35 + 0.05 * t / nF;
+  }
+  const f0 = new Float32Array(nF), voiced = new Uint8Array(nF);
+  let st = P, bv = prev[P];
+  for (let j = 0; j < P; j++) if (prev[j] > bv) { bv = prev[j]; st = j; }
+  let nGated = 0, nVoiced = 0;
+  for (let t = nF - 1; t >= 0; t--) {
+    if (st < P) {
+      voiced[t] = 1;
+      const a = st > 0 ? sal[t * P + st - 1] : 0, b0 = sal[t * P + st], c = st < P - 1 ? sal[t * P + st + 1] : 0;
+      const den = a - 2 * b0 + c;
+      let d = den < -1e-9 ? 0.5 * (a - c) / den : 0;
+      if (d > 0.5) d = 0.5; else if (d < -0.5) d = -0.5;
+      f0[t] = fmin * Math.pow(2, (st + d) * stepC / 1200);
+    }
+    if (gated[t]) { nGated++; if (voiced[t]) nVoiced++; }
+    st = bp[t * S1 + st];
+  }
+  yield 0.4;
+  const SL = new Float32Array(len), SR = R ? new Float32Array(len) : null;
+  const m = new Float32Array(half + 1);
+  const norm = 1 / (1.5 * N), hiLimit = Math.min(cfg.hi || 14000, 0.45 * sr);
+  const f0s = [];
+  for (let t = 0; t < nF; t++) {
+    f0s.length = 0;
+    for (let u = t - 1; u <= t + 1; u++) if (u >= 0 && u < nF && voiced[u]) f0s.push(f0[u]);
+    if (f0s.length) {
+      loadFrame(GL, GR, t); fft(-1); midMag();
+      m.fill(0);
+      for (let q = 0; q < f0s.length; q++) {
+        const f = f0s[q];
+        for (let h = 1; h * f <= hiLimit; h++) {
+          const c = h * f / binHz;
+          const w = 1.2 + 0.004 * c;
+          let lo = Math.floor(c - w), hi = Math.ceil(c + w);
+          if (lo < 1) lo = 1;
+          if (hi > half - 1) hi = half - 1;
+          if (lo > hi) break;
+          let cp = lo, mv = A[lo];
+          for (let k = lo + 1; k <= hi; k++) if (A[k] > mv) { mv = A[k]; cp = k; }
+          const hwid = 1.5 + 0.0035 * c, taper = 1.0;
+          let k0 = Math.floor(cp - hwid - taper), k1 = Math.ceil(cp + hwid + taper);
+          if (k0 < 1) k0 = 1;
+          if (k1 > half - 1) k1 = half - 1;
+          for (let k = k0; k <= k1; k++) {
+            const dist = Math.abs(k - cp);
+            const v = dist <= hwid ? 1 : 1 - (dist - hwid) / taper;
+            if (v > m[k]) m[k] = v;
+          }
+        }
+      }
+      if (guide) { loadFrame(XL, XR, t); fft(-1); }
+      for (let k = 0; k <= half; k++) {
+        const mk = m[k];
+        re[k] *= mk; im[k] *= mk;
+        if (k > 0 && k < half) { re[N - k] *= mk; im[N - k] *= mk; }
+      }
+      fft(1);
+      const s0 = t * H - (N - H);
+      for (let n = 0; n < N; n++) {
+        const i = s0 + n;
+        if (i >= 0 && i < len) {
+          const g = win[n] * norm;
+          SL[i] += re[n] * g;
+          if (SR) SR[i] += im[n] * g;
+        }
+      }
+    }
+    if ((t & 63) === 0) yield 0.4 + 0.6 * t / nF;
+  }
+  yield 1;
+  return { SL, SR, f0, voiced, voicedFrac: nGated ? nVoiced / nGated : 0, H, N };
+}
+</script>
 
 <script id="engine-src" type="text/plain">
 class StretchEngine {
@@ -207,6 +445,9 @@ class StretchEngine {
         this.pos = 0; this.resetStream(); this.endedSent = false; break;
       case 'play':
         this.playing = !!m.playing; if (this.playing) this.endedSent = false; break;
+      case 'swap':
+        if (m.L && m.L.length === this.len) { this.L = m.L; this.R = m.R || m.L; }
+        break;
       case 'seek':
         this.seekPending = Math.max(0, m.pos); break;
       case 'params':
@@ -425,69 +666,111 @@ function parseTime(str) {
 function setStatus(msg, err = false) { const s = $('#status'); s.textContent = msg; s.title = msg; s.className = err ? 'err' : ''; }
 const pitchRatio = () => Math.pow(2, (semis * 100 + cents) / 1200);
 
-const SAX = {
-  soprano: { low: 208, mid: 650 },
-  alto: { low: 139, mid: 400 },
-  tenor: { low: 104, mid: 280 },
-  baritone: { low: 65, mid: 170 }
-};
-const dbToGain = db => Math.pow(10, db / 20);
-function createFx(ac) {
-  const input = ac.createGain(), output = ac.createGain();
-  const dry = ac.createGain(), wet = ac.createGain();
-  wet.gain.value = 0;
-  input.connect(dry); dry.connect(output);
-  const split = ac.createChannelSplitter(2), merge = ac.createChannelMerger(2);
-  const midG = ac.createGain(), sideL = ac.createGain(), sideR = ac.createGain();
-  const sideSum = ac.createGain(), sideInv = ac.createGain();
-  sideInv.gain.value = -1;
-  input.connect(split);
-  split.connect(midG, 0); split.connect(midG, 1);
-  split.connect(sideL, 0); split.connect(sideR, 1);
-  sideL.connect(sideSum); sideR.connect(sideSum); sideSum.connect(sideInv);
-  midG.connect(merge, 0, 0); sideSum.connect(merge, 0, 0);
-  midG.connect(merge, 0, 1); sideInv.connect(merge, 0, 1);
-  const low = ac.createBiquadFilter(); low.type = 'lowshelf';
-  const body = ac.createBiquadFilter(); body.type = 'peaking'; body.Q.value = 0.7;
-  const harm = ac.createBiquadFilter(); harm.type = 'peaking'; harm.Q.value = 0.9;
-  const pres = ac.createBiquadFilter(); pres.type = 'peaking'; pres.Q.value = 1; pres.frequency.value = 3200;
-  const makeup = ac.createGain();
-  const limiter = ac.createDynamicsCompressor();
-  limiter.threshold.value = -3; limiter.knee.value = 0; limiter.ratio.value = 20;
-  limiter.attack.value = 0.002; limiter.release.value = 0.1;
-  merge.connect(low); low.connect(body); body.connect(harm); harm.connect(pres);
-  pres.connect(makeup); makeup.connect(limiter); limiter.connect(wet); wet.connect(output);
-  const glide = (param, v) => param.setTargetAtTime(v, ac.currentTime, 0.02);
-  const fade = (param, v) => {
-    const t = ac.currentTime;
-    param.cancelScheduledValues(t); param.setValueAtTime(param.value, t); param.linearRampToValueAtTime(v, t + 0.03);
-  };
-  function set(on, type, amount) {
-    const s = clamp(amount, 0, 1), p = SAX[type] || SAX.tenor;
-    glide(midG.gain, 0.5 * (1 + 0.15 * s));
-    glide(sideL.gain, 0.5 * (1 - 0.6 * s));
-    glide(sideR.gain, -0.5 * (1 - 0.6 * s));
-    glide(low.frequency, p.low * 0.85); glide(low.gain, -9 * s);
-    glide(body.frequency, p.mid); glide(body.gain, 6 * s);
-    glide(harm.frequency, Math.min(p.mid * 3, 6000)); glide(harm.gain, 4 * s);
-    glide(pres.gain, 3 * s);
-    glide(makeup.gain, dbToGain(-2.5 * s));
-    fade(wet.gain, on ? 1 : 0); fade(dry.gain, on ? 0 : 1);
-  }
-  return { input, output, dry, wet, set };
+const SAX_TYPES = { soprano: [190, 1500], alto: [120, 1150], tenor: [90, 850], baritone: [60, 580] };
+const SAX_DB = [0, -6, -15, -30];
+let saxLevel = 0, saxRun = null, saxWorkerUrl = null;
+const saxCfg = type => ({ tau: 0.3, lam: 0.012, jump: 0.35, vpen: 0.12, fmin: SAX_TYPES[type][0], fmax: SAX_TYPES[type][1] });
+const saxType = () => $('#saxType').value;
+function saxValid(t) { return !!(t && t.sax && t.sax.type === saxType()); }
+function cancelSax() { if (saxRun) { saxRun.cancelled = true; if (saxRun.w) saxRun.w.terminate(); saxRun = null; } }
+function saxInfo(p) {
+  const el = $('#saxInfo');
+  let s;
+  if (!audio) s = 'Load a track, then choose a level.';
+  else if (saxRun && saxRun.t === audio) s = 'Analysing the melody… ' + Math.round((p == null ? saxRun.p || 0 : p) * 100) + '%';
+  else if (saxLevel === 0) s = 'Level 1–3 keep the saxophone and reduce the rest.';
+  else if (saxValid(audio)) {
+    const v = audio.sax.voiced;
+    s = 'Level ' + saxLevel + ' · melody in ' + Math.round(v * 100) + '%' + (v < 0.2 ? ' · weak effect' : '');
+  } else s = '';
+  el.textContent = s; el.title = s;
 }
-let fx = null, saxOn = false;
-function applySax() {
-  const b = $('#saxBtn');
-  b.setAttribute('aria-pressed', String(saxOn)); b.textContent = saxOn ? 'On' : 'Off';
-  if (fx) fx.set(saxOn, $('#saxType').value, +$('#saxAmt').value / 100);
+function startSax(t) {
+  cancelSax();
+  const type = saxType(), sr = t.buffer.sampleRate, cfg = saxCfg(type);
+  const job = { t, type, cancelled: false, w: null, p: 0 };
+  saxRun = job;
+  const fresh = () => {
+    const L = t.buffer.getChannelData(0).slice();
+    const R = t.buffer.numberOfChannels > 1 ? t.buffer.getChannelData(1).slice() : null;
+    return { L, R };
+  };
+  const finish = res => {
+    if (job.cancelled) return;
+    saxRun = null;
+    t.sax = { type, SL: res.SL, SR: res.SR, voiced: res.voicedFrac };
+    if (audio === t && saxLevel > 0) applyMix();
+    saxInfo();
+  };
+  const progress = p => { if (!job.cancelled) { job.p = p; saxInfo(p); } };
+  const onMain = () => {
+    const { L, R } = fresh();
+    const fn = new Function($('#sax-src').textContent + '\nreturn saxJob;')();
+    const g = fn(L, R, sr, cfg);
+    const step = () => {
+      if (job.cancelled) return;
+      const t0 = performance.now();
+      let r;
+      do { r = g.next(); } while (!r.done && performance.now() - t0 < 14);
+      if (r.done) finish(r.value); else { progress(r.value); setTimeout(step, 0); }
+    };
+    step();
+  };
+  try {
+    if (!saxWorkerUrl) {
+      const wsrc = $('#sax-src').textContent + '\nonmessage=e=>{const d=e.data;const g=saxJob(d.L,d.R,d.sr,d.cfg);let r;while(!(r=g.next()).done)postMessage({p:r.value});const v=r.value;postMessage({done:1,SL:v.SL,SR:v.SR,voicedFrac:v.voicedFrac},[v.SL.buffer].concat(v.SR?[v.SR.buffer]:[]));};';
+      saxWorkerUrl = URL.createObjectURL(new Blob([wsrc], { type: 'text/javascript' }));
+    }
+    const w = new Worker(saxWorkerUrl);
+    job.w = w;
+    w.onmessage = e => { if (e.data.done) { w.terminate(); job.w = null; finish(e.data); } else progress(e.data.p); };
+    w.onerror = () => { w.terminate(); job.w = null; if (!job.cancelled) onMain(); };
+    const { L, R } = fresh();
+    w.postMessage({ L, R, sr, cfg }, R ? [L.buffer, R.buffer] : [L.buffer]);
+  } catch (e) {
+    job.w = null; onMain();
+  }
+  saxInfo(0);
+}
+function applyMix() {
+  const t = audio;
+  if (!t || !ready) return;
+  const X0 = t.buffer.getChannelData(0), X1 = t.buffer.numberOfChannels > 1 ? t.buffer.getChannelData(1) : null;
+  let L, R = null;
+  if (saxLevel > 0 && saxValid(t)) {
+    const g = Math.pow(10, SAX_DB[saxLevel] / 20), h = 1 - g, S = t.sax;
+    L = new Float32Array(X0.length);
+    for (let i = 0; i < L.length; i++) L[i] = g * X0[i] + h * S.SL[i];
+    if (X1) { R = new Float32Array(X1.length); for (let i = 0; i < R.length; i++) R[i] = g * X1[i] + h * S.SR[i]; }
+  } else {
+    L = X0.slice(); if (X1) R = X1.slice();
+  }
+  post({ type: 'swap', L, R }, R ? [L.buffer, R.buffer] : [L.buffer]);
+}
+function syncSax() {
+  const t = audio;
+  tracks.forEach(x => { if (x !== t && x.sax) x.sax = null; });
+  if (!t) { saxInfo(); return; }
+  if (t.sax && !saxValid(t)) t.sax = null;
+  if (saxLevel > 0 && !saxValid(t) && !(saxRun && saxRun.t === t && saxRun.type === saxType())) startSax(t);
+  else if (saxLevel === 0 || saxValid(t)) { if (saxRun && (saxLevel === 0 || saxRun.t !== t)) cancelSax(); applyMix(); }
+  saxInfo();
+}
+function setSaxLevel(n) {
+  saxLevel = n;
+  document.querySelectorAll('#saxSeg button').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.l === n)));
+  if (audio) syncSax(); else saxInfo();
+}
+function onSaxType() {
+  if (audio && audio.sax && !saxValid(audio)) audio.sax = null;
+  if (saxRun && saxRun.type !== saxType()) cancelSax();
+  if (audio) syncSax(); else saxInfo();
 }
 
 async function initAudio() {
   if (ctx) { if (ctx.state === 'suspended') await ctx.resume(); return; }
   ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'playback' });
   master = ctx.createGain(); master.gain.value = volume; master.connect(ctx.destination);
-  fx = createFx(ctx); fx.output.connect(master); applySax();
   const engineSrc = $('#engine-src').textContent;
   let ok = false;
   try {
@@ -496,7 +779,7 @@ async function initAudio() {
     await ctx.audioWorklet.addModule(url);
     node = new AudioWorkletNode(ctx, 'stretch-processor', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
     node.port.onmessage = onNodeMsg;
-    node.connect(fx.input);
+    node.connect(master);
     post = (m, tr) => node.port.postMessage(m, tr || []);
     ok = true;
   } catch (e) {
@@ -507,7 +790,7 @@ async function initAudio() {
     engine = new Engine(ctx.sampleRate, m => onNodeMsg({ data: m }));
     proc = ctx.createScriptProcessor(4096, 0, 2);
     proc.onaudioprocess = e => engine.render(e.outputBuffer.getChannelData(0), e.outputBuffer.getChannelData(1), e.outputBuffer.length);
-    proc.connect(fx.input);
+    proc.connect(master);
     post = m => engine.onMsg(m);
   }
   ready = true;
@@ -579,8 +862,8 @@ function refreshInfo() {
   const details = fmt(audio.duration) + ' · ' + audio.channels + ' ch · ' + ctx.sampleRate + ' Hz';
   $('#fileName').textContent = tracks.length > 1 ? details : audio.name + ' · ' + details;
 }
-function addTrack(name, buf) {
-  const t = { name, buffer: buf, duration: buf.duration, channels: buf.numberOfChannels };
+function addTrack(name, buf, extra) {
+  const t = { name, buffer: buf, duration: buf.duration, channels: buf.numberOfChannels, sax: null, raw: null, src: null, blobId: null, ...(extra || {}) };
   tracks.push(t);
   if (tracks.length > MAX_TRACKS) {
     const drop = tracks.findIndex(x => x !== audio);
@@ -597,15 +880,17 @@ function activateTrack(t) {
   post({ type: 'loop', enabled: false, start: 0, end: 0 });
   applyParams();
   restoreLoops(); computePeaks(); refreshTray(); refreshInfo(); refreshUI();
+  syncSax(); renderPl();
 }
 
-async function loadArrayBuffer(ab, name, activate = true) {
+async function loadArrayBuffer(ab, name, activate = true, extra = null) {
   try { await initAudio(); }
   catch (err) { console.error(err); setStatus('The audio engine could not start: ' + err.message, true); return null; }
   let buf;
+  const raw = new Blob([ab]);
   try { buf = await ctx.decodeAudioData(ab); }
   catch (err) { console.error(err); setStatus('Could not decode "' + name + '". Its format may not be supported by the browser.', true); return null; }
-  const t = addTrack(name, buf);
+  const t = addTrack(name, buf, { raw, ...(extra || {}) });
   if (activate || !audio) activateTrack(t); else { refreshTray(); refreshInfo(); }
   return t;
 }
@@ -659,7 +944,7 @@ async function loadItems(items) {
       setStatus(prefix + 'Loading ' + it.title + '…');
       const url = it.helper ? helperBase + '/api/audio?url=' + encodeURIComponent(it.url) : it.url;
       const got = await download(url, it.helper);
-      const t = await loadArrayBuffer(got.ab, it.name || got.title || it.title, ok === 0);
+      const t = await loadArrayBuffer(got.ab, it.name || got.title || it.title, ok === 0, { src: { url: it.url, helper: !!it.helper } });
       if (t) ok++;
     } catch (err) {
       console.error(err);
@@ -669,6 +954,176 @@ async function loadItems(items) {
   }
   if (ok && !lastErr) setStatus(ok > 1 ? ok + ' versions loaded. Use the list at the top to switch.' : 'Loaded.');
   else if (ok && lastErr) setStatus(ok + ' of ' + items.length + ' loaded. Last error: ' + lastErr, true);
+}
+
+const PL_COUNT = 5, PL_MAX = 40;
+const idb = {
+  p: null,
+  open() {
+    if (!this.p) this.p = new Promise((res, rej) => {
+      try {
+        const r = indexedDB.open('pp-audio', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('f');
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      } catch (e) { rej(e); }
+    });
+    return this.p;
+  },
+  async run(mode, fn) {
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('f', mode), rq = fn(tx.objectStore('f'));
+      tx.oncomplete = () => res(rq && rq.result);
+      tx.onerror = tx.onabort = () => rej(tx.error);
+    });
+  },
+  put(k, v) { return this.run('readwrite', s => s.put(v, k)); },
+  get(k) { return this.run('readonly', s => s.get(k)); },
+  del(k) { return this.run('readwrite', s => s.delete(k)); }
+};
+function readLists() {
+  try {
+    const s = JSON.parse(localStorage.getItem('pp-lists'));
+    if (Array.isArray(s) && s.length === PL_COUNT) return s;
+  } catch (e) {}
+  return Array.from({ length: PL_COUNT }, (_, i) => ({ name: 'List ' + (i + 1), items: [] }));
+}
+const playlists = readLists();
+let plIndex = 0, plOpen = false;
+function writeLists() {
+  try { localStorage.setItem('pp-lists', JSON.stringify(playlists)); }
+  catch (e) { setStatus('The lists could not be saved in this browser.', true); }
+}
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+const sameTrack = (it, t) => !!t && ((it.blobId && it.blobId === t.blobId) || (it.name === t.name && Math.abs(it.duration - t.duration) < 0.5));
+function snapshot() {
+  return { speed: mainSpeed, semis, cents, win: winMs, sax: saxLevel, saxType: saxType(), loops: loops.map(l => ({ start: l.start, end: l.end, speed: l.speed })) };
+}
+function summary(st) {
+  const n = st.loops.filter(l => l.start != null && l.end != null).length;
+  const parts = [pct(st.speed), fmtS(st.semis) + ' st'];
+  if (st.cents) parts.push(fmtS(st.cents) + ' ct');
+  parts.push(n + (n === 1 ? ' loop' : ' loops'));
+  if (st.sax) parts.push('sax ' + st.sax);
+  return parts.join(' · ');
+}
+function applyState(st) {
+  const set = (id, v) => { const el = $('#' + id); el.value = v; el.oninput({ target: el }); };
+  set('speed', st.speed); set('semis', st.semis); set('cents', st.cents);
+  $('#win').value = st.win; $('#win').onchange({ target: $('#win') });
+  loops.forEach((l, i) => {
+    const s = st.loops[i] || {};
+    l.start = s.start == null ? null : s.start; l.end = s.end == null ? null : s.end; l.speed = s.speed || 1;
+    refreshLoop(i);
+  });
+  saveLoops();
+  if (st.saxType && SAX_TYPES[st.saxType]) $('#saxType').value = st.saxType;
+  onSaxType();
+  setSaxLevel(st.sax || 0);
+  applyParams();
+}
+async function plAdd() {
+  const t = audio;
+  if (!t) { setStatus('Load a track first.', true); return; }
+  const list = playlists[plIndex];
+  if (list.items.length >= PL_MAX) { setStatus('This list is full.', true); return; }
+  let stored = true;
+  if (!t.blobId) {
+    const id = uid();
+    try { await idb.put(id, t.raw); t.blobId = id; } catch (e) { stored = false; }
+  }
+  list.items.push({ name: t.name, duration: t.duration, blobId: t.blobId || null, src: t.src || null, state: snapshot() });
+  writeLists(); renderPl();
+  if (!stored && !t.src) setStatus('Added, but the audio could not be stored in this browser: you will have to open the file again.', true);
+  else setStatus('Added to ' + list.name + '.');
+}
+function plUpdate(i) {
+  const it = playlists[plIndex].items[i];
+  if (!sameTrack(it, audio)) return;
+  it.state = snapshot(); writeLists(); renderPl(); setStatus('Entry updated.');
+}
+function plMove(i) {
+  const a = playlists[plIndex].items;
+  if (i < 1) return;
+  [a[i - 1], a[i]] = [a[i], a[i - 1]]; writeLists(); renderPl();
+}
+function plRemove(i) {
+  const a = playlists[plIndex].items, [it] = a.splice(i, 1);
+  writeLists();
+  if (it && it.blobId && !playlists.some(l => l.items.some(x => x.blobId === it.blobId))) {
+    tracks.forEach(x => { if (x.blobId === it.blobId) x.blobId = null; });
+    idb.del(it.blobId).catch(() => {});
+  }
+  renderPl();
+}
+async function plPlay(i) {
+  const it = playlists[plIndex].items[i];
+  if (!it) return;
+  setStatus('Loading ' + it.name + '…');
+  let t = tracks.find(x => sameTrack(it, x));
+  if (t) { if (t !== audio) activateTrack(t); }
+  else {
+    if (it.blobId) {
+      try {
+        const b = await idb.get(it.blobId);
+        if (b) t = await loadArrayBuffer(await b.arrayBuffer(), it.name, true, { src: it.src, blobId: it.blobId });
+      } catch (e) {}
+    }
+    if (!t && it.src && it.src.url) {
+      try {
+        const got = await download(it.src.helper ? helperBase + '/api/audio?url=' + encodeURIComponent(it.src.url) : it.src.url, it.src.helper);
+        t = await loadArrayBuffer(got.ab, it.name, true, { src: it.src });
+      } catch (e) { setStatus('Could not download "' + it.name + '" again: ' + e.message, true); return; }
+    }
+    if (!t) { setStatus('The audio of "' + it.name + '" is not stored in this browser. Open the file again.', true); return; }
+  }
+  applyState(it.state);
+  setStatus('Loaded "' + it.name + '" with its saved settings.');
+  renderPl();
+}
+function renderPl() {
+  const p = $('#plPanel'), list = playlists[plIndex];
+  document.querySelectorAll('#plBtns button').forEach((b, i) => {
+    b.setAttribute('aria-pressed', String(plOpen && i === plIndex));
+    b.title = playlists[i].name + ' · ' + playlists[i].items.length + (playlists[i].items.length === 1 ? ' track' : ' tracks');
+  });
+  p.hidden = !plOpen;
+  if (!plOpen) return;
+  p.innerHTML = '';
+  const head = document.createElement('div'); head.className = 'rhead';
+  const nm = document.createElement('input'); nm.type = 'text'; nm.value = list.name; nm.maxLength = 30; nm.title = 'List name';
+  nm.onchange = () => { list.name = nm.value.trim() || 'List ' + (plIndex + 1); writeLists(); renderPl(); };
+  const add = document.createElement('button'); add.className = 'primary'; add.textContent = 'Add current track';
+  add.title = 'Saves the current track with its loops, speed, transposition, window and sax level'; add.onclick = plAdd;
+  const sp = document.createElement('span'); sp.className = 'spacer';
+  const cl = document.createElement('button'); cl.textContent = 'Close'; cl.onclick = () => { plOpen = false; renderPl(); };
+  head.append(nm, add, sp, cl); p.append(head);
+  if (!list.items.length) {
+    const e = document.createElement('div'); e.className = 'muted'; e.textContent = 'Empty. Load a track, set it up, then press "Add current track".'; p.append(e);
+  }
+  list.items.forEach((it, i) => {
+    const row = document.createElement('div'); row.className = 'row' + (sameTrack(it, audio) ? ' cur' : '');
+    const n = document.createElement('b'); n.textContent = i + 1;
+    const open = document.createElement('button'); open.className = 'item'; open.title = 'Load this track with its saved settings';
+    const a = document.createElement('span'); a.textContent = it.name;
+    const s = document.createElement('small'); s.textContent = summary(it.state);
+    open.append(a, s); open.onclick = () => plPlay(i);
+    const up = document.createElement('button'); up.className = 'mini mv'; up.textContent = '↑'; up.title = 'Move up'; up.disabled = i === 0; up.onclick = () => plMove(i);
+    const upd = document.createElement('button'); upd.className = 'mini upd'; upd.textContent = 'Update';
+    upd.title = 'Overwrite this entry with the current settings (the track must be the one loaded)'; upd.disabled = !sameTrack(it, audio); upd.onclick = () => plUpdate(i);
+    const rm = document.createElement('button'); rm.className = 'mini rm'; rm.textContent = '✕'; rm.title = 'Remove from the list'; rm.onclick = () => plRemove(i);
+    row.append(n, open, up, upd, rm); p.append(row);
+  });
+}
+function buildPlBtns() {
+  const box = $('#plBtns');
+  for (let i = 0; i < PL_COUNT; i++) {
+    const b = document.createElement('button'); b.textContent = i + 1; b.setAttribute('aria-pressed', 'false');
+    b.onclick = () => { if (plOpen && plIndex === i) plOpen = false; else { plIndex = i; plOpen = true; } renderPl(); };
+    box.append(b);
+  }
+  renderPl();
 }
 
 const results = $('#results');
@@ -981,7 +1436,8 @@ $('#searchBtn').onclick = doSearch;
 $('#q').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
 document.addEventListener('click', e => { const bt = e.target.closest && e.target.closest('button'); if (bt && e.detail > 0) bt.blur(); });
 document.addEventListener('click', e => { if (!results.hidden && !results.contains(e.target) && e.target.id !== 'searchBtn' && e.target.id !== 'q') hideResults(); });
-document.addEventListener('keydown', e => { if (e.key === 'Escape') hideResults(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { hideResults(); if (plOpen) { plOpen = false; renderPl(); } } });
+document.addEventListener('click', e => { if (plOpen && !e.composedPath().some(n => n.id === 'plPanel' || n.id === 'plBtns')) { plOpen = false; renderPl(); } });
 $('#playBtn').onclick = togglePlay;
 $('#toStart').onclick = () => { if (audio) { if (typeof mode === 'number') seekClick(0); else seekTo(0); } };
 $('#speed').oninput = e => { mainSpeed = +e.target.value; $('#speedV').textContent = pct(mainSpeed); if (typeof mode !== 'number') applyParams(); };
@@ -993,9 +1449,8 @@ $('#semisR').onclick = () => { $('#semis').value = 0; $('#semis').oninput({ targ
 $('#centsR').onclick = () => { $('#cents').value = 0; $('#cents').oninput({ target: $('#cents') }); };
 $('#win').onchange = e => { winMs = +e.target.value; if (ready) post({ type: 'window', ms: winMs }); };
 $('#vol').oninput = e => { volume = +e.target.value; if (master) master.gain.value = volume; };
-$('#saxBtn').onclick = () => { saxOn = !saxOn; applySax(); };
-$('#saxType').onchange = applySax;
-$('#saxAmt').oninput = e => { $('#saxAmtV').textContent = e.target.value + '%'; applySax(); };
+document.querySelectorAll('#saxSeg button').forEach(b => { b.onclick = () => setSaxLevel(+b.dataset.l); });
+$('#saxType').onchange = onSaxType;
 
 window.addEventListener('keydown', e => {
   const t = e.target, tag = t.tagName;
@@ -1005,14 +1460,14 @@ window.addEventListener('keydown', e => {
   if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
   else if (e.key === 'ArrowLeft' && audio) { e.preventDefault(); seekClick(curSec - 5); }
   else if (e.key === 'ArrowRight' && audio) { e.preventDefault(); seekClick(curSec + 5); }
-  else if (e.key === 's' || e.key === 'S') { saxOn = !saxOn; applySax(); }
+  else if (e.key === 's' || e.key === 'S') setSaxLevel((saxLevel + 1) % 4);
   else if (/^[0-9]$/.test(e.key)) { const idx = e.key === '0' ? 9 : +e.key - 1; if (idx < LOOP_COUNT) playLoop(idx); }
 });
 ['dragenter', 'dragover'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); document.body.classList.add('dropping'); }));
 ['dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); document.body.classList.remove('dropping'); }));
 document.addEventListener('drop', e => { const f = [...e.dataTransfer.files]; if (f.length) loadFiles(f); });
 
-buildLoops(); refreshUI(); computePeaks(); if (isWeb && !isHosted) detectHelper(); requestAnimationFrame(draw);
+buildPlBtns(); saxInfo(); buildLoops(); refreshUI(); computePeaks(); if (isWeb && !isHosted) detectHelper(); requestAnimationFrame(draw);
 </script>
 </body>
 </html>
