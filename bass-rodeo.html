@@ -228,8 +228,9 @@
   /*  Settings                                                          */
   /* ------------------------------------------------------------------ */
   const KEY = "bassRodeo.v2";
-  const S = { pos: 1, level: 1, acc: "sharp", strings: 4, strict: true, hint: false, lastPhase: "" };
+  const S = { v: 3, pos: 1, level: 1, acc: "sharp", strings: 4, strict: false, hint: false, lastPhase: "" };
   try { Object.assign(S, JSON.parse(localStorage.getItem(KEY) || "{}")); } catch (e) {}
+  if (S.v !== 3) { S.strict = false; S.v = 3; }
   S.pos = clamp(Math.round(S.pos) || 1, 1, 13);
   S.level = clamp(Math.round(S.level) || 1, 1, 5);
   S.acc = S.acc === "flat" ? "flat" : "sharp";
@@ -1889,6 +1890,8 @@
     if (b.shakeAmp > 0) { ox = (Math.random() - 0.5) * b.shakeAmp; oy = (Math.random() - 0.5) * b.shakeAmp * 0.6; }
     c.translate(b.x + ox, b.y + oy + b.hopY);
     c.scale(b.flip * b.scale, b.scale);
+    if (b.puff) c.scale(1 + b.puff, 1 + b.puff * 0.85);
+    if (b.rot) c.rotate(b.rot);
     if (wr >= 2 && b.mode === "idle") c.rotate(Math.sin(t * 60) * 0.04);
     c.lineJoin = "round"; c.lineCap = "round"; c.strokeStyle = OUT;
     c.translate(0, fl ? Math.sin(t * 10 + b.phase) * 2.5 : 0);
@@ -1997,23 +2000,39 @@
     c.save(); c.clip(); c.fillStyle = "#10101e"; c.globalAlpha = 0.28; c.beginPath(); c.arc(24 + sx * -9, -17.5 + sy * -9, 12, 0, TAU);
     c.rect(0, -50, 80, 100); c.fill("evenodd"); c.restore();
     c.beginPath(); c.arc(24, -17.5, 10.8, 0, TAU); c.lineWidth = 2.2; c.stroke();
-    // beak
-    c.beginPath();
-    if (b.sp.beakType === 0) { c.moveTo(32.5, -21); c.lineTo(45, -15.5); c.lineTo(32.5, -11.5); }
-    else if (b.sp.beakType === 1) { c.moveTo(32, -24); c.bezierCurveTo(47, -26, 51, -12, 43, -6); c.bezierCurveTo(41, -11, 37, -13, 32, -13); }
-    else { c.moveTo(32, -24); c.bezierCurveTo(51, -28, 63, -20, 65, -12); c.bezierCurveTo(53, -9, 41, -10, 32, -13); }
-    c.closePath(); c.fillStyle = col.beak; c.fill(); c.lineWidth = 2.1; c.stroke();
-    c.lineWidth = 1.4; c.beginPath(); c.moveTo(33, -16.5); c.lineTo(b.sp.beakType === 2 ? 53 : 41, -16); c.stroke();
-    // eye
-    c.beginPath(); c.arc(27, -20, 4.3, 0, TAU);
-    c.fillStyle = wr >= 2 ? "#ffe0da" : "#ffffff"; c.fill(); c.lineWidth = 1.7; c.stroke();
-    c.fillStyle = "#0d0d12"; c.beginPath(); c.arc(28.3, -20, wr >= 2 ? 1.7 : wr ? 2.1 : 2.5, 0, TAU); c.fill();
-    if (wr === 0) { c.fillStyle = "#fff"; c.beginPath(); c.arc(29.1, -21, 0.85, 0, TAU); c.fill(); }
-    if (wr >= 1) {
-      c.strokeStyle = OUT; c.lineWidth = wr >= 2 ? 4.2 : 3.2;
+    // beak (opens when the bird sings)
+    const beakShape = () => {
       c.beginPath();
-      if (wr >= 2) { c.moveTo(19, -31); c.lineTo(34, -20); } else { c.moveTo(20, -27.5); c.lineTo(33, -21); }
-      c.stroke();
+      if (b.sp.beakType === 0) { c.moveTo(32.5, -21); c.lineTo(45, -15.5); c.lineTo(32.5, -11.5); }
+      else if (b.sp.beakType === 1) { c.moveTo(32, -24); c.bezierCurveTo(47, -26, 51, -12, 43, -6); c.bezierCurveTo(41, -11, 37, -13, 32, -13); }
+      else { c.moveTo(32, -24); c.bezierCurveTo(51, -28, 63, -20, 65, -12); c.bezierCurveTo(53, -9, 41, -10, 32, -13); }
+      c.closePath(); c.fillStyle = col.beak; c.fill(); c.lineWidth = 2.1; c.stroke();
+    };
+    const open = b.sing || 0;
+    if (open > 0.05) {
+      c.fillStyle = "#4a0f12"; c.beginPath(); c.moveTo(32, -16); c.lineTo(46, -16 - open * 6); c.lineTo(46, -16 + open * 8); c.closePath(); c.fill();
+      c.save(); c.translate(32, -16); c.rotate(open * 0.38); c.translate(-32, 16); c.beginPath(); c.rect(28, -16, 50, 30); c.clip(); beakShape(); c.restore();
+      c.save(); c.translate(32, -16); c.rotate(-open * 0.2); c.translate(-32, 16); c.beginPath(); c.rect(28, -40, 50, 24); c.clip(); beakShape(); c.restore();
+    } else {
+      beakShape();
+      c.lineWidth = 1.4; c.beginPath(); c.moveTo(33, -16.5); c.lineTo(b.sp.beakType === 2 ? 53 : 41, -16); c.stroke();
+    }
+    // eye
+    const glad = b.happy;
+    if (glad) {
+      c.strokeStyle = OUT; c.lineWidth = 2.4; c.beginPath(); c.arc(27.5, -18, 3.8, Math.PI * 1.05, Math.PI * 1.95); c.stroke();
+      c.fillStyle = "rgba(255,105,105,0.55)"; c.beginPath(); c.arc(23, -11.5, 3.4, 0, TAU); c.fill();
+    } else {
+      c.beginPath(); c.arc(27, -20, 4.3, 0, TAU);
+      c.fillStyle = wr >= 2 ? "#ffe0da" : "#ffffff"; c.fill(); c.lineWidth = 1.7; c.stroke();
+      c.fillStyle = "#0d0d12"; c.beginPath(); c.arc(28.3, -20, wr >= 2 ? 1.7 : wr ? 2.1 : 2.5, 0, TAU); c.fill();
+      if (wr === 0) { c.fillStyle = "#fff"; c.beginPath(); c.arc(29.1, -21, 0.85, 0, TAU); c.fill(); }
+      if (wr >= 1) {
+        c.strokeStyle = OUT; c.lineWidth = wr >= 2 ? 4.2 : 3.2;
+        c.beginPath();
+        if (wr >= 2) { c.moveTo(19, -31); c.lineTo(34, -20); } else { c.moveTo(20, -27.5); c.lineTo(33, -21); }
+        c.stroke();
+      }
     }
 
     // near wing, small, folded, with primaries
@@ -2225,6 +2244,8 @@
       wrongs: 0, tone: 0, toneTarget: 0, toneAt: 0, lum: 0.5, tintFrom: 0, tintTo: 0, tintP: 1, hopT: 0, hopY: 0, shakeAmp: 0, excitedUntil: 0, steamT: 0
     };
     if (!demo) { b.x = b.sx; b.y = b.sy; }
+    b.pf = b.sp.name === "Tucà" ? 0.62 : b.sp.name === "Canari" ? 1.25 : rnd(0.9, 1.15);
+    b.rot = 0; b.puff = 0; b.sing = 0; b.happy = false; b.emT = 0;
     b.lum = lumAt(b.tx, b.ty); b.toneTarget = b.lum > TONE_SPLIT ? 1 : -1; b.tone = b.toneTarget;
     G.bird = b;
     G.acceptAfter = demo ? 0 : T + 1e6;
@@ -2260,11 +2281,20 @@
           addP({ type: "puff", x: b.x + b.flip * b.scale * 23, y: b.y - 26 * b.scale, vx: rnd(-20, 20), vy: -rnd(50, 90), drag: 0.8, life: 0.8, size: 12, color: "#f4f4f4" });
         }
       }
+    } else if (b.mode === "happy") {
+      happyAnim(b, dt);
+      if (b.t >= b.dur) { b.mode = "out"; b.happyOut = true; b.t = 0; b.dur = 1.0; b.x0 = b.x; b.y0 = b.y; b.ox = b.flip > 0 ? W + 260 : -260; b.puff = 0; b.sing = 0; b.rot = 0; }
+    } else if (b.mode === "swell") {
+      b.x = b.tx; b.y = b.ty; b.flying = b.space; b.hopY = 0;
+      b.puff = Math.min(0.6, b.t / 0.8 * 0.6); b.shakeAmp = 3 + b.t * 14;
+      b.steamT -= dt;
+      if (b.steamT <= 0) { b.steamT = 0.07; addP({ type: "puff", x: b.x + b.flip * b.scale * 23, y: b.y - 26 * b.scale, vx: rnd(-30, 30), vy: -rnd(60, 120), drag: 0.8, life: 0.7, size: 14, color: "#f4f4f4" }); }
+      if (b.t >= 0.8) explodeBird(b);
     } else if (b.mode === "out") {
       const p = clamp(b.t / b.dur, 0, 1), e = easeIn(p);
       b.x = lerp(b.x0, b.ox, e); b.y = lerp(b.y0, -220, e);
-      b.flying = true; b.shakeAmp = 4;
-      if (p >= 1) { G.bird = null; updatePips(); }
+      b.flying = true; b.shakeAmp = b.happyOut ? 0 : 4;
+      if (p >= 1) { G.bird = null; if (b.happyOut) G.nextAt = T + 350; updatePips(); }
     }
   }
 
@@ -2381,14 +2411,141 @@
   /*  Answer handling                                                   */
   /* ------------------------------------------------------------------ */
   let lockMidi = null;
+  const b0pc = () => -1;
+
+  /* ----------------------------- sound ------------------------------- */
+  let sfx = null;
+  function sfxCtx() {
+    try { if (!sfx) sfx = new (window.AudioContext || window.webkitAudioContext)(); if (sfx.state === "suspended") sfx.resume(); } catch (e) { sfx = null; }
+    return sfx;
+  }
+  function tone(a, t0, f0, f1, dur, o) {
+    o = o || {};
+    const g = a.createGain(), os = a.createOscillator();
+    os.type = o.type || "sine"; os.frequency.setValueAtTime(f0, t0); os.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
+    if (o.vib) { const l = a.createOscillator(), lg = a.createGain(); l.frequency.value = o.vib; lg.gain.value = f0 * 0.035; l.connect(lg); lg.connect(os.frequency); l.start(t0); l.stop(t0 + dur + 0.05); }
+    const v = o.vol || 0.12;
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(v, t0 + Math.min(0.015, dur * 0.3)); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    let node = os;
+    if (o.lp) { const f = a.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = o.lp; os.connect(f); node = f; }
+    node.connect(g); g.connect(a.destination); os.start(t0); os.stop(t0 + dur + 0.05);
+  }
+  function noise(a, t0, dur, vol, lp, hp) {
+    const n = Math.floor(a.sampleRate * dur), bf = a.createBuffer(1, n, a.sampleRate), d = bf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
+    const src = a.createBufferSource(); src.buffer = bf;
+    const f = a.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = lp || 1800;
+    const g = a.createGain(); g.gain.value = vol || 0.3;
+    src.connect(f); let last = f;
+    if (hp) { const h = a.createBiquadFilter(); h.type = "highpass"; h.frequency.value = hp; f.connect(h); last = h; }
+    last.connect(g); g.connect(a.destination); src.start(t0);
+  }
+  const CHIRPS = {
+    piu: (a, t, p) => { tone(a, t, 2900 * p, 3700 * p, 0.11, { vib: 30 }); tone(a, t + 0.19, 2700 * p, 3500 * p, 0.13, { vib: 30 }); },
+    tuit: (a, t, p) => { for (let i = 0; i < 3; i++) tone(a, t + i * 0.13, 2400 * p, 3600 * p, 0.09); },
+    trill: (a, t, p) => { for (let i = 0; i < 9; i++) tone(a, t + i * 0.055, (i % 2 ? 3300 : 2800) * p, (i % 2 ? 2900 : 3500) * p, 0.05, { vol: 0.1 }); },
+    fiu: (a, t, p) => { tone(a, t, 2200 * p, 4200 * p, 0.16); tone(a, t + 0.2, 4000 * p, 2600 * p, 0.2, { vib: 22 }); },
+    pipiu: (a, t, p) => { tone(a, t, 3300 * p, 3500 * p, 0.06); tone(a, t + 0.12, 3300 * p, 3500 * p, 0.06); tone(a, t + 0.26, 3800 * p, 2400 * p, 0.3, { vib: 26 }); },
+    warble: (a, t, p) => { let tt = t; for (let i = 0; i < 8; i++) { const f = (2200 + Math.random() * 1800) * p, d = 0.07 + Math.random() * 0.07; tone(a, tt, f, f * (0.8 + Math.random() * 0.6), d, { vib: 20 + Math.random() * 20 }); tt += d * 0.9; } }
+  };
+  function chirp(name, p, delay) {
+    const a = sfxCtx(); if (!a) return;
+    try { (CHIRPS[name] || CHIRPS.piu)(a, a.currentTime + 0.02 + (delay || 0), p || 1); } catch (e) {}
+  }
+  function whistleSound(dur) { const a = sfxCtx(); if (!a) return; try { const t = a.currentTime + 0.02; tone(a, t, 380, 1700, dur, { type: "sawtooth", vol: 0.05, lp: 2400 }); tone(a, t, 200, 900, dur, { type: "square", vol: 0.025, lp: 1500 }); } catch (e) {} }
+  function boomSound() {
+    const a = sfxCtx(); if (!a) return;
+    try { const t = a.currentTime + 0.02; tone(a, t, 150, 38, 0.5, { vol: 0.55 }); noise(a, t, 0.7, 0.45, 900); noise(a, t, 0.25, 0.25, 6000, 1500); tone(a, t + 0.12, 90, 30, 0.6, { vol: 0.3 }); } catch (e) {}
+  }
+
+  /* ---------------------- happy / failure animations ----------------- */
+  const happyNames = ["hop", "twirl", "dance", "halo", "boing", "loop", "sing"];
+  let happyBag = [];
+  function nextHappy() { if (!happyBag.length) happyBag = happyNames.map((_, i) => i).sort(() => Math.random() - 0.5); return happyBag.pop(); }
+  const FAIL_FX = [
+    (x, y, cols) => { flash(x, y, "#ffc060"); ring(x, y, "#ff7a1a", 0, 230); ring(x, y, "#b01010", 0.08, 300);
+      puffs(x, y, 12, ["#3b3b3b", "#6b6b6b", "#9a9a9a"], rnd(60, 100));
+      radial(70, a => { const sp = rnd(200, 700); addP({ type: "spark", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 1.7, g: 300, life: rnd(0.7, 1.3), size: rnd(3, 6), color: pick(["#ffd23a", "#ff8a1a", "#ff4a1a"]) }); });
+      feathers(x, y, 36, cols, 1.2); burstText(x, y - 40, "BOOM!"); state.shake = 18; },
+    (x, y, cols) => { flash(x, y, "#ffffff"); puffs(x, y, 16, ["#f2f2f2", "#d9d9d9", "#bdbdbd"], rnd(60, 110));
+      feathers(x, y, 64, cols, 0.9); stars5(x, y, 8, ["#ffd23a", "#ff8a1a"]); burstText(x, y - 40, "PUF!"); state.shake = 10; },
+    (x, y, cols) => { flash(x, y, "#ffd0a0"); ring(x, y, "#ff4a1a", 0, 200);
+      radial(90, a => { const sp = rnd(250, 760); addP({ type: "spark", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 1.6, g: 340, life: rnd(0.7, 1.4), size: rnd(3, 6), color: pick(["#ff5a2a", "#ffb02a", "#ffffff"]) }); });
+      feathers(x, y, 44, cols, 1.4); puffs(x, y, 8, ["#4a4a4a", "#777777"], rnd(50, 90)); burstText(x, y - 40, pick(["PAM!", "BANG!", "ZAS!"])); state.shake = 14; }
+  ];
+  function explodeBird(b) {
+    const cc = curCols(b);
+    pick(FAIL_FX)(b.x, b.y, [cc.main, cc.wing, "#2a1a1a", cc.belly]);
+    boomSound();
+    G.total++; G.streak = 0;
+    const h = hintFor(b.midi);
+    setMsg("Era " + noteLabel(b.spelled) + (h ? " — " + h : ""), "bad");
+    G.bird = null; G.nextAt = T + 3000; updateStats(); updatePips();
+  }
+  // Called each frame while the bird is celebrating.
+  function happyAnim(b, dt) {
+    const u = b.t, k = b.hk, bx = b.tx, by = b.ty;
+    let ox = 0, oy = 0, air = false;
+    b.rot = 0; b.puff = 0; b.sing = 0;
+    const em = (rate, fn) => { b.emT -= dt; if (b.emT <= 0) { b.emT = 1 / rate; fn(); } };
+    const f = b.flip;
+    switch (k) {
+      case 0: { // three hops, each launches a musical note
+        if (u < 1.5) {
+          const hp = (u % 0.5) / 0.5; oy = -Math.abs(Math.sin(hp * Math.PI)) * 46; air = oy < -4; b.sing = oy < -8 ? 1 : 0.15;
+          const idx = Math.floor(u / 0.5);
+          if (idx !== b.lastIdx) { b.lastIdx = idx; addP({ type: "note", x: b.x, y: b.y - 30, vx: f * rnd(40, 120), vy: -rnd(160, 240), g: -10, drag: 0.6, life: 1.4, rot: rnd(-0.3, 0.3), vr: rnd(-1, 1), size: 46, color: pick(RAINBOW), text: pick(["♪", "♫", "♬"]) }); }
+        }
+        break; }
+      case 1: { // backflip with a sparkle trail
+        const q = clamp((u - 0.2) / 0.8, 0, 1);
+        if (u > 0.2 && u < 1.0) { oy = -Math.sin(q * Math.PI) * 74; air = true; b.rot = -q * TAU * f; b.sing = 1;
+          em(40, () => addP({ type: "star", x: b.x, y: b.y, vx: rnd(-40, 40), vy: rnd(-30, 30), drag: 1.5, life: 0.6, rot: Math.random() * TAU, vr: rnd(-6, 6), size: rnd(7, 13), color: pick(["#fff4a0", "#ffffff", "#ffd23a"]) })); }
+        else b.sing = 0.2;
+        break; }
+      case 2: { // happy wiggle with hearts
+        b.rot = Math.sin(u * 14) * 0.2; oy = -Math.abs(Math.sin(u * 7)) * 9; b.sing = 0.5 + 0.5 * Math.sin(u * 14);
+        em(9, () => addP({ type: "heart", x: b.x + rnd(-24, 24), y: b.y - 34, vx: rnd(-40, 40), vy: -rnd(90, 170), g: 0, drag: 0.4, life: 1.5, rot: Math.random() * TAU, vr: rnd(-3, 3), size: rnd(18, 30), color: pick(["#ff3b6a", "#ff7aa8", "#ff9ab8"]) }));
+        break; }
+      case 3: { // golden halo: lifts, swells and sends out rings
+        oy = -20 * Math.sin(Math.min(1, u / 0.45) * Math.PI / 2) + Math.sin(u * 9) * 3; air = true; b.puff = 0.07 + 0.05 * Math.sin(u * 12); b.sing = 0.6;
+        em(2.4, () => { ring(b.x, b.y, "#ffd23a", 0, 150); stars5(b.x, b.y, 7, ["#fff4a0", "#ffffff", "#ffd23a"]); });
+        break; }
+      case 4: { // two big jumps that shake the wire
+        const j = u < 0.6 ? u / 0.6 : u < 1.4 ? (u - 0.6) / 0.8 : 1, big = u < 0.6 ? 56 : 92;
+        if (u < 1.4) { oy = -Math.sin(j * Math.PI) * big; air = oy < -4; b.sing = 1; }
+        const idx = u < 0.6 ? 0 : u < 1.4 ? 1 : 2;
+        if (idx !== b.lastIdx) { b.lastIdx = idx; if (idx > 0) { state.wobble = 7; radial(34, () => addP({ type: "confetti", x: b.x, y: b.y - 20, vx: rnd(-300, 300), vy: -rnd(200, 560), g: 620, drag: 0.5, life: rnd(1.2, 1.8), rot: Math.random() * TAU, vr: rnd(-9, 9), size: rnd(6, 11), color: pick(RAINBOW) })); } }
+        break; }
+      case 5: { // loop-the-loop with a rainbow trail
+        const q = clamp((u - 0.1) / 1.2, 0, 1);
+        if (u > 0.1 && u < 1.3) { const a = q * TAU; ox = Math.sin(a) * 78 * f; oy = (Math.cos(a) - 1) * 78; air = true; b.rot = a * 0 - a * f * 0.15; b.sing = 1;
+          em(60, () => addP({ type: "spark", x: b.x - f * 10, y: b.y, vx: rnd(-20, 20), vy: rnd(-10, 30), drag: 2, life: 0.8, size: 7, color: RAINBOW[Math.floor(u * 22) % 7] })); }
+        break; }
+      default: { // singing chest-puffed bird
+        b.puff = 0.1 * Math.abs(Math.sin(u * 9)); b.sing = Math.abs(Math.sin(u * 9));
+        em(6, () => addP({ type: "note", x: b.x + f * 36, y: b.y - 26, vx: f * rnd(70, 130), vy: -rnd(50, 110), g: 0, drag: 0.2, life: 1.8, rot: rnd(-0.4, 0.4), vr: rnd(-1, 1), size: rnd(34, 58), color: pick(RAINBOW), text: pick(["♪", "♫", "♬"]) }));
+      }
+    }
+    b.x = bx + ox; b.y = by + oy; b.flying = air;
+    b.hopY = 0;
+  }
 
   function win() {
     const b = G.bird;
     G.correct++; G.total++; G.streak++; G.best = Math.max(G.best, G.streak);
-    const cc = curCols(b);
-    nextFx()(b.x, b.y, [cc.main, cc.belly, cc.wing, "#ffffff"]);
     setMsg("Correcte! " + noteLabel(b.spelled), "ok");
-    G.bird = null; G.nextAt = T + 1900; updateStats(); updatePips();
+    b.mode = "happy"; b.t = 0; b.dur = 2.0; b.happy = true; b.hk = nextHappy(); b.lastIdx = -1; b.emT = 0; b.shakeAmp = 0;
+    b.tintFrom = b.tintTo = 0; b.tintP = 1;
+    const p = b.pf;
+    ({ 0: () => { chirp("pipiu", p, 0); chirp("piu", p, 0.5); chirp("tuit", p, 1.0); },
+      1: () => { chirp("fiu", p, 0.15); chirp("piu", p, 1.1); },
+      2: () => { chirp("warble", p, 0); chirp("piu", p, 1.0); },
+      3: () => { chirp("trill", p, 0); chirp("piu", p, 0.8); },
+      4: () => { chirp("pipiu", p, 0); chirp("tuit", p, 0.65); },
+      5: () => { chirp("fiu", p, 0.1); chirp("tuit", p, 0.8); chirp("piu", p, 1.4); },
+      6: () => { chirp("warble", p, 0); chirp("warble", p, 0.7); chirp("pipiu", p, 1.4); } })[b.hk]();
+    G.acceptAfter = T + 1e9; updateStats(); updatePips();
   }
   function wrong(midi) {
     const b = G.bird;
@@ -2400,11 +2557,11 @@
       b.tintFrom = b.tintTo; b.tintTo = 2; b.tintP = 0;
       setMsg("Has tocat " + shortName(midi) + ". Última oportunitat!", "bad");
     } else {
-      G.total++; G.streak = 0;
-      b.mode = "out"; b.t = 0; b.dur = 1.3; b.x0 = b.x; b.y0 = b.y; b.ox = b.x < W / 2 ? -260 : W + 260;
+      b.tintFrom = b.tintTo; b.tintTo = 2; b.tintP = 1;
+      b.mode = "swell"; b.t = 0; b.hopT = 0; G.acceptAfter = T + 1e9;
       const h = hintFor(b.midi);
       setMsg("Era " + noteLabel(b.spelled) + (h ? " — " + h : ""), "bad");
-      G.nextAt = T + 3200; updateStats();
+      whistleSound(0.8);
     }
     updatePips();
   }
@@ -2486,7 +2643,7 @@
     }
     if (midi !== null) {
       lastValidAt = T;
-      heardEl.textContent = "Sento: " + shortName(midi) + " · " + r.f.toFixed(0) + " Hz";
+      heardEl.textContent = "Sento: " + shortName(midi) + " (" + (midi % 12 === b0pc() ? "" : "") + "oct. " + (Math.floor(midi / 12) - 1) + ") · " + r.f.toFixed(0) + " Hz";
       if (candMidi !== midi) { candMidi = midi; candSince = T; }
     } else {
       if (T - lastValidAt > 110) candMidi = null;
@@ -2532,6 +2689,7 @@
 
   async function startGame() {
     playBtn.disabled = true; playBtn.textContent = "Escoltant…";
+    sfxCtx();
     const ok = await startMic();
     playBtn.disabled = false;
     if (!ok) { playBtn.textContent = "▶ Juga"; return; }
