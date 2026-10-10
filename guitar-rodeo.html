@@ -1,0 +1,1252 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chord Rodeo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Anton&family=Bangers&family=Barlow+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #16141f;
+    --paper: #f1e6c8;
+    --yellow: #f2b632;
+    --red: #e2522b;
+    --teal: #2aa3b5;
+    --muted: #9a93ad;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background: #0d0c14;
+    color: var(--paper);
+    font-family: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+    display: flex; flex-direction: column; align-items: center;
+  }
+  #app { width: 100%; display: flex; flex-direction: column; align-items: center; }
+
+  #stage {
+    position: relative;
+    width: min(100%, calc((100vh - 118px) * 16 / 9));
+    min-width: min(100%, 420px);
+    aspect-ratio: 16 / 9;
+    border: 3px solid #05040a;
+    box-shadow: 0 0 0 2px var(--paper), 10px 12px 0 rgba(0,0,0,.6);
+    overflow: hidden;
+    background: #000;
+  }
+  #stage:fullscreen { width: 100vw; height: 100vh; aspect-ratio: auto; border: 0; box-shadow: none; }
+  #stage:fullscreen canvas { object-fit: contain; }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  .hud { position: absolute; pointer-events: none; text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+  #stats {
+    top: 10px; left: 10px;
+    background: var(--ink); color: var(--paper);
+    border-left: 5px solid var(--yellow);
+    padding: 4px 12px 4px 10px;
+    font-size: clamp(.8rem, 1.5vw, 1.15rem);
+    box-shadow: 3px 3px 0 rgba(0,0,0,.55);
+  }
+  #pips { top: 10px; right: 10px; display: flex; gap: 6px; background: var(--ink); padding: 7px 10px; box-shadow: 3px 3px 0 rgba(0,0,0,.55); }
+  .pip { width: 15px; height: 15px; background: var(--yellow); border: 2px solid #05040a; transform: skewX(-14deg); }
+  .pip.lost { background: #3a3646; }
+  #heardBox {
+    bottom: 10px; left: 10px;
+    background: var(--ink); color: var(--paper);
+    padding: 4px 12px; min-width: 150px;
+    border-left: 5px solid var(--teal);
+    font-size: clamp(.75rem, 1.3vw, 1rem);
+    box-shadow: 3px 3px 0 rgba(0,0,0,.55);
+  }
+  #meter { margin-top: 4px; height: 4px; background: rgba(255,255,255,.18); }
+  #meterFill { height: 100%; width: 0; background: var(--yellow); }
+  #msg {
+    bottom: 12px; left: 50%;
+    transform: translateX(-50%) rotate(-.6deg);
+    max-width: 60%; text-align: center;
+    background: #f4d35e; color: var(--ink);
+    border: 3px solid #05040a; padding: 5px 18px;
+    font-size: clamp(.95rem, 2vw, 1.5rem);
+    letter-spacing: .05em;
+    box-shadow: 5px 5px 0 #05040a;
+    transition: opacity .25s;
+  }
+  #msg.hidden { opacity: 0; }
+  #msg.ok { background: #8fd9c0; }
+  #msg.warn { background: #f2a03d; }
+  #msg.bad { background: #ee6a4a; color: #fff3dc; }
+
+  #bar {
+    width: min(100%, 1700px);
+    display: flex; flex-wrap: wrap; gap: 10px;
+    justify-content: center; align-items: stretch;
+    margin-top: 12px;
+  }
+  .grp {
+    display: flex; flex-direction: column; justify-content: space-between; gap: 4px;
+    background: var(--ink);
+    border: 2px solid rgba(241,230,200,.25);
+    border-top: 3px solid var(--yellow);
+    padding: 5px 10px 6px;
+    min-width: 110px;
+  }
+  .lab { font-size: .7rem; letter-spacing: .2em; text-transform: uppercase; color: var(--yellow); font-weight: 700; }
+  .val { display: flex; align-items: center; gap: 8px; }
+  .val b { min-width: 46px; text-align: center; font-size: 1.15rem; letter-spacing: .06em; }
+  .grp em { font-style: normal; font-size: .72rem; color: var(--muted); letter-spacing: .04em; text-transform: uppercase; min-height: 1em; }
+
+  button {
+    font: 700 .95rem "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+    letter-spacing: .1em; text-transform: uppercase;
+    cursor: pointer;
+    color: var(--ink); background: var(--paper);
+    border: 2px solid #05040a; border-radius: 0;
+    padding: 4px 11px;
+    box-shadow: 3px 3px 0 #05040a;
+  }
+  button:hover { background: #fff6dc; }
+  button:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 #05040a; }
+  button.dim { opacity: .4; }
+  button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+  .val button { padding: 2px 9px; }
+  #play {
+    align-self: center;
+    font: 400 1.7rem Anton, Impact, sans-serif; letter-spacing: .08em;
+    padding: 6px 30px 4px;
+    background: var(--red); color: #fff3dc;
+    transform: skewX(-8deg);
+    box-shadow: 4px 4px 0 #05040a;
+  }
+  #play:hover { background: #f0643a; }
+  #play:active { transform: skewX(-8deg) translate(2px, 2px); }
+  #play.on { background: #7d2616; }
+  #full { align-self: center; padding: 6px 12px; font-size: 1.1rem; }
+
+  #pips { display: none; }
+  :root { --ink: #2a1d14; --paper: #ecdfba; --yellow: #d99a2b; --red: #c4452d; --teal: #1b7f8f; --muted: #b9a681; }
+  body { background: #1c140e; }
+  #stage { box-shadow: 0 0 0 2px #d99a2b, 10px 12px 0 rgba(0,0,0,.6); }
+  .grp { border-top-color: #d99a2b; }
+  button.chip.on { background: #d99a2b; }
+  button { background: #ecdfba; }
+  #stats { left: auto; right: 10px; }
+  #stage { width: min(100%, calc((100vh - 200px) * 16 / 9)); }
+  #stage:fullscreen { width: 100vw; }
+  #bar { gap: 6px; margin-top: 8px; }
+  .grp { padding: 3px 8px 5px; min-width: 0; }
+  #heardBox, #msg, button.chip, .chips { text-transform: none; }
+  #heardBox { letter-spacing: .04em; font-size: clamp(.8rem, 1.4vw, 1.1rem); }
+  #msg { letter-spacing: .03em; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  button.chip { padding: 3px 10px; background: #2b2838; color: var(--paper); border-color: #05040a; box-shadow: 2px 2px 0 #05040a; }
+  button.chip:hover { background: #3a3650; }
+  button.chip.on { background: var(--yellow); color: var(--ink); }
+  #listen { align-self: center; font: 400 1.5rem Anton, Impact, sans-serif; letter-spacing: .08em; padding: 6px 22px 4px; background: var(--red); color: #fff3dc; transform: skewX(-8deg); box-shadow: 4px 4px 0 #05040a; }
+  #listen:hover { background: #f0643a; }
+  #listen.on { background: #7d2616; }
+  .act { align-self: center; font-size: 1.05rem; padding: 7px 14px; }
+  #heardBox { min-width: 220px; max-width: 70%; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="cv" width="1600" height="900"></canvas>
+    <div id="stats" class="hud">Encerts 0</div>
+    <div id="pips" class="hud"></div>
+    <div id="heardBox" class="hud"><div id="heard">Sento: —</div><div id="meter"><div id="meterFill"></div></div></div>
+    <div id="msg" class="hud hidden"></div>
+  </div>
+  <div id="bar">
+    <button id="listen" type="button">🎧 Escolta</button>
+    <div class="grp"><span class="lab">Tipus d'acord</span><div class="chips" id="types"></div></div>
+    <div class="grp"><span class="lab" title="Cap botó premut = guitarra de 6 cordes">Guitarra 7 cordes</span><div class="chips" id="inst"></div></div>
+    <div class="grp"><span class="lab">Grup de cordes</span><div class="chips" id="sets"></div></div>
+    <div class="grp"><span class="lab">Inversió</span><div class="chips" id="invs"></div></div>
+    <div class="grp"><span class="lab">Detecció</span><div class="chips"><button id="tol" class="chip" type="button" title="Tolerant: accepta l'acord si en sento 3 de les 4 notes">Estricte</button></div></div>
+    <button id="newc" class="act" type="button" title="Espai">↻ Nou acord</button>
+    <button id="hear" class="act" type="button">🔊 Sentir</button>
+    <button id="full" type="button" title="Pantalla completa">⛶</button>
+  </div>
+</div>
+<script>
+(() => {
+  "use strict";
+  /* ------------------------------------------------------------------ */
+  /*  Constants & helpers                                               */
+  /* ------------------------------------------------------------------ */
+  const W = 1600, H = 900, HORIZON = 640, TAU = Math.PI * 2;
+  const OUT = "#16141f";          // ink
+  const SHADOW = "#252a5a";       // cel-shading colour
+  const STAFF = { x1: 290, x2: 1500, bottom: 570, gap: 54 };
+  const lineY = k => STAFF.bottom - k * STAFF.gap;
+  const stepY = s => STAFF.bottom - s * STAFF.gap / 2;
+
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeOut = t => 1 - Math.pow(1 - t, 3);
+  const easeIn = t => t * t;
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+
+  function mulberry32(a) {
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function parseColor(s) {
+    if (s[0] === "#") {
+      let h = s.slice(1);
+      if (h.length === 3) h = h.split("").map(c => c + c).join("");
+      return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+    }
+    const m = s.match(/[\d.]+/g);
+    return [+m[0], +m[1], +m[2]];
+  }
+  function mix(a, b, t) {
+    const A = parseColor(a), B = parseColor(b);
+    return "rgb(" + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(",") + ")";
+  }
+  const shade = (c, f) => mix(c, "#0c0b18", f);
+  const light = (c, f) => mix(c, "#ffffff", f);
+
+
+  /* ------------------------------------------------------------------ */
+  /*  Chord theory: types, string sets, voicing solver                  */
+  /* ------------------------------------------------------------------ */
+  // semitone offsets and degree labels (F = fonamental)
+  const CHORD_TYPES = [
+    { id: "maj7", btn: "Maj7", suffix: "maj7", name: "Major setena major", iv: [0, 4, 7, 11], deg: ["F", "3", "5", "7"] },
+    { id: "dom7", btn: "7", suffix: "7", name: "Setena de dominant", iv: [0, 4, 7, 10], deg: ["F", "3", "5", "♭7"] },
+    { id: "m7", btn: "m7", suffix: "m7", name: "Menor setena", iv: [0, 3, 7, 10], deg: ["F", "♭3", "5", "♭7"] },
+    { id: "m6", btn: "m6", suffix: "m6", name: "Menor sisena", iv: [0, 3, 7, 9], deg: ["F", "♭3", "5", "6"] },
+    { id: "mmaj7", btn: "m maj7", suffix: "m(maj7)", name: "Menor amb setena major", iv: [0, 3, 7, 11], deg: ["F", "♭3", "5", "7"] },
+    { id: "m7b5", btn: "m7♭5", suffix: "m7♭5", name: "Semidisminuït", iv: [0, 3, 6, 10], deg: ["F", "♭3", "♭5", "♭7"] },
+    { id: "dim7", btn: "dim7", suffix: "dim7", name: "Disminuït", iv: [0, 3, 6, 9], deg: ["F", "♭3", "♭5", "♭♭7"] }
+  ];
+  const KEYS = [["C", 0], ["D♭", 1], ["D", 2], ["E♭", 3], ["E", 4], ["F", 5], ["F♯", 6], ["G", 7], ["A♭", 8], ["A", 9], ["B♭", 10], ["B", 11]];
+  const NOTE_NAMES = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"];
+  const TUNING = { 6: 40, 5: 45, 4: 50, 3: 55, 2: 59, 1: 64 };       // MIDI of the open strings
+  // sets of strings, listed from the lowest (bass) string to the highest
+  const STRING_SETS = [
+    { id: "6543", strs: [6, 5, 4, 3], fam: "drop2" },
+    { id: "6432", strs: [6, 4, 3, 2], fam: "drop3" },
+    { id: "5321", strs: [5, 3, 2, 1], fam: "drop3" },
+    { id: "5432", strs: [5, 4, 3, 2], fam: "drop2" },
+    { id: "4321", strs: [4, 3, 2, 1], fam: "drop2" },
+    { id: "6321", strs: [6, 3, 2, 1], fam: "closed" }
+  ];
+  // order of the chord tones (0=root,1=3rd,2=5th,3=7th) from the bass string upward, per inversion
+  const FAMILY = {
+    drop2: [[0, 2, 3, 1], [1, 3, 0, 2], [2, 0, 1, 3], [3, 1, 2, 0]],
+    drop3: [[0, 3, 1, 2], [1, 0, 2, 3], [2, 1, 3, 0], [3, 2, 0, 1]],
+    closed: [[0, 1, 2, 3], [1, 2, 3, 0], [2, 3, 0, 1], [3, 0, 1, 2]]
+  };
+  // 7-string guitar: every group of 4 strings that includes the 7th string (20 groups)
+  const SETS7 = [];
+  for (let a = 6; a >= 3; a--) for (let b = a - 1; b >= 2; b--) for (let c = b - 1; c >= 1; c--)
+    SETS7.push({ id: "7" + a + b + c, strs: [7, a, b, c], fam: null });
+  const VIZ7 = ["7654", "7543"];
+  const INV_NAMES = ["Fonamental", "1a inversió", "2a inversió", "3a inversió"];
+  const INV_SHORT = ["Fonamental", "1a inv.", "2a inv.", "3a inv."];
+
+  // Find the playable fingering (no open strings, max span) of one inversion.
+  function solveVoicing(rootPc, type, set, inv, tun) {
+    tun = tun || TUNING;
+    const order = FAMILY[set.fam][inv], notes = [];
+    for (let i = 0; i < 4; i++) {
+      const ti = order[i], pc = (rootPc + type.iv[ti]) % 12, s = set.strs[i];
+      const opts = [];
+      for (let f = 1; f <= 17; f++) if ((tun[s] + f) % 12 === pc) opts.push(f);
+      notes.push({ s, ti, pc, opts });
+    }
+    let best = null;
+    const rec = (i, frets, last) => {
+      if (i === 4) {
+        const mn = Math.min(...frets), mx = Math.max(...frets), span = mx - mn;
+        const score = span * 100 + mx;
+        if (span <= maxSpan && (!best || score < best.score)) best = { frets: frets.slice(), score, span };
+        return;
+      }
+      for (const f of notes[i].opts) {
+        const p = tun[notes[i].s] + f;
+        if (p <= last) continue;                      // pitches must rise from bass to treble
+        frets.push(f); rec(i + 1, frets, p); frets.pop();
+      }
+    };
+    let maxSpan = 5;
+    rec(0, [], -1);
+    while (!best && maxSpan < 7) { maxSpan++; rec(0, [], -1); }
+    if (!best) return null;
+    return {
+      inv, span: best.span,
+      notes: notes.map((n, i) => ({ s: n.s, fret: best.frets[i], ti: n.ti, midi: tun[n.s] + best.frets[i], deg: type.deg[n.ti] }))
+    };
+  }
+  // Free search: any distribution of the 4 chord tones over the 4 strings (the lowest sounding note
+  // decides the inversion); picks the most compact (closest) hand position.
+  const PERMS = (() => { const r = []; const rec = (a, u) => { if (a.length === 4) { r.push(a.slice()); return; } for (let i = 0; i < 4; i++) if (!u[i]) { u[i] = 1; a.push(i); rec(a, u); a.pop(); u[i] = 0; } }; rec([], []); return r; })();
+  function solveCompact(rootPc, type, set, inv, tun) {
+    tun = tun || TUNING;
+    let best = null;
+    PERMS.forEach(order => {
+      const opts = order.map((ti, i) => { const pc = (rootPc + type.iv[ti]) % 12, s = set.strs[i], o = []; for (let f = 1; f <= 17; f++) if ((tun[s] + f) % 12 === pc) o.push(f); return o; });
+      const frets = [];
+      const rec = i => {
+        if (i === 4) {
+          const ps = frets.map((f, k) => tun[set.strs[k]] + f), lo = Math.min(...ps);
+          if (order[ps.indexOf(lo)] !== inv) return;
+          if (new Set(ps).size < 4) return;
+          const mn = Math.min(...frets), mx = Math.max(...frets), span = mx - mn, range = Math.max(...ps) - lo;
+          let rise = 0; for (let k = 1; k < 4; k++) if (ps[k] <= ps[k - 1]) rise++;
+          const score = span * 100 + rise * 45 + Math.max(0, range - 16) * 6 + mx;
+          if (!best || score < best.score) best = { frets: frets.slice(), order: order.slice(), score, span };
+          return;
+        }
+        for (const f of opts[i]) { frets.push(f); rec(i + 1); frets.pop(); }
+      };
+      rec(0);
+    });
+    if (!best) return null;
+    return {
+      inv, span: best.span, score: best.score, hard: best.span > 4,
+      notes: best.order.map((ti, i) => ({ s: set.strs[i], fret: best.frets[i], ti, midi: tun[set.strs[i]] + best.frets[i], deg: type.deg[ti] }))
+    };
+  }
+  function buildChord(rootPc, rootName, type, set, tun) {
+    const voicings = [];
+    for (let inv = 0; inv < 4; inv++) {
+      const o = set.fam ? solveVoicing(rootPc, type, set, inv, tun) : null, c = solveCompact(rootPc, type, set, inv, tun);
+      let v = c;
+      if (o && (!c || o.span <= c.span) ) { o.hard = o.span > 4; v = o; }
+      if (v) voicings.push(v);
+    }
+    const pcs = type.iv.map(i => (rootPc + i) % 12);
+    return { rootPc, rootName, type, set, voicings, pcs, name: rootName + type.suffix };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Particles & explosions                                            */
+  /* ------------------------------------------------------------------ */
+  const parts = [];
+  const state = { shake: 0, wobble: 0 };
+  function addP(o) {
+    const p = Object.assign({ x: 0, y: 0, vx: 0, vy: 0, g: 0, drag: 0, life: 1, rot: 0, vr: 0, size: 10, color: "#fff", type: "spark", delay: 0, text: "" }, o);
+    p.max = p.life; parts.push(p);
+  }
+  function starPath(c, r) {
+    c.beginPath();
+    for (let i = 0; i < 10; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? r * 0.45 : r;
+      i ? c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : c.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+    }
+    c.closePath();
+  }
+  function updateParts(dt) {
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      if (p.delay > 0) { p.delay -= dt; continue; }
+      p.life -= dt;
+      if (p.life <= 0) { parts.splice(i, 1); continue; }
+      const k = Math.max(0, 1 - p.drag * dt);
+      p.vx *= k; p.vy *= k; p.vy += p.g * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
+    }
+  }
+  function drawParts(c) {
+    parts.forEach(p => {
+      if (p.delay > 0) return;
+      const u = p.life / p.max, age = 1 - u;
+      c.save(); c.translate(p.x, p.y);
+      c.lineJoin = "round"; c.lineCap = "round"; c.strokeStyle = OUT;
+      switch (p.type) {
+        case "feather":
+          c.rotate(p.rot); c.globalAlpha = Math.min(1, u * 2.2);
+          c.beginPath(); c.ellipse(0, 0, p.size, p.size * 0.3, 0, 0, TAU); c.fillStyle = p.color; c.fill(); c.lineWidth = 2; c.stroke();
+          c.beginPath(); c.moveTo(-p.size, 0); c.lineTo(p.size * 0.8, 0); c.lineWidth = 1.4; c.stroke();
+          break;
+        case "spark":
+          c.globalAlpha = Math.min(1, u * 2);
+          c.strokeStyle = p.color; c.lineWidth = p.size * (0.5 + u * 0.6);
+          c.beginPath(); c.moveTo(0, 0); c.lineTo(-p.vx * 0.045, -p.vy * 0.045); c.stroke();
+          break;
+        case "star":
+          c.rotate(p.rot); c.globalAlpha = Math.min(1, u * 2.5);
+          c.scale(0.5 + u * 0.6, 0.5 + u * 0.6); starPath(c, p.size);
+          c.fillStyle = p.color; c.fill(); c.lineWidth = 3; c.stroke();
+          break;
+        case "heart": {
+          const s = p.size * (0.7 + 0.3 * u); c.globalAlpha = Math.min(1, u * 2.5); c.rotate(Math.sin(p.rot) * 0.3);
+          c.beginPath(); c.moveTo(0, s * 0.3);
+          c.bezierCurveTo(-s, -s * 0.4, -s * 0.5, -s * 1.1, 0, -s * 0.5);
+          c.bezierCurveTo(s * 0.5, -s * 1.1, s, -s * 0.4, 0, s * 0.3);
+          c.fillStyle = p.color; c.fill(); c.lineWidth = 3; c.stroke();
+          break;
+        }
+        case "note":
+          c.rotate(Math.sin(p.rot) * 0.4); c.globalAlpha = Math.min(1, u * 2.5);
+          c.font = "bold " + p.size + "px Georgia, serif"; c.textAlign = "center"; c.textBaseline = "middle";
+          c.lineWidth = 5; c.strokeText(p.text, 0, 0); c.fillStyle = p.color; c.fillText(p.text, 0, 0);
+          break;
+        case "coin":
+          c.globalAlpha = Math.min(1, u * 2.5); c.scale(Math.max(0.12, Math.abs(Math.cos(p.rot))), 1);
+          c.beginPath(); c.arc(0, 0, p.size, 0, TAU); c.fillStyle = "#ffcf3a"; c.fill(); c.lineWidth = 3; c.stroke();
+          c.beginPath(); c.arc(0, 0, p.size * 0.62, 0, TAU); c.strokeStyle = "#c8861a"; c.lineWidth = 2.5; c.stroke();
+          break;
+        case "confetti":
+          c.rotate(p.rot); c.globalAlpha = Math.min(1, u * 2.5); c.scale(1, Math.cos(p.rot * 2.3));
+          c.fillStyle = p.color; c.fillRect(-p.size, -p.size * 0.5, p.size * 2, p.size); c.lineWidth = 1.5; c.strokeRect(-p.size, -p.size * 0.5, p.size * 2, p.size);
+          break;
+        case "puff": {
+          const r = p.size * (0.6 + age * 0.9); c.globalAlpha = Math.min(0.95, u * 1.6);
+          c.beginPath(); c.arc(0, 0, r, 0, TAU); c.fillStyle = p.color; c.fill(); c.lineWidth = 3.5; c.stroke();
+          break;
+        }
+        case "ring":
+          c.globalAlpha = Math.min(1, u * 2);
+          c.beginPath(); c.arc(0, 0, p.size * easeOut(age), 0, TAU); c.strokeStyle = p.color; c.lineWidth = (1 - age) * 16 + 2; c.stroke();
+          break;
+        case "flash":
+          c.globalAlpha = u * 0.9; c.beginPath(); c.arc(0, 0, p.size * (1 + age * 1.2), 0, TAU); c.fillStyle = p.color; c.fill();
+          break;
+        case "burst": {
+          const pop = age < 0.15 ? easeOut(age / 0.15) * 1.15 : 1.15 - Math.min(0.15, (age - 0.15) * 0.5);
+          c.rotate(p.rot); c.scale(pop, pop); c.globalAlpha = Math.min(1, u * 4);
+          const r = p.size, n = 14; c.beginPath();
+          for (let i = 0; i < n * 2; i++) {
+            const a = i * Math.PI / n, rr = i % 2 ? r * 0.62 : r * (i % 4 === 0 ? 1.05 : 0.92);
+            i ? c.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : c.moveTo(Math.cos(a) * rr, Math.sin(a) * rr);
+          }
+          c.closePath(); c.fillStyle = p.color; c.fill(); c.lineWidth = 6; c.stroke();
+          c.font = "" + Math.round(r * 0.52) + "px Bangers, Anton, Impact, sans-serif"; c.textAlign = "center"; c.textBaseline = "middle";
+          c.lineWidth = r * 0.1; c.strokeText(p.text, 0, 4); c.fillStyle = "#d62f2f"; c.fillText(p.text, 0, 4);
+          break;
+        }
+      }
+      c.restore();
+    });
+  }
+
+  const RAINBOW = ["#ff3b3b", "#ff9a2e", "#ffe03a", "#4cd964", "#2fb5ff", "#6a5cff", "#c05cff"];
+  const FIRE = ["#ffd23a", "#ff5a3a", "#5ad1ff", "#a8ff5a", "#ff6ad5", "#ffffff"];
+  const WORDS = ["POW!", "BOOM!", "PAM!", "BRAVO!", "YEEHAA!", "TOMA!", "ZAS!", "CLAP!", "BANG!"];
+  const radial = (n, fn) => { for (let i = 0; i < n; i++) fn(Math.random() * TAU, i); };
+  const burstText = (x, y, word) => addP({ type: "burst", x, y, life: 1.2, size: 135, text: word || pick(WORDS), rot: (Math.random() - 0.5) * 0.5, color: pick(["#ffd23a", "#ffb62e", "#fff25a"]) });
+  const flash = (x, y, color) => addP({ type: "flash", x, y, life: 0.35, size: 70, color: color || "#ffffff" });
+  const puffs = (x, y, n, colors, size) => radial(n, a => { const sp = rnd(60, 220); addP({ type: "puff", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 2.2, life: rnd(0.6, 1.1), size: size || rnd(26, 46), color: pick(colors) }); });
+  const feathers = (x, y, n, cols, power) => radial(n, a => { const sp = rnd(150, 520) * (power || 1); addP({ type: "feather", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - 120, g: 420, drag: 1.4, life: rnd(1.2, 2.1), rot: Math.random() * TAU, vr: rnd(-14, 14), size: rnd(12, 24), color: pick(cols) }); });
+  const stars5 = (x, y, n, cols) => radial(n, a => { const sp = rnd(120, 480); addP({ type: "star", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 1.6, g: 120, life: rnd(0.8, 1.4), rot: Math.random() * TAU, vr: rnd(-8, 8), size: rnd(12, 22), color: pick(cols) }); });
+  const ring = (x, y, color, delay, size) => addP({ type: "ring", x, y, life: 0.7, size: size || 190, color, delay: delay || 0 });
+
+  const FX = [
+    (x, y, cols) => { flash(x, y); feathers(x, y, 64, cols); puffs(x, y, 6, ["#fff6e0", "#ffe9c0"]); burstText(x, y - 40); state.shake = 9; },
+    (x, y) => { flash(x, y, "#fff3a0"); ring(x, y, "#ffd23a", 0); ring(x, y, "#ff5a3a", 0.08); ring(x, y, "#5ad1ff", 0.16, 240);
+      radial(110, a => { const sp = rnd(160, 640); addP({ type: "spark", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 1.8, g: 260, life: rnd(0.9, 1.6), size: rnd(3, 6), color: pick(FIRE) }); });
+      stars5(x, y, 14, FIRE); state.shake = 8; },
+    (x, y) => { flash(x, y);
+      radial(110, () => addP({ type: "confetti", x, y, vx: rnd(-380, 380), vy: -rnd(300, 860), g: 620, drag: 0.5, life: rnd(1.6, 2.4), rot: Math.random() * TAU, vr: rnd(-10, 10), size: rnd(6, 12), color: pick(RAINBOW) }));
+      stars5(x, y, 16, ["#ffd23a", "#ffffff"]); burstText(x, y - 50, pick(["YEEHAA!", "BRAVO!", "TOMA!"])); state.shake = 8; },
+    (x, y) => { flash(x, y, "#ffd0e0"); ring(x, y, "#ff7aa8", 0, 200);
+      radial(26, () => addP({ type: "heart", x, y, vx: rnd(-220, 220), vy: -rnd(120, 420), g: 140, drag: 1.1, life: rnd(1.4, 2.0), rot: Math.random() * TAU, vr: rnd(-4, 4), size: rnd(18, 34), color: pick(["#ff3b6a", "#ff7aa8", "#ff9ab8", "#e0194f"]) }));
+      stars5(x, y, 14, ["#fff0a0", "#ffffff"]); burstText(x, y - 40, pick(["TOMA!", "BRAVO!"])); },
+    (x, y, cols) => { flash(x, y, "#ffc060"); ring(x, y, "#ff7a1a", 0, 230);
+      puffs(x, y, 10, ["#6b6b6b", "#9a9a9a", "#d8d8d8"], rnd(50, 90));
+      radial(60, a => { const sp = rnd(200, 700); addP({ type: "spark", x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, drag: 1.7, g: 300, life: rnd(0.7, 1.3), size: rnd(3, 6), color: pick(["#ffd23a", "#ff8a1a", "#ff4a1a"]) }); });
+      feathers(x, y, 26, cols, 1.1); burstText(x, y - 40, "BOOM!"); state.shake = 16; },
+    (x, y, cols) => { flash(x, y, "#e0f0ff"); ring(x, y, "#5ad1ff", 0, 200); ring(x, y, "#a8ff5a", 0.1, 260);
+      radial(30, () => addP({ type: "note", x, y, vx: rnd(-420, 420), vy: -rnd(100, 620), g: 300, drag: 1, life: rnd(1.3, 2.0), rot: Math.random() * TAU, vr: rnd(-6, 6), size: rnd(34, 56), color: pick(RAINBOW), text: pick(["♪", "♫", "♬"]) }));
+      feathers(x, y, 16, cols); burstText(x, y - 50, "BRAVO!"); state.shake = 7; },
+    (x, y) => { flash(x, y, "#fff3a0"); ring(x, y, "#ffcf3a", 0, 180);
+      radial(36, () => addP({ type: "coin", x, y, vx: rnd(-380, 380), vy: -rnd(300, 780), g: 900, drag: 0.3, life: rnd(1.5, 2.1), rot: Math.random() * TAU, vr: rnd(10, 18), size: rnd(14, 20) }));
+      stars5(x, y, 18, ["#ffe14a", "#ffffff"]); burstText(x, y - 50, pick(["CLING!", "YEEHAA!"])); state.shake = 7; },
+    (x, y) => { flash(x, y);
+      RAINBOW.forEach((c2, i) => ring(x, y, c2, i * 0.06, 150 + i * 28));
+      radial(54, i => addP({ type: "feather", x, y, vx: Math.cos(i * 1.7) * rnd(120, 560), vy: Math.sin(i * 1.7) * rnd(120, 560) - 100, g: 380, drag: 1.3, life: rnd(1.3, 2.2), rot: Math.random() * TAU, vr: rnd(-12, 12), size: rnd(12, 22), color: pick(RAINBOW) }));
+      stars5(x, y, 12, RAINBOW); burstText(x, y - 40); state.shake = 8; }
+  ];
+  let fxBag = [];
+  function nextFx() {
+    if (!fxBag.length) { fxBag = FX.map((_, i) => i).sort(() => Math.random() - 0.5); }
+    return FX[fxBag.pop()];
+  }
+
+
+  /* ------------------------------------------------------------------ */
+  /*  Polyphonic note detection for guitar chords                       */
+  /*  (windowed FFT -> spectral peaks -> iterative harmonic grouping)   */
+  /* ------------------------------------------------------------------ */
+  const CD = (() => {
+    const NW = 16384, M = 65536;
+    let win = null, cosT = null, sinT = null, rev = null, re = null, im = null, mag = null;
+    function init() {
+      if (win) return;
+      win = new Float32Array(NW);
+      for (let i = 0; i < NW; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (NW - 1));
+      cosT = new Float64Array(M / 2); sinT = new Float64Array(M / 2);
+      for (let i = 0; i < M / 2; i++) { cosT[i] = Math.cos(2 * Math.PI * i / M); sinT[i] = -Math.sin(2 * Math.PI * i / M); }
+      rev = new Uint32Array(M);
+      const bits = Math.log2(M);
+      for (let i = 0; i < M; i++) { let r = 0, x = i; for (let b = 0; b < bits; b++) { r = (r << 1) | (x & 1); x >>= 1; } rev[i] = r; }
+      re = new Float64Array(M); im = new Float64Array(M); mag = new Float32Array(M / 2);
+    }
+    function fft() {
+      for (let i = 0; i < M; i++) { const j = rev[i]; if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+      for (let size = 2; size <= M; size <<= 1) {
+        const half = size >> 1, step = M / size;
+        for (let i = 0; i < M; i += size) {
+          for (let j = 0, k = 0; j < half; j++, k += step) {
+            const a = i + j, b = a + half, tr = re[b] * cosT[k] - im[b] * sinT[k], ti = re[b] * sinT[k] + im[b] * cosT[k];
+            re[b] = re[a] - tr; im[b] = im[a] - ti; re[a] += tr; im[a] += ti;
+          }
+        }
+      }
+    }
+    // buf: time-domain samples (uses the last NW). Returns {notes:[{midi,f,amp}], rms}
+    function analyze(buf, sr) {
+      init();
+      const off = buf.length - NW; let mean = 0, e = 0;
+      for (let i = 0; i < NW; i++) mean += buf[off + i]; mean /= NW;
+      for (let i = 0; i < NW; i++) { const v = buf[off + i] - mean; re[i] = v * win[i]; e += v * v; }
+      re.fill(0, NW); im.fill(0);
+      const rms = Math.sqrt(e / NW);
+      fft();
+      const binHz = sr / M, k0 = Math.ceil(60 / binHz), k1 = Math.min(M / 2 - 2, Math.floor(3200 / binHz));
+      let mx = 0;
+      for (let k = k0 - 2; k <= k1 + 1; k++) { mag[k] = Math.hypot(re[k], im[k]); if (mag[k] > mx) mx = mag[k]; }
+      if (mx <= 0) return { notes: [], rms };
+      const thr = mx * 0.012, peaks = [];
+      // peaks must be real spectral lines (the window's main lobe is ~4 bins of the unpadded FFT = 16 padded bins)
+      const lobe = 14;
+      for (let k = k0; k <= k1; k++) {
+        const v = mag[k];
+        if (v < thr || v < mag[k - 1] || v <= mag[k + 1]) continue;
+        let isMax = true;
+        for (let d = 2; d <= lobe && isMax; d++) { if (mag[k - d] > v || mag[k + d] > v) isMax = false; }
+        if (!isMax) continue;
+        const a = Math.log(mag[k - 1] + 1e-12), b = Math.log(v + 1e-12), c = Math.log(mag[k + 1] + 1e-12);
+        const den = a - 2 * b + c, sh = den !== 0 ? clamp(0.5 * (a - c) / den, -0.5, 0.5) : 0;
+        peaks.push({ f: (k + sh) * binHz, a: v / mx });
+      }
+      peaks.sort((p, q) => q.a - p.a); peaks.length = Math.min(peaks.length, 70);
+      const find = (f, tolCents) => {
+        let best = null;
+        const lo = f * Math.pow(2, -tolCents / 1200), hi = f * Math.pow(2, tolCents / 1200);
+        for (const p of peaks) if (p.f >= lo && p.f <= hi && p.cur > 0.0005 && (!best || p.cur > best.cur)) best = p;
+        return best;
+      };
+      peaks.forEach(p => { p.cur = p.a; });
+      const notes = []; let firstScore = 0;
+      for (let iter = 0; iter < 6; iter++) {
+        let best = null;
+        const cands = new Set();
+        peaks.forEach(p => { if (p.cur < 0.02) return; for (let d = 1; d <= 4; d++) { const f0 = p.f / d; if (f0 >= 76 && f0 <= 1400) cands.add(Math.round(f0 * 4) / 4); } });
+        cands.forEach(f0 => {
+          let score = 0, hits = 0, h1 = 0, missing = 0; const used = [];
+          for (let h = 1; h <= 10; h++) {
+            const p = find(f0 * h, 28);
+            if (p) { const w = 1 / Math.sqrt(h); score += p.cur * w; hits++; if (h === 1) h1 = p.cur; used.push(p); }
+            else if (h <= 4) missing++;
+          }
+          if (!hits) return;
+          // the fundamental (or at least its 2nd and 3rd partials) must be there
+          const hasF = find(f0, 28), has2 = find(f0 * 2, 28), has3 = find(f0 * 3, 28);
+          if (!hasF && !(has2 && has3)) return;
+          score *= (1 - 0.22 * missing);
+          if (score > 0 && (!best || score > best.score)) best = { f0, score, used };
+        });
+        if (!best) break;
+        if (!iter) firstScore = best.score;
+        else if (best.score < firstScore * 0.17) break;
+        // refine f0 from its own strongest low partial
+        const low = best.used[0];
+        const m = 69 + 12 * Math.log2(best.f0 / 440);
+        notes.push({ f: best.f0, midi: Math.round(m), cents: (m - Math.round(m)) * 100, amp: best.score });
+        best.used.forEach(p => { p.cur *= 0.35; });
+      }
+      // octave-duplicates collapse, keep strongest
+      const out = [];
+      notes.forEach(n => { if (!out.some(o => o.midi === n.midi)) out.push(n); });
+      return { notes: out, rms };
+    }
+    // judge: does the detection match the proposed chord? (5th optional: it is a harmonic of the root and often masked)
+    function judge(res, ch, v, requireBass, tol) {
+      const pcs = res.notes.map(n => ((n.midi % 12) + 12) % 12);
+      const have = new Set(pcs);
+      const need = ch.type.iv.map((iv, i) => ({ pc: (ch.rootPc + iv) % 12, opt: i === 2 && iv === 7 }));
+      // a missing note that sits exactly an octave + a fifth (19 semitones) above another note of the voicing is usually
+      // just that note's 3rd partial (it can't be told apart on a guitar): tolerate one such masked note.
+      let miss = need.filter(n => !n.opt && !have.has(n.pc)).length;
+      if (miss === 1 && res.notes.length >= 3) {
+        const m = need.find(n => !n.opt && !have.has(n.pc));
+        const vm = v.notes.find(q => ((q.midi % 12) + 12) % 12 === m.pc);
+        if (vm && v.notes.some(u => u !== vm && u.midi + 19 === vm.midi && have.has(((u.midi % 12) + 12) % 12))) miss = 0;
+      }
+      const ok = new Set(need.map(n => n.pc));
+      const extra = [...have].filter(p => !ok.has(p)).length;
+      let bassOk = true;
+      if (requireBass && res.notes.length) {
+        const low = res.notes.reduce((a, b) => (b.midi < a.midi ? b : a));
+        const want = ((v.notes[0].midi % 12) + 12) % 12;
+        bassOk = ((low.midi % 12) + 12) % 12 === want;
+      }
+      const present = need.filter(n => have.has(n.pc)).length;
+      if (tol && present >= 3 && miss <= 1) miss = 0;
+      return { ok: miss === 0 && extra === 0 && res.notes.length >= 3 && bassOk, miss, extra, bassOk };
+    }
+    return { analyze, judge, NW };
+  })();
+
+  /* ------------------------------------------------------------------ */
+  /*  Chord Rodeo — game                                                */
+  /* ------------------------------------------------------------------ */
+  const ctx = document.getElementById("cv").getContext("2d");
+  const KEY = "chordRodeo.v2";
+  const S = { types: ["maj7"], sets: ["6432"], inv: -1, tol: false, inst: "6" };
+  try {
+    const o = JSON.parse(localStorage.getItem(KEY) || "{}");
+    if (Array.isArray(o.types)) S.types = o.types.filter(id => CHORD_TYPES.some(t => t.id === id));
+    if (o.inst === "m3" || o.inst === "p4") S.inst = o.inst;
+    if (Array.isArray(o.sets)) S.sets = o.sets.filter(id => id === "all" || STRING_SETS.concat(SETS7).some(s => s.id === id));
+    if (o.tol === true) S.tol = true;
+    if (typeof o.inv === "number" && o.inv >= -1 && o.inv <= 3) S.inv = o.inv;
+  } catch (e) {}
+  if (!S.types.length) S.types = ["maj7"];
+  S.sets = [S.sets[0] || "6432"];
+  const INST = {
+    "6": { n: 6, tun: TUNING, sub: "ESTÀNDARD · E A D G B E", long: "" },
+    m3: { n: 7, tun: { 7: 40, 6: 44, 5: 48, 4: 52, 3: 56, 2: 60, 1: 64 }, sub: "TERCERES MAJORS · E G♯ C E G♯ C E", long: "7 cordes · terceres majors" },
+    p4: { n: 7, tun: { 7: 40, 6: 45, 5: 50, 4: 55, 3: 60, 2: 65, 1: 70 }, sub: "QUARTES JUSTES · E A D G C F B♭", long: "7 cordes · quartes justes" }
+  };
+  const setsFor = inst => INST[inst].n === 7 ? STRING_SETS.concat(SETS7) : STRING_SETS;
+  if (S.sets[0] !== "all" && !setsFor(S.inst).some(x => x.id === S.sets[0])) S.sets = ["6432"];
+  const saveS = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+
+  const stringY = s => 330 + (s - 1) * 48;        // string 1 = top wire, string 6 = bottom wire
+  const DEG_SPECIES = n => {
+    const d = n.deg;
+    if (d === "F") return SPECIES[5];                       // cardenal
+    if (d === "3" || d === "♭3") return SPECIES[4];         // canari
+    if (d === "5" || d === "♭5") return SPECIES[2];         // blauet
+    if (d === "6") return SPECIES[6];                       // tucà
+    return SPECIES[3];                                      // lloro: 7, ♭7, ♭♭7
+  };
+
+  let T = performance.now();
+  const G = { listening: false, chord: null, birds: [], plates: [], solved: false, nextAt: 0, acceptAfter: 0, correct: 0, total: 0, streak: 0, best: 0, last: "", muteUntil: 0 };
+  const el = id => document.getElementById(id);
+  const msgEl = el("msg"), statsEl = el("stats"), heardEl = el("heard"), meterEl = el("meterFill");
+  function setMsg(text, kind) {
+    if (!text) { msgEl.className = "hud hidden"; return; }
+    msgEl.textContent = text; msgEl.className = "hud " + (kind || "");
+  }
+  function updateStats() { statsEl.textContent = "Encerts " + G.correct + " · Ratxa " + G.streak + " · Rècord " + G.best + " · acords v1"; }
+
+  /* ----------------------------- chord set-up ------------------------ */
+  const ROLE_COL = ["#ff7d6e", "#ffd65c", "#72b9f4", "#7ed49c"];       // fonamental, tercera, quinta, setena/sisena
+  const ROLE_NAME = ["Fonamental", "Tercera", "Quinta", "Setena"];
+  const INK = "#2b1e14";
+  const INV_COL = ["#2b1e14", "#1b7f8f", "#7b4a9e", "#5b8a22"], HARD = "#d11f1f";
+  // electric-guitar-like neck: narrow, slightly wider towards the body
+  function boardGeom(shown, rows, all, nStr) {
+    nStr = nStr || 6; const kn = 6.3 / (nStr - 1 + 1.3);
+    let lo, hi;
+    if (all) { lo = 0; hi = 21; }
+    else { const fr = shown.flatMap(v => v.notes.map(q => q.fret)), mnA = Math.min(...fr), mxA = Math.max(...fr); lo = mnA <= 2 ? 1 : mnA; hi = Math.max(mxA, lo + 8); if (hi - lo + 1 > 17) hi = lo + 16; }
+    const cols = hi - lo + 1, x0 = 130, x1 = 1540, k = (all ? 1.3 : rows === 1 ? 1.3 : 1) * kn;
+    const sp0 = 52 * k, sp1 = 61 * k, top = rows > 1 ? 150 + rows * 30 + 14 : 160;
+    const cy = all ? 450 : (rows > 1 ? top + 215 : 450), colW = (x1 - x0) / cols;
+    const sp = x => sp0 + (sp1 - sp0) * clamp((x - x0) / (x1 - x0), 0, 1);
+    return { lo, hi, cols, bx0: x0, bx1: x1, colW, cy, sp, sp0, sp1, edge: (nStr - 1) / 2 + 0.65, nStr, rad0: 0.43, k,
+      sy: (s, x) => cy + (s - (nStr + 1) / 2) * sp(x), colX: f => x0 + colW * (f - lo + 0.5), rad: x => Math.min(sp(x) * 0.45, colW * 0.43) * (all ? 0.92 : 1) };
+  }
+  function hull(pts) {
+    const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]); if (p.length < 3) return p;
+    const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
+    p.forEach(q => { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); });
+    for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+    lo.pop(); up.pop(); return lo.concat(up);
+  }
+  function buildVizLayer(g) {
+    const mk = () => { const d = document.createElement("canvas"); d.width = W; d.height = H; return d; };
+    const layer = mk(), A = mk(), B = mk(), lc = layer.getContext("2d"), ac = A.getContext("2d"), bc = B.getContext("2d");
+    G.viz.forEach(v => {
+      const pts = v.notes.map(q => { const x = g.colX(q.fret); return [x, g.sy(q.s, x)]; });
+      const h = hull(pts), pad = g.rad(g.bx0 + 500) * 1.35, col = v.hard ? HARD : INV_COL[v.inv];
+      const shape = (cx, w, fill) => { cx.lineJoin = "round"; cx.lineCap = "round"; cx.beginPath(); h.forEach((q, i) => i ? cx.lineTo(q[0], q[1]) : cx.moveTo(q[0], q[1])); cx.closePath(); cx.lineWidth = w; if (fill) cx.fill(); cx.stroke(); };
+      ac.clearRect(0, 0, W, H); ac.fillStyle = ac.strokeStyle = col; shape(ac, pad * 2, true);
+      lc.globalAlpha = 0.13; lc.drawImage(A, 0, 0);
+      bc.globalCompositeOperation = "source-over"; bc.clearRect(0, 0, W, H); bc.fillStyle = bc.strokeStyle = col; shape(bc, pad * 2 + 6, true);
+      bc.globalCompositeOperation = "destination-out"; bc.fillStyle = bc.strokeStyle = "#000"; shape(bc, pad * 2 - 1, true);
+      lc.globalAlpha = 0.9; lc.drawImage(B, 0, 0);
+      lc.globalAlpha = 1; lc.strokeStyle = col; lc.lineWidth = 4; pts.forEach(q => { lc.beginPath(); lc.arc(q[0], q[1], g.rad(q[0]) * 1.17, 0, 7); lc.stroke(); });
+    });
+    return layer;
+  }
+  function newChord(first) {
+    const types = CHORD_TYPES.filter(t => S.types.includes(t.id));
+    const inst = INST[S.inst], all = S.sets[0] === "all", avail = setsFor(S.inst), vizSets = INST[S.inst].n === 7 ? STRING_SETS.concat(SETS7.filter(x => VIZ7.includes(x.id))) : STRING_SETS;
+    const setList = all ? vizSets : [avail.find(s => s.id === S.sets[0]) || STRING_SETS[1]];
+    let chs = null;
+    for (let tries = 0; tries < 30; tries++) {
+      const type = pick(types), key = pick(KEYS);
+      chs = setList.map(set => buildChord(key[1], key[0], type, set, inst.tun));
+      if (chs.every(c => c.voicings.length === 4) && chs[0].name + (all ? "all" : chs[0].set.id) !== G.last) break;
+    }
+    const ch = Object.assign({}, chs[0]); if (all) ch.set = { id: "all", strs: Array.from({ length: inst.n }, (_, i) => inst.n - i) };
+    G.last = ch.name + ch.set.id;
+    G.chord = ch; G.solved = false; G.total++;
+    G.shown = [];
+    G.birds = []; G.panels = []; G.all = all;
+    G.viz = []; G.vizLayer = null;
+    if (all) {
+      // visualisation only: every chord tone on every string, with each chord position (voicing) joined by a line
+      chs.forEach(c => c.voicings.forEach(v => { if (S.inv < 0 || v.inv === S.inv) G.viz.push({ inv: v.inv, notes: v.notes, set: c.set.id, hard: v.hard }); }));
+      const g = boardGeom([], 0, true, inst.n); G.board = g; G.vizLayer = buildVizLayer(g);
+      for (let s = 1; s <= inst.n; s++) for (let f = 0; f <= 21; f++) {
+        const pc = (inst.tun[s] + f) % 12, ti = ch.type.iv.findIndex(i => (ch.rootPc + i) % 12 === pc);
+        if (ti < 0) continue;
+        const tx = g.colX(f), ty = g.sy(s, tx), inAny = G.viz.some(v => v.notes.some(q => q.s === s && q.fret === f));
+        G.birds.push({
+          deg: ch.type.deg[ti], role: ti, fret: f, inv: 0, vids: [], vi: 0, dim: !inAny, r: g.rad(tx), flip: 1, scale: 1,
+          tx, ty, x: tx, y: ty, mode: "wait", wait: 0.1 + f * 0.03 + Math.random() * 0.2, t: 0, dur: 0.4, pop: 0, flying: false,
+          phase: 0, hopY: 0, shakeAmp: 0, rot: 0, puff: 0, sing: 0, happy: false, emT: 0, hk: 0, lastIdx: -1, pf: 1
+        });
+      }
+    } else {
+      chs.forEach(c => c.voicings.forEach(v => { if (S.inv < 0 || v.inv === S.inv) { v.vid = c.set.id + "/" + v.inv; v.setId = c.set.id; v.strs = c.set.strs; G.shown.push(v); } }));
+      const g = boardGeom(G.shown, G.shown.length, false, inst.n); G.board = g;
+      G.shown.forEach((v, vi) => {
+        const frets = v.notes.map(q => q.fret), mn = Math.min(...frets), mx = Math.max(...frets);
+        G.panels.push({ mn, mx, inv: v.inv, vi, alpha: 1, notes: v.notes, hard: v.hard });
+        v.notes.forEach((q, qi) => {
+          const tx = g.colX(q.fret), ty = g.sy(q.s, tx);
+          G.birds.push({
+            deg: q.deg, role: q.ti, fret: q.fret, inv: v.inv, vids: [v.vid], vi, r: g.rad(tx), flip: Math.random() < 0.5 ? 1 : -1, scale: 1,
+            tx, ty, x: tx, y: ty, mode: "wait", wait: 0.15 + (vi * 4 + qi) * 0.07, t: 0, dur: 0.4, pop: 0, flying: false,
+            phase: Math.random() * TAU, hopY: 0, shakeAmp: 0, rot: 0, puff: 0, sing: 0, happy: false, emT: 0, hk: 0, lastIdx: -1, pf: rnd(0.9, 1.3)
+          });
+        });
+      });
+    }
+    G.nStr = inst.n; G.inst = inst;
+    G.acceptAfter = T + 900;
+    G.stable = 0; G.nextAt = 0;
+    setMsg(all ? "Visualització: els graus de " + ch.name + " a totes les cordes" : S.inv < 0 ? "Toca " + ch.name + " (qualsevol inversió)" : "Toca " + ch.name + " · " + INV_NAMES[S.inv].toLowerCase(), "");
+    updateStats();
+  }
+
+  function updateBird(b, dt) {
+    if (b.mode === "wait") { b.wait -= dt; if (b.wait <= 0) { b.mode = "in"; b.t = 0; } return; }
+    b.t += dt;
+    if (b.mode === "in") {
+      const p = clamp(b.t / b.dur, 0, 1), k = 1.70158, q = p - 1;
+      b.pop = 1 + (k + 1) * q * q * q + k * q * q;
+      if (p >= 1) { b.mode = "idle"; b.pop = 1; }
+    } else if (b.mode === "idle") {
+      b.x = b.tx; b.y = b.ty; b.pop = 1;
+    } else if (b.mode === "happy") {
+      happyAnim(b, dt); b.pop = 1;
+      if (b.t >= b.dur) { b.mode = "out"; b.t = 0; b.dur = 0.5; b.puff = 0; b.sing = 0; b.rot = 0; }
+    } else if (b.mode === "out") {
+      b.pop = 1 - easeIn(clamp(b.t / b.dur, 0, 1));
+      if (b.t >= b.dur) b.dead = true;
+    }
+  }
+
+  /* ----------------------------- drawing ----------------------------- */
+  const ROUND = (c, x, y, w, h, r) => { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); };
+  const INLAY = { 3: 1, 5: 1, 7: 1, 9: 1, 12: 2, 15: 1, 17: 1, 19: 1, 21: 1, 24: 2 };
+  const HEAD = "'Alfa Slab One', Anton, Impact, serif";
+
+  /* ---- worn paper background (rendered once) ---- */
+  let paperC = null;
+  function makePaper() {
+    const cv2 = document.createElement("canvas"); cv2.width = W; cv2.height = H; const c = cv2.getContext("2d");
+    const hash = (x, y) => { let h = (x * 374761393 + y * 668265263) | 0; h = (h ^ (h >>> 13)) * 1274126177 | 0; return ((h ^ (h >>> 16)) >>> 0) / 4294967296; };
+    const vn = (x, y) => { const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, u = fx * fx * (3 - 2 * fx), v = fy * fy * (3 - 2 * fy);
+      return hash(xi, yi) * (1 - u) * (1 - v) + hash(xi + 1, yi) * u * (1 - v) + hash(xi, yi + 1) * (1 - u) * v + hash(xi + 1, yi + 1) * u * v; };
+    const w2 = 400, h2 = 225, small = document.createElement("canvas"); small.width = w2; small.height = h2;
+    const sc = small.getContext("2d"), id = sc.createImageData(w2, h2), d = id.data;
+    for (let y = 0; y < h2; y++) for (let x = 0; x < w2; x++) {
+      const n = 0.5 * vn(x / 60, y / 60) + 0.3 * vn(x / 22, y / 22) + 0.2 * vn(x / 7, y / 7);
+      const edge = Math.min(x, y, w2 - x, h2 - y) / 40, wear = clamp(1 - edge, 0, 1);
+      const base = [233, 219, 182], dark = [186, 150, 98];
+      let k = clamp((n - 0.35) * 1.3, 0, 1) * 0.55 + wear * wear * 0.6;
+      const i = (y * w2 + x) * 4;
+      d[i] = base[0] + (dark[0] - base[0]) * k; d[i + 1] = base[1] + (dark[1] - base[1]) * k; d[i + 2] = base[2] + (dark[2] - base[2]) * k; d[i + 3] = 255;
+    }
+    sc.putImageData(id, 0, 0); c.imageSmoothingEnabled = true; c.drawImage(small, 0, 0, W, H);
+    // faded sunburst rays from behind the neck
+    c.save(); c.translate(W * 0.5, 470); c.globalAlpha = 0.07;
+    for (let i = 0; i < 28; i++) { c.rotate(TAU / 28); c.fillStyle = i % 2 ? "#c4452d" : "#1b7f8f"; c.beginPath(); c.moveTo(0, 0); c.lineTo(1500, -60); c.lineTo(1500, 60); c.closePath(); c.fill(); }
+    c.restore();
+    // halftone dots, top-right and bottom-left corners
+    c.fillStyle = "rgba(43,30,20,.10)";
+    for (let y = 0; y < 150; y += 11) for (let x = 0; x < 260; x += 11) { const r = 4.2 * (1 - Math.hypot(x, y) / 300); if (r > 0.6) { c.beginPath(); c.arc(W - 10 - x - (y / 11 % 2) * 5, 10 + y, r, 0, TAU); c.fill(); } }
+    for (let y = 0; y < 150; y += 11) for (let x = 0; x < 260; x += 11) { const r = 4.2 * (1 - Math.hypot(x, y) / 300); if (r > 0.6) { c.beginPath(); c.arc(10 + x + (y / 11 % 2) * 5, H - 10 - y, r, 0, TAU); c.fill(); } }
+    // fibres, speckles, scratches, creases
+    for (let i = 0; i < 2600; i++) { c.fillStyle = "rgba(60,40,20," + (0.04 + Math.random() * 0.1) + ")"; c.fillRect(Math.random() * W, Math.random() * H, 1 + Math.random() * 2, 1 + Math.random() * 2); }
+    c.lineCap = "round";
+    for (let i = 0; i < 90; i++) { const x = Math.random() * W, y = Math.random() * H, a = Math.random() * TAU, l = 8 + Math.random() * 40; c.strokeStyle = Math.random() < 0.5 ? "rgba(255,248,225,.35)" : "rgba(60,35,15,.18)"; c.lineWidth = 0.8 + Math.random(); c.beginPath(); c.moveTo(x, y); c.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); c.stroke(); }
+    [[W * 0.33, 0, W * 0.31, H], [0, H * 0.62, W, H * 0.6]].forEach(([a, b, e, f]) => {
+      c.strokeStyle = "rgba(70,45,20,.22)"; c.lineWidth = 2; c.beginPath(); c.moveTo(a, b); c.lineTo(e, f); c.stroke();
+      c.strokeStyle = "rgba(255,250,230,.45)"; c.lineWidth = 2; c.beginPath(); c.moveTo(a + 2, b); c.lineTo(e + 2, f); c.stroke();
+    });
+    // stains
+    for (let i = 0; i < 7; i++) { const x = Math.random() * W, y = Math.random() * H, r = 40 + Math.random() * 110, g = c.createRadialGradient(x, y, r * 0.5, x, y, r); g.addColorStop(0, "rgba(120,80,30,0)"); g.addColorStop(0.85, "rgba(120,80,30,.10)"); g.addColorStop(1, "rgba(120,80,30,0)"); c.fillStyle = g; c.fillRect(x - r, y - r, r * 2, r * 2); }
+    // printed border
+    c.strokeStyle = "rgba(43,30,20,.7)"; c.lineWidth = 5; c.strokeRect(14, 14, W - 28, H - 28); c.lineWidth = 1.6; c.strokeRect(24, 24, W - 48, H - 48);
+    return cv2;
+  }
+
+  function drawBall(c, x, y, r, col, label, alpha) {
+    c.save(); c.globalAlpha = alpha == null ? 1 : alpha;
+    c.fillStyle = "rgba(43,30,20,.35)"; c.beginPath(); c.ellipse(x + r * 0.2, y + r * 0.92, r * 0.85, r * 0.22, 0, 0, TAU); c.fill();
+    const g = c.createRadialGradient(x - r * 0.38, y - r * 0.42, r * 0.1, x, y, r * 1.05);
+    g.addColorStop(0, light(col, 0.45)); g.addColorStop(0.5, col); g.addColorStop(1, shade(col, 0.22));
+    c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+    c.lineWidth = 2.6; c.strokeStyle = INK; c.stroke();
+    const fs = r * (label.length > 2 ? 0.95 : label.length > 1 ? 1.15 : 1.4);
+    c.font = fs + "px Anton, Impact, 'Arial Black', sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = INK;
+    c.fillText(label, x, y + fs * 0.06);
+    c.fillStyle = "rgba(255,255,255,.7)"; c.beginPath(); c.ellipse(x - r * 0.5, y - r * 0.6, r * 0.2, r * 0.11, -0.7, 0, TAU); c.fill();
+    c.restore();
+  }
+
+  function drawBoard(c) {
+    const g = G.board; if (!g) return;
+    const x0 = g.bx0, x1 = g.bx1, top = x => g.cy - g.edge * g.sp(x), bot = x => g.cy + g.edge * g.sp(x);
+    const poly = () => { c.beginPath(); c.moveTo(x0, top(x0)); c.lineTo(x1, top(x1)); c.lineTo(x1, bot(x1)); c.lineTo(x0, bot(x0)); c.closePath(); };
+    c.save();
+    // soft shadow + body of the neck (aged maple)
+    c.save(); c.translate(7, 9); poly(); c.fillStyle = "rgba(43,30,20,.35)"; c.fill(); c.restore();
+    poly(); const wg = c.createLinearGradient(0, g.cy - 200, 0, g.cy + 200); wg.addColorStop(0, "#dcae68"); wg.addColorStop(0.5, "#cf9c52"); wg.addColorStop(1, "#bd8742");
+    c.fillStyle = wg; c.fill();
+    c.save(); poly(); c.clip();
+    c.strokeStyle = "rgba(110,66,20,.22)"; c.lineWidth = 1;
+    for (let i = 0; i < 60; i++) { const yy = g.cy - 200 + ((i * 53) % 100) / 100 * 400; c.beginPath(); c.moveTo(x0, yy); c.bezierCurveTo(x0 + 400, yy + 6, x0 + 900, yy - 7, x1, yy + 2); c.stroke(); }
+    // play wear: darker, grubby patches around the lower frets
+    for (let i = 0; i < 9; i++) { const wx = x0 + g.colW * (0.5 + i * 0.9), g2 = c.createRadialGradient(wx, g.cy, 0, wx, g.cy, 110); g2.addColorStop(0, "rgba(90,50,15,.22)"); g2.addColorStop(1, "rgba(90,50,15,0)"); c.fillStyle = g2; c.fillRect(wx - 110, g.cy - 200, 220, 400); }
+    for (let i = 0; i < 70; i++) { const sx = x0 + Math.random() * (x1 - x0), sy = g.cy + (Math.random() - 0.5) * 2 * g.edge * g.sp(sx), a = Math.random() * TAU, l = 5 + Math.random() * 22; c.strokeStyle = Math.random() < 0.5 ? "rgba(255,240,200,.4)" : "rgba(70,40,10,.3)"; c.lineWidth = 0.8; c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx + Math.cos(a) * l, sy + Math.sin(a) * l * 0.4); c.stroke(); }
+    c.restore();
+    // cream binding on the edges
+    c.lineCap = "butt"; [top, bot].forEach(f => { c.strokeStyle = "#f2e6c2"; c.lineWidth = 7; c.beginPath(); c.moveTo(x0, f(x0)); c.lineTo(x1, f(x1)); c.stroke(); c.strokeStyle = INK; c.lineWidth = 2.4; c.beginPath(); c.moveTo(x0, f(x0) + (f === top ? -3.5 : 3.5)); c.lineTo(x1, f(x1) + (f === top ? -3.5 : 3.5)); c.stroke(); });
+    // inlays (black dots)
+    for (let i = 0; i < g.cols; i++) {
+      const f = g.lo + i, k = INLAY[f]; if (!k) continue;
+      const cx = x0 + g.colW * (i + 0.5), sp = g.sp(cx);
+      c.fillStyle = "rgba(43,30,20,.82)";
+      (k === 2 ? [-1.2, 1.2] : [0]).forEach(o => { c.beginPath(); c.arc(cx, g.cy + o * sp, sp * 0.2, 0, TAU); c.fill(); });
+    }
+    // frets (nickel silver, worn) and nut
+    for (let i = 0; i <= g.cols; i++) {
+      const fx = x0 + g.colW * i;
+      if (i === 1 - g.lo && g.lo <= 1) { c.fillStyle = "#efe3bd"; c.fillRect(fx - 13, top(fx) - 2, 13, bot(fx) - top(fx) + 4); c.strokeStyle = INK; c.lineWidth = 2; c.strokeRect(fx - 13, top(fx) - 2, 13, bot(fx) - top(fx) + 4); continue; }
+      c.fillStyle = "rgba(60,35,10,.5)"; c.fillRect(fx - 4, top(fx), 8, bot(fx) - top(fx));
+      const fg = c.createLinearGradient(fx - 3, 0, fx + 3, 0); fg.addColorStop(0, "#9b9a92"); fg.addColorStop(0.45, "#eeeee6"); fg.addColorStop(1, "#85847c");
+      c.fillStyle = fg; c.fillRect(fx - 3, top(fx), 6, bot(fx) - top(fx));
+    }
+    // strings
+    for (let s = 1; s <= g.nStr; s++) {
+      const used = G.chord.set.strs.includes(s), th = 2.6 + (s - 1) * 0.95 * (6 / g.nStr), bass = s >= g.nStr - 2;
+      const ya = g.sy(s, x0 - 34), yb = g.sy(s, x1);
+      c.globalAlpha = used ? 1 : 0.38; c.lineCap = "butt";
+      c.strokeStyle = "rgba(43,30,20,.55)"; c.lineWidth = th + 3.2; c.beginPath(); c.moveTo(x0 - 34, ya + 2); c.lineTo(x1, yb + 2); c.stroke();
+      c.strokeStyle = bass ? "#8c5a1f" : "#8d929c"; c.lineWidth = th; c.beginPath(); c.moveTo(x0 - 34, ya); c.lineTo(x1, yb); c.stroke();
+      c.strokeStyle = bass ? "#e4b568" : "#eef0f5"; c.lineWidth = Math.max(0.9, th * 0.32); c.beginPath(); c.moveTo(x0 - 34, ya - th * 0.18); c.lineTo(x1, yb - th * 0.18); c.stroke();
+      if (bass) { c.strokeStyle = "rgba(60,32,8,.5)"; c.lineWidth = th; c.setLineDash([1.4, 4]); c.beginPath(); c.moveTo(x0 - 34, ya); c.lineTo(x1, yb); c.stroke(); c.setLineDash([]); }
+      // string number tag
+      const tr = g.sp0 * 0.3, tx = x0 - 62, ty = g.sy(s, x0 - 62);
+      c.fillStyle = "#f2e6c2"; c.strokeStyle = INK; c.lineWidth = 2.2; c.beginPath(); c.arc(tx, ty, tr, 0, TAU); c.fill(); c.stroke();
+      c.fillStyle = INK; c.font = Math.round(tr * 1.3) + "px Anton, Impact, sans-serif"; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(String(s), tx, ty + 1);
+    }
+    c.globalAlpha = 1;
+    // fret numbers
+    const ny = g.cy + g.edge * g.sp1 + 34;
+    c.font = "30px " + HEAD; c.textAlign = "center"; c.textBaseline = "middle"; c.fillStyle = INK;
+    for (let i = 0; i < g.cols; i++) c.fillText(String(g.lo + i), x0 + g.colW * (i + 0.5), ny);
+    // all-mode: translucent outline around each chord position (prebuilt layer)
+    if (G.vizLayer) c.drawImage(G.vizLayer, 0, 0);
+    // inversion brackets + connectors (single string set)
+    const n = G.panels.length;
+    G.panels.forEach((p, k) => {
+      const solved = G.solved && G.solvedVid && G.solvedVid.endsWith("/" + p.inv), col2 = solved ? "#2e9b5e" : p.hard ? HARD : INV_COL[p.inv];
+      c.save(); c.globalAlpha = p.alpha;
+      const pts = p.notes.slice().sort((q, r) => r.s - q.s).map(q => { const x = g.colX(q.fret); return [x, g.sy(q.s, x)]; });
+      c.lineJoin = "round"; c.lineCap = "round";
+      c.strokeStyle = "rgba(242,230,194,.9)"; c.lineWidth = 11; c.beginPath(); pts.forEach((q, i) => i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1])); c.stroke();
+      c.strokeStyle = col2; c.lineWidth = 5; c.beginPath(); pts.forEach((q, i) => i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1])); c.stroke();
+      const ry = (n > 1 ? 150 + k * 30 : 140) + 4, xa = x0 + g.colW * (p.mn - g.lo) + 6, xb = x0 + g.colW * (p.mx - g.lo + 1) - 6;
+      c.strokeStyle = col2; c.lineWidth = 4; c.beginPath(); c.moveTo(xa, ry + 24); c.lineTo(xa, ry + 4); c.lineTo(xb, ry + 4); c.lineTo(xb, ry + 24); c.stroke();
+      const label = INV_NAMES[p.inv].toUpperCase() + "  ·  trastes " + p.mn + (p.mx > p.mn ? "–" + p.mx : "") + (p.hard ? "  ·  DIFÍCIL" : "");
+      c.font = (n > 1 ? 20 : 28) + "px " + HEAD; const tw = c.measureText(label).width + 22, cx = (xa + xb) / 2, lx = clamp(cx - tw / 2, 40, W - 40 - tw);
+      c.fillStyle = "#efe2bb"; c.fillRect(lx, ry - 9, tw, 28); c.strokeStyle = col2; c.lineWidth = 2; c.strokeRect(lx, ry - 9, tw, 28);
+      c.fillStyle = col2; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(label, lx + tw / 2, ry + 5);
+      c.restore();
+    });
+    c.restore();
+  }
+  function drawLegend(c) {
+    const ch = G.chord; if (!ch) return;
+    const names = ROLE_NAME.slice(); if (ch.type.id === "m6") names[3] = "Sisena";
+    c.save(); c.textBaseline = "middle"; c.textAlign = "left";
+    ch.type.deg.forEach((d, i) => {
+      const x = 900 + i * 185, y = 92;
+      drawBall(c, x - 36, y, 23, ROLE_COL[i], d);
+      c.fillStyle = INK; c.font = "700 22px 'Barlow Condensed', sans-serif"; c.fillText(names[i], x - 6, y + 2);
+    });
+    c.restore();
+  }
+  function drawTitle(c) {
+    const ch = G.chord; if (!ch) return;
+    c.save(); c.textAlign = "left"; c.textBaseline = "middle";
+    let fs = 92; c.font = fs + "px " + HEAD;
+    while (c.measureText(ch.name).width > 400 && fs > 40) { fs -= 4; c.font = fs + "px " + HEAD; }
+    c.fillStyle = "#d99a2b"; c.fillText(ch.name, 54 + 4, 78 + 4);          // off-register print shadow
+    c.fillStyle = INK; c.fillText(ch.name, 54, 78);
+    const x = 54 + Math.min(400, c.measureText(ch.name).width) + 30;
+    c.font = "26px " + HEAD; c.fillStyle = "#c4452d"; c.fillText((ch.set.id === "all" ? "TOTES LES CORDES" : "CORDES " + ch.set.strs.join(" · ")) + (G.nStr === 7 ? "  ·  7 CORDES" : ""), x, 62);
+    c.fillStyle = INK; c.font = "700 23px 'Barlow Condensed', sans-serif"; c.fillText(ch.type.name.toUpperCase(), x, 96);
+    c.restore();
+  }
+  function drawLiveBall(c, b) {
+    if (b.mode === "wait" || b.dead) return;
+    const s = Math.max(0.001, b.pop * (1 + b.puff));
+    c.save(); c.translate(b.x, b.y + b.hopY); if (b.rot) c.rotate(b.rot); c.scale(s, s);
+    drawBall(c, 0, 0, b.r, ROLE_COL[b.role], b.deg, (b.mode === "out" ? clamp(b.pop, 0, 1) : 1) * (b.dim ? 0.28 : 1));
+    c.restore();
+  }
+
+  function render() {
+    const c = ctx;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, W, H);
+    if (!paperC) paperC = makePaper();
+    c.drawImage(paperC, 0, 0);
+    c.save();
+    if (state.shake > 0.2) c.translate((Math.random() - 0.5) * state.shake, (Math.random() - 0.5) * state.shake);
+    drawTitle(c); drawLegend(c);
+    drawBoard(c);
+    if (G.chord && G.all) {
+      c.save(); c.textBaseline = "middle"; c.textAlign = "left";
+      const names = ["Fonamental", "1a inversió", "2a inversió", "3a inversió"], vis = S.inv < 0 ? [0, 1, 2, 3] : [S.inv];
+      c.font = "700 23px 'Barlow Condensed', sans-serif"; let lx = 330;
+      if (G.viz.some(v => v.hard)) vis.push(-1);
+      vis.forEach(i => { c.lineCap = "round"; c.strokeStyle = "rgba(242,230,194,.9)"; c.lineWidth = 11; c.beginPath(); c.moveTo(lx, 776); c.lineTo(lx + 44, 776); c.stroke(); c.strokeStyle = i < 0 ? HARD : INV_COL[i]; c.lineWidth = 5; c.beginPath(); c.moveTo(lx, 776); c.lineTo(lx + 44, 776); c.stroke(); c.fillStyle = INK; c.fillText(i < 0 ? "Difícil" : names[i], lx + 54, 777); lx += 54 + c.measureText(i < 0 ? "Difícil" : names[i]).width + 40; });
+      c.font = "26px " + HEAD; c.textAlign = "center"; c.fillStyle = INK; c.fillText("AFINACIÓ (GREU → AGUT):  " + G.inst.sub.replace(" · ", "  ·  "), W / 2, 822);
+      c.restore();
+    }
+    G.birds.forEach(b => drawLiveBall(c, b));
+    drawParts(c);
+    c.restore();
+  }
+
+  function update(dt) {
+    state.shake *= Math.exp(-dt * 7);
+    G.birds.forEach(b => updateBird(b, dt));
+    G.birds = G.birds.filter(b => !b.dead);
+    G.panels.forEach(p => { const tgt = (G.solved && !(G.solvedVid || "").endsWith("/" + p.inv)) ? 0 : 1; p.alpha += (tgt - p.alpha) * Math.min(1, dt * 5); });
+    updateParts(dt);
+    if (G.solved && G.nextAt && T >= G.nextAt) { G.nextAt = 0; newChord(); }
+  }
+
+  /* ----------------------------- sound ------------------------------- */
+    /* ----------------------------- sound ------------------------------- */
+  let sfx = null;
+  function sfxCtx() {
+    try { if (!sfx) sfx = new (window.AudioContext || window.webkitAudioContext)(); if (sfx.state === "suspended") sfx.resume(); } catch (e) { sfx = null; }
+    return sfx;
+  }
+  function tone(a, t0, f0, f1, dur, o) {
+    o = o || {};
+    const g = a.createGain(), os = a.createOscillator();
+    os.type = o.type || "sine"; os.frequency.setValueAtTime(f0, t0); os.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
+    if (o.vib) { const l = a.createOscillator(), lg = a.createGain(); l.frequency.value = o.vib; lg.gain.value = f0 * 0.035; l.connect(lg); lg.connect(os.frequency); l.start(t0); l.stop(t0 + dur + 0.05); }
+    const v = o.vol || 0.12;
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(v, t0 + Math.min(0.015, dur * 0.3)); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    let node = os;
+    if (o.lp) { const f = a.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = o.lp; os.connect(f); node = f; }
+    node.connect(g); g.connect(a.destination); os.start(t0); os.stop(t0 + dur + 0.05);
+  }
+  function noise(a, t0, dur, vol, lp, hp) {
+    const n = Math.floor(a.sampleRate * dur), bf = a.createBuffer(1, n, a.sampleRate), d = bf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, 2);
+    const src = a.createBufferSource(); src.buffer = bf;
+    const f = a.createBiquadFilter(); f.type = "lowpass"; f.frequency.value = lp || 1800;
+    const g = a.createGain(); g.gain.value = vol || 0.3;
+    src.connect(f); let last = f;
+    if (hp) { const h = a.createBiquadFilter(); h.type = "highpass"; h.frequency.value = hp; f.connect(h); last = h; }
+    last.connect(g); g.connect(a.destination); src.start(t0);
+  }
+  const CHIRPS = {
+    piu: (a, t, p) => { tone(a, t, 2900 * p, 3700 * p, 0.11, { vib: 30 }); tone(a, t + 0.19, 2700 * p, 3500 * p, 0.13, { vib: 30 }); },
+    tuit: (a, t, p) => { for (let i = 0; i < 3; i++) tone(a, t + i * 0.13, 2400 * p, 3600 * p, 0.09); },
+    trill: (a, t, p) => { for (let i = 0; i < 9; i++) tone(a, t + i * 0.055, (i % 2 ? 3300 : 2800) * p, (i % 2 ? 2900 : 3500) * p, 0.05, { vol: 0.1 }); },
+    fiu: (a, t, p) => { tone(a, t, 2200 * p, 4200 * p, 0.16); tone(a, t + 0.2, 4000 * p, 2600 * p, 0.2, { vib: 22 }); },
+    pipiu: (a, t, p) => { tone(a, t, 3300 * p, 3500 * p, 0.06); tone(a, t + 0.12, 3300 * p, 3500 * p, 0.06); tone(a, t + 0.26, 3800 * p, 2400 * p, 0.3, { vib: 26 }); },
+    warble: (a, t, p) => { let tt = t; for (let i = 0; i < 8; i++) { const f = (2200 + Math.random() * 1800) * p, d = 0.07 + Math.random() * 0.07; tone(a, tt, f, f * (0.8 + Math.random() * 0.6), d, { vib: 20 + Math.random() * 20 }); tt += d * 0.9; } }
+  };
+  function chirp(name, p, delay) {
+    const a = sfxCtx(); if (!a) return;
+    try { (CHIRPS[name] || CHIRPS.piu)(a, a.currentTime + 0.02 + (delay || 0), p || 1); } catch (e) {}
+  }
+  function whistleSound(dur) { const a = sfxCtx(); if (!a) return; try { const t = a.currentTime + 0.02; tone(a, t, 380, 1700, dur, { type: "sawtooth", vol: 0.05, lp: 2400 }); tone(a, t, 200, 900, dur, { type: "square", vol: 0.025, lp: 1500 }); } catch (e) {} }
+  function boomSound() {
+    const a = sfxCtx(); if (!a) return;
+    try { const t = a.currentTime + 0.02; tone(a, t, 150, 38, 0.5, { vol: 0.55 }); noise(a, t, 0.7, 0.45, 900); noise(a, t, 0.25, 0.25, 6000, 1500); tone(a, t + 0.12, 90, 30, 0.6, { vol: 0.3 }); } catch (e) {}
+  }
+
+
+    const happyNames = ["hop", "twirl", "dance", "halo", "boing", "loop", "sing"];
+  let happyBag = [];
+  function nextHappy() { if (!happyBag.length) happyBag = happyNames.map((_, i) => i).sort(() => Math.random() - 0.5); return happyBag.pop(); }
+  // Called each frame while the bird is celebrating.
+  function happyAnim(b, dt) {
+    const u = b.t, k = b.hk, bx = b.tx, by = b.ty;
+    let ox = 0, oy = 0, air = false;
+    b.rot = 0; b.puff = 0; b.sing = 0;
+    const em = (rate, fn) => { b.emT -= dt; if (b.emT <= 0) { b.emT = 1 / rate; fn(); } };
+    const f = b.flip;
+    switch (k) {
+      case 0: { // three hops, each launches a musical note
+        if (u < 1.5) {
+          const hp = (u % 0.5) / 0.5; oy = -Math.abs(Math.sin(hp * Math.PI)) * 46; air = oy < -4; b.sing = oy < -8 ? 1 : 0.15;
+          const idx = Math.floor(u / 0.5);
+          if (idx !== b.lastIdx) { b.lastIdx = idx; addP({ type: "note", x: b.x, y: b.y - 30, vx: f * rnd(40, 120), vy: -rnd(160, 240), g: -10, drag: 0.6, life: 1.4, rot: rnd(-0.3, 0.3), vr: rnd(-1, 1), size: 46, color: pick(RAINBOW), text: pick(["♪", "♫", "♬"]) }); }
+        }
+        break; }
+      case 1: { // backflip with a sparkle trail
+        const q = clamp((u - 0.2) / 0.8, 0, 1);
+        if (u > 0.2 && u < 1.0) { oy = -Math.sin(q * Math.PI) * 74; air = true; b.rot = -q * TAU * f; b.sing = 1;
+          em(40, () => addP({ type: "star", x: b.x, y: b.y, vx: rnd(-40, 40), vy: rnd(-30, 30), drag: 1.5, life: 0.6, rot: Math.random() * TAU, vr: rnd(-6, 6), size: rnd(7, 13), color: pick(["#fff4a0", "#ffffff", "#ffd23a"]) })); }
+        else b.sing = 0.2;
+        break; }
+      case 2: { // happy wiggle with hearts
+        b.rot = Math.sin(u * 14) * 0.2; oy = -Math.abs(Math.sin(u * 7)) * 9; b.sing = 0.5 + 0.5 * Math.sin(u * 14);
+        em(9, () => addP({ type: "heart", x: b.x + rnd(-24, 24), y: b.y - 34, vx: rnd(-40, 40), vy: -rnd(90, 170), g: 0, drag: 0.4, life: 1.5, rot: Math.random() * TAU, vr: rnd(-3, 3), size: rnd(18, 30), color: pick(["#ff3b6a", "#ff7aa8", "#ff9ab8"]) }));
+        break; }
+      case 3: { // golden halo: lifts, swells and sends out rings
+        oy = -20 * Math.sin(Math.min(1, u / 0.45) * Math.PI / 2) + Math.sin(u * 9) * 3; air = true; b.puff = 0.07 + 0.05 * Math.sin(u * 12); b.sing = 0.6;
+        em(2.4, () => { ring(b.x, b.y, "#ffd23a", 0, 150); stars5(b.x, b.y, 7, ["#fff4a0", "#ffffff", "#ffd23a"]); });
+        break; }
+      case 4: { // two big jumps that shake the wire
+        const j = u < 0.6 ? u / 0.6 : u < 1.4 ? (u - 0.6) / 0.8 : 1, big = u < 0.6 ? 56 : 92;
+        if (u < 1.4) { oy = -Math.sin(j * Math.PI) * big; air = oy < -4; b.sing = 1; }
+        const idx = u < 0.6 ? 0 : u < 1.4 ? 1 : 2;
+        if (idx !== b.lastIdx) { b.lastIdx = idx; if (idx > 0) { state.wobble = 7; radial(34, () => addP({ type: "confetti", x: b.x, y: b.y - 20, vx: rnd(-300, 300), vy: -rnd(200, 560), g: 620, drag: 0.5, life: rnd(1.2, 1.8), rot: Math.random() * TAU, vr: rnd(-9, 9), size: rnd(6, 11), color: pick(RAINBOW) })); } }
+        break; }
+      case 5: { // loop-the-loop with a rainbow trail
+        const q = clamp((u - 0.1) / 1.2, 0, 1);
+        if (u > 0.1 && u < 1.3) { const a = q * TAU; ox = Math.sin(a) * 78 * f; oy = (Math.cos(a) - 1) * 78; air = true; b.rot = a * 0 - a * f * 0.15; b.sing = 1;
+          em(60, () => addP({ type: "spark", x: b.x - f * 10, y: b.y, vx: rnd(-20, 20), vy: rnd(-10, 30), drag: 2, life: 0.8, size: 7, color: RAINBOW[Math.floor(u * 22) % 7] })); }
+        break; }
+      default: { // singing chest-puffed bird
+        b.puff = 0.1 * Math.abs(Math.sin(u * 9)); b.sing = Math.abs(Math.sin(u * 9));
+        em(6, () => addP({ type: "note", x: b.x + f * 36, y: b.y - 26, vx: f * rnd(70, 130), vy: -rnd(50, 110), g: 0, drag: 0.2, life: 1.8, rot: rnd(-0.4, 0.4), vr: rnd(-1, 1), size: rnd(34, 58), color: pick(RAINBOW), text: pick(["♪", "♫", "♬"]) }));
+      }
+    }
+    b.x = bx + ox; b.y = by + oy; b.flying = air;
+    b.hopY = 0;
+  }
+
+
+
+  // plucked-string (Karplus–Strong) so the user can hear the proposed voicing
+  function pluck(a, midi, when, vol) {
+    const f = midiHz(midi), sr = a.sampleRate, N = Math.floor(sr * 2.2), bf = a.createBuffer(1, N, sr), d = bf.getChannelData(0);
+    const L = Math.max(2, Math.round(sr / f)), ring = new Float32Array(L);
+    for (let i = 0; i < L; i++) ring[i] = Math.random() * 2 - 1;
+    let lp = 0;
+    for (let i = 0; i < N; i++) {
+      const j = i % L, nx = (j + 1) % L;
+      const v = ring[j]; d[i] = v;
+      lp = 0.5 * (ring[j] + ring[nx]);
+      ring[j] = lp * (0.9965 - 0.0000 * f);
+    }
+    const src = a.createBufferSource(), g = a.createGain(); src.buffer = bf;
+    g.gain.setValueAtTime(vol, when); g.gain.exponentialRampToValueAtTime(0.0005, when + 2.1);
+    src.connect(g); g.connect(a.destination); src.start(when);
+  }
+  function playVoicings() {
+    const a = sfxCtx(); if (!a || !G.chord) return;
+    const vs = G.all ? [{ notes: G.chord.type.iv.map(i => ({ midi: 48 + G.chord.rootPc + i })) }] : G.shown.slice(0, 8);
+    let t = a.currentTime + 0.05, dur = 0;
+    vs.forEach(v => {
+      v.notes.forEach((n, i) => pluck(a, n.midi, t + i * 0.035, 0.22));
+      t += 1.5; dur += 1.5;
+    });
+    G.muteUntil = T + dur * 1000 + 600;
+  }
+
+  /* --------------------------- listening ----------------------------- */
+  let audioCtx = null, analyser = null, micStream = null, abuf = null, lastAn = 0;
+  const NN = id => NOTE_NAMES[id];
+  function templateName(pcs) {
+    const set = new Set(pcs);
+    if (set.size < 3) return "";
+    for (let r = 0; r < 12; r++) for (const t of CHORD_TYPES) {
+      const cs = new Set(t.iv.map(i => (r + i) % 12));
+      if (cs.size === set.size && [...set].every(p => cs.has(p))) return NOTE_NAMES[r] + t.suffix;
+    }
+    return "";
+  }
+  function processAudio() {
+    if (!analyser) return;
+    if (T - lastAn < 110) return;
+    lastAn = T;
+    if (!abuf || abuf.length !== analyser.fftSize) abuf = new Float32Array(analyser.fftSize);
+    analyser.getFloatTimeDomainData(abuf);
+    const tail = abuf.subarray(abuf.length - 4096); let s = 0; for (let i = 0; i < tail.length; i++) s += tail[i] * tail[i];
+    const level = Math.sqrt(s / tail.length);
+    meterEl.style.width = Math.min(100, Math.sqrt(level) * 260) + "%";
+    if (T < G.muteUntil) { heardEl.textContent = "Sento: …"; G.stable = 0; return; }
+    if (level < 0.004) { G.quiet = (G.quiet || 0) + 1; if (G.quiet > 8) heardEl.textContent = "Sento: —"; G.stable = 0; return; }
+    G.quiet = 0;
+    const res = CD.analyze(abuf, audioCtx.sampleRate);
+    const sorted = res.notes.slice().sort((p, q) => p.midi - q.midi);
+    const pcs = sorted.map(n => ((n.midi % 12) + 12) % 12);
+    const nm = templateName(pcs);
+    heardEl.textContent = "Sento: " + (sorted.length ? sorted.map(n => NN(((n.midi % 12) + 12) % 12)).join(" ") : "—") + (nm ? "  →  " + nm : "");
+    if (G.solved || !G.chord || T < G.acceptAfter || !G.birds.some(b => b.mode === "idle")) { G.stable = 0; return; }
+    let hit = null;
+    const dm = new Set(res.notes.map(n => n.midi)); let bestSc = -1;
+    for (const v of G.shown) {
+      const j = CD.judge(res, G.chord, v, true, S.tol);
+      if (j.ok) { const sc = v.notes.filter(q => dm.has(q.midi)).length; if (sc > bestSc) { bestSc = sc; hit = [v]; } else if (sc === bestSc) hit.push(v); }
+    }
+    G.stable = hit ? G.stable + 1 : 0;
+    if (hit && G.stable >= 2) win(hit);
+  }
+  function win(hits) {
+    const v = hits[0], vids = hits.map(h => h.vid);
+    G.solved = true; G.solvedInv = v.inv; G.solvedVid = v.vid; G.correct++; G.streak++; G.best = Math.max(G.best, G.streak);
+    setMsg("Correcte!! · " + INV_NAMES[v.inv], "ok");
+    const mine = G.birds.filter(b => b.vids.some(x => vids.includes(x)));
+    const hs = [0, 1, 2, 3, 4, 5, 6].sort(() => Math.random() - 0.5);
+    mine.forEach((b, i) => {
+      b.mode = "happy"; b.t = 0; b.dur = 2.2; b.happy = true; b.hk = hs[i % 7]; b.lastIdx = -1; b.emT = 0; b.shakeAmp = 0;
+      const p = b.pf; const names = ["pipiu", "piu", "tuit", "fiu", "trill", "warble"];
+      chirp(names[(b.hk + i) % names.length], p, 0.06 * i); if (i % 2 === 0) chirp(names[(b.hk + 2) % names.length], p, 0.9 + 0.1 * i);
+    });
+    // big celebration over the whole chord
+    const cx = mine.reduce((s, b) => s + b.tx, 0) / mine.length, cy = mine.reduce((s, b) => s + b.ty, 0) / mine.length;
+    nextFx()(cx, cy, ["#d62f2f", "#ffd93b", "#2f86d8", "#3dbd5c"]);
+    // the other inversions fly away
+    
+    G.birds.forEach(b => { if (!b.vids.some(x => vids.includes(x)) && b.mode === "idle") { b.mode = "out"; b.t = 0; b.dur = 0.5; } });
+    G.nextAt = T + 3400;
+    updateStats();
+  }
+  async function startMic() {
+    if (window.isSecureContext === false) { setMsg("El micro necessita una pàgina segura (https). Obre el fitxer directament al navegador.", "bad"); return false; }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { setMsg("Micròfon no disponible en aquest navegador.", "bad"); return false; }
+    try {
+      micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    } catch (error) {
+      const name = error && error.name;
+      if (name === "NotAllowedError" || name === "SecurityError") setMsg("Micròfon bloquejat: revisa el permís del navegador per a aquesta pàgina.", "bad");
+      else if (name === "NotFoundError") setMsg("No s'ha trobat cap micròfon.", "bad");
+      else setMsg("No s'ha pogut accedir al micròfon (" + (name || "error") + ").", "bad");
+      return false;
+    }
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioCtx.createMediaStreamSource(micStream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 32768; analyser.smoothingTimeConstant = 0;
+    source.connect(analyser);
+    abuf = null; G.stable = 0;
+    return true;
+  }
+  function stopMic() {
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+    analyser = null;
+    if (audioCtx) { audioCtx.close && audioCtx.close(); audioCtx = null; }
+    heardEl.textContent = "Sento: —"; meterEl.style.width = "0";
+  }
+
+  /* ----------------------------- controls ---------------------------- */
+  const listenBtn = el("listen");
+  async function toggleListen() {
+    if (listenBtn.disabled) return;
+    if (G.listening) {
+      G.listening = false; stopMic(); listenBtn.textContent = "🎧 Escolta"; listenBtn.classList.remove("on");
+      setMsg("Micro apagat. Pots seguir veient els acords.", "");
+      return;
+    }
+    listenBtn.disabled = true; listenBtn.textContent = "Connectant…"; sfxCtx();
+    const ok = await startMic();
+    listenBtn.disabled = false;
+    if (!ok) { listenBtn.textContent = "🎧 Escolta"; return; }
+    G.listening = true; listenBtn.textContent = "■ Para d'escoltar"; listenBtn.classList.add("on");
+    G.acceptAfter = Math.max(G.acceptAfter, T + 500);
+    if (G.chord && !G.solved) setMsg("Toca " + G.chord.name + "…", "");
+  }
+  listenBtn.addEventListener("click", toggleListen);
+  el("newc").addEventListener("click", () => { sfxCtx(); newChord(); });
+  el("hear").addEventListener("click", () => { sfxCtx(); playVoicings(); });
+
+  function mkChips(cont, items, isOn, onToggle) {
+    const box = el(cont); box.innerHTML = "";
+    items.forEach(it => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = it.label;
+      b.dataset.id = it.id; b.addEventListener("click", () => onToggle(it.id));
+      box.appendChild(b);
+    });
+    return () => { [...box.children].forEach(b => b.classList.toggle("on", isOn(b.dataset.id))); };
+  }
+  const refTypes = mkChips("types", CHORD_TYPES.map(t => ({ id: t.id, label: t.btn })), id => S.types.includes(id), id => {
+    const i = S.types.indexOf(id); if (i >= 0) { if (S.types.length > 1) S.types.splice(i, 1); } else S.types.push(id);
+    saveS(); refresh(); if (!S.types.includes(G.chord.type.id)) newChord();
+  });
+  let refSets = () => {};
+  function buildSets() {
+    const items = [{ id: "all", label: "Totes" }].concat(setsFor(S.inst).map(x => ({ id: x.id, label: x.strs.join("-") })));
+    refSets = mkChips("sets", items, id => S.sets[0] === id, id => { S.sets = [id]; saveS(); refresh(); newChord(); });
+  }
+  buildSets();
+  const refInst = mkChips("inst", [{ id: "m3", label: "3es majors" }, { id: "p4", label: "4es justes" }], id => S.inst === id, id => {
+    S.inst = S.inst === id ? "6" : id;          // no 7-string button pressed -> normal 6-string guitar
+    if (S.sets[0] !== "all" && !setsFor(S.inst).some(x => x.id === S.sets[0])) S.sets = ["6432"];
+    saveS(); buildSets(); refresh(); newChord();
+  });
+  const INVS = [{ id: "-1", label: "Totes" }, { id: "0", label: "Fonamental" }, { id: "1", label: "1a" }, { id: "2", label: "2a" }, { id: "3", label: "3a" }];
+  const refInv = mkChips("invs", INVS, id => String(S.inv) === id, id => { S.inv = +id; saveS(); refresh(); newChord(); });
+  function refresh() { refTypes(); refInst(); refSets(); refInv(); el("tol").classList.toggle("on", S.tol); el("tol").textContent = S.tol ? "Tolerant" : "Estricte"; }
+  el("tol").addEventListener("click", () => { S.tol = !S.tol; saveS(); refresh(); });
+  el("full").addEventListener("click", () => {
+    const st = el("stage");
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (st.requestFullscreen) st.requestFullscreen();
+  });
+  window.addEventListener("keydown", e => {
+    if (e.target && e.target.tagName === "BUTTON") return;
+    if (e.code === "Space") { e.preventDefault(); newChord(); }
+  });
+  window.addEventListener("beforeunload", () => { if (G.listening) stopMic(); });
+
+  refresh();
+  newChord(true);
+  G.total = 0; updateStats();
+  setMsg("Prem 🎧 ESCOLTA i toca l'acord que veus", "");
+
+  let last = performance.now();
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now; T = now;
+    update(dt);
+    render();
+    processAudio();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+})();
+</script>
+</body>
+</html>
