@@ -201,6 +201,67 @@
       transform: scale(1.35);
     }
 
+    .progress.sub-progress {
+      margin: -14px 0 26px;
+      min-height: 12px;
+    }
+
+    .progress.sub-progress[hidden] { display: none; }
+
+    .dot.sub {
+      width: 10px;
+      height: 10px;
+      background: transparent;
+      border: 2px solid #ffb4aa;
+      opacity: .55;
+      border-radius: 2px;
+    }
+
+    .dot.sub.active {
+      background: #ffb4aa;
+      opacity: 1;
+      transform: scale(1.35);
+    }
+
+    .poly-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+
+    .poly-grid[hidden] { display: none; }
+
+    .poly-volumes {
+      display: grid;
+      gap: 10px;
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.1);
+    }
+
+    .poly-volumes[hidden] { display: none; }
+    .poly-volumes label { font-size: .9rem; }
+    .poly-volumes output { min-width: 3ch; text-align: right; }
+
+    button.poly-option {
+      min-height: 38px;
+      padding: 0 4px;
+      border: 1px solid rgba(255,255,255,.2);
+      background: #30394f;
+      color: var(--ink);
+      font-size: .9rem;
+      font-variant-numeric: tabular-nums;
+    }
+
+    button.poly-option:hover { background: #3d4965; }
+    button.poly-option.selected {
+      background: #7d4a2f;
+      border-color: #ffb4aa;
+      color: #fff1ee;
+      box-shadow: 0 0 0 2px #ffb4aa;
+    }
+
     .layout {
       display: grid;
       grid-template-columns: 1.4fr 1fr;
@@ -515,15 +576,30 @@
         </section>
         <p class="played-notes" id="playedNotes" aria-live="polite">—</p>
 
-        <div class="progress" aria-label="Beats of the current bar">
+        <div class="progress" id="beatDots" aria-label="Beats of the current bar">
           <span class="dot"></span><span class="dot"></span><span class="dot"></span><span class="dot"></span>
         </div>
+        <div class="progress sub-progress" id="subDots" aria-label="Subdivision of the current bar" hidden></div>
       </div>
 
       <div class="controls-column" aria-label="Metronome controls">
         <button id="toggle" type="button" aria-pressed="false">Start</button>
         <div class="option-buttons" aria-label="Practice options">
           <button id="transposition" class="secondary selected" type="button" aria-pressed="true">Instrument: Bb</button>
+          <button id="polyToggle" class="secondary" type="button" aria-expanded="false" aria-controls="polyGrid">Polyrhythm: Off</button>
+          <div class="poly-grid" id="polyGrid" role="group" aria-label="Bar beats : subdivision parts" hidden></div>
+          <div class="poly-volumes" id="polyVolumes" aria-label="Metronome volumes" hidden>
+            <div class="tempo-row">
+              <label for="beatVolume">Kick &amp; snare volume</label>
+              <output id="beatVolumeValue" for="beatVolume">80</output>
+            </div>
+            <input id="beatVolume" type="range" min="0" max="100" value="80" step="1" aria-label="Kick and snare volume">
+            <div class="tempo-row">
+              <label for="subVolume">Subdivision volume</label>
+              <output id="subVolumeValue" for="subVolume">80</output>
+            </div>
+            <input id="subVolume" type="range" min="0" max="100" value="80" step="1" aria-label="Subdivision metronome volume">
+          </div>
         </div>
         <div class="chord-type-section">
           <span>Chord type</span>
@@ -565,7 +641,7 @@
       <input id="tempo" type="range" min="40" max="240" value="80" step="5" aria-label="Metronome tempo">
     </div>
 
-    <p class="help">A new chord sounds on the first beat of every 4/4 bar. Press the space bar to start or stop.</p>
+    <p class="help">A new chord sounds on the first beat of every 4/4 bar (kick on strong beats, snare on weak ones). Press the space bar to start or stop.</p>
   </main>
 
   <script>
@@ -574,7 +650,18 @@
       const chordDisplay = document.querySelector("#chord");
       const chordCard = document.querySelector("#chordCard");
       const playedNotes = document.querySelector("#playedNotes");
-      const dots = [...document.querySelectorAll(".dot")];
+      const beatDotsEl = document.querySelector("#beatDots");
+      const subDotsEl = document.querySelector("#subDots");
+      const polyToggleButton = document.querySelector("#polyToggle");
+      const helpText = document.querySelector(".help");
+      const beatVolume = document.querySelector("#beatVolume");
+      const beatVolumeValue = document.querySelector("#beatVolumeValue");
+      const subVolume = document.querySelector("#subVolume");
+      const subVolumeValue = document.querySelector("#subVolumeValue");
+      const polyGrid = document.querySelector("#polyGrid");
+      const polyVolumes = document.querySelector("#polyVolumes");
+      let dots = [...beatDotsEl.querySelectorAll(".dot")];
+      let subDots = [];
       const tempo = document.querySelector("#tempo");
       const tempoValue = document.querySelector("#tempoValue");
       const toggle = document.querySelector("#toggle");
@@ -638,11 +725,24 @@
 
       let audioContext;
       let masterOutput;
+      let beatBus;      // volume bus for the main metronome (kick & snare)
+      let subBus;       // volume bus for the subdivision metronome
+      let noiseBuffer;  // shared white noise for snare / kick click
       let concertReverb;
       let pianoWave;
-      let timerId;
       let running = false;
-      let beat = 0;
+      // Look-ahead scheduler state. Every bar is a list of events (beat clicks
+      // and subdivision clicks) placed at a phase in [0, 1) of the bar, so both
+      // metronomes always line up exactly, whatever the tempo changes do.
+      const LOOKAHEAD_SEC = 0.12;
+      const SCHEDULER_MS = 25;
+      let schedulerId;
+      let barBeats = 4;           // numerator: bar length in quarter notes
+      let subParts = 0;           // 0 = polyrhythm off, else equal parts per bar
+      let barStartTime = 0;       // AudioContext time of the current bar's start
+      let barEvents = [];
+      let eventPointer = 0;
+      let pendingUiTimeouts = new Set();
       let currentConcertRootIndex = null;
       let currentChordType = "7";
       let currentChordObj = null;
@@ -700,6 +800,18 @@
           masterOutput.release.value = 0.24;
           masterOutput.connect(audioContext.destination);
 
+          beatBus = audioContext.createGain();
+          subBus = audioContext.createGain();
+          beatBus.gain.value = volumeToGain(beatVolume.value);
+          subBus.gain.value = volumeToGain(subVolume.value);
+          beatBus.connect(masterOutput);
+          subBus.connect(masterOutput);
+
+          const noiseLength = Math.floor(audioContext.sampleRate * 0.5);
+          noiseBuffer = audioContext.createBuffer(1, noiseLength, audioContext.sampleRate);
+          const noiseData = noiseBuffer.getChannelData(0);
+          for (let i = 0; i < noiseLength; i += 1) noiseData[i] = Math.random() * 2 - 1;
+
           const real = new Float32Array(12);
           const imaginary = new Float32Array([0, 1, 0.68, 0.37, 0.22, 0.12, 0.07, 0.035, 0.018, 0.01, 0.006, 0.003]);
           pianoWave = audioContext.createPeriodicWave(real, imaginary);
@@ -731,17 +843,34 @@
         return convolver;
       }
 
-      function chooseChord() {
+      // Picks the next chord and schedules its sound at audio time `when`.
+      // The on-screen update is deferred to that same moment by the caller's
+      // UI timeout, because this runs slightly ahead of the audible beat.
+      function chooseChord(when) {
         const chord = queuedChord ?? createRandomChord();
         currentConcertRootIndex = chord.rootIndex;
         currentChordType = chord.type;
         currentChordObj = chord;
-        renderChordSymbol();
-        renderStaff(chordStaffWrap, currentChordObj, "main");
-        playSeventhChord(currentConcertRootIndex, currentChordType);
+        playSeventhChord(currentConcertRootIndex, currentChordType, when);
         queuedChord = createRandomChord();
-        renderNextChordSymbol();
-        renderStaff(nextChordStaffWrap, queuedChord, "next");
+        const shownChord = currentChordObj;
+        const shownNext = queuedChord;
+        runAt(when, () => {
+          chordDisplay.innerHTML = chordSymbolFor(shownChord);
+          renderStaff(chordStaffWrap, shownChord, "main");
+          nextChordDisplay.innerHTML = chordSymbolFor(shownNext);
+          renderStaff(nextChordStaffWrap, shownNext, "next");
+        });
+      }
+
+      // Runs a UI update when the audio clock reaches `when`.
+      function runAt(when, fn) {
+        const delayMs = Math.max(0, (when - audioContext.currentTime) * 1000);
+        const id = window.setTimeout(() => {
+          pendingUiTimeouts.delete(id);
+          fn();
+        }, delayMs);
+        pendingUiTimeouts.add(id);
       }
 
       // Picks a root pitch class at random, weighted by noteWeights (percentages
@@ -1177,33 +1306,144 @@
         return bestVoicing;
       }
 
-      function updateDots() {
-        dots.forEach((dot, index) => dot.classList.toggle("active", index === beat));
+      function buildDots(container, count, extraClass) {
+        container.innerHTML = "";
+        const created = [];
+        for (let i = 0; i < count; i += 1) {
+          const dot = document.createElement("span");
+          dot.className = extraClass ? `dot ${extraClass}` : "dot";
+          container.appendChild(dot);
+          created.push(dot);
+        }
+        return created;
       }
 
-      function clickSound(accented) {
-        const context = getAudioContext();
+      // Rebuilds both dot rows to match the current bar length / subdivision.
+      function rebuildDotRows() {
+        dots = buildDots(beatDotsEl, barBeats);
+        subDots = buildDots(subDotsEl, subParts, "sub");
+        subDotsEl.hidden = subParts === 0;
+      }
 
-        const now = context.currentTime;
+      function highlightBeatDot(index) {
+        dots.forEach((dot, i) => dot.classList.toggle("active", i === index));
+      }
+
+      function highlightSubDot(index) {
+        subDots.forEach((dot, i) => dot.classList.toggle("active", i === index));
+      }
+
+      // Slider 0-100 -> bus gain (squared curve so the low end is usable).
+      function volumeToGain(value) {
+        return 1.5 * Math.pow(Number(value) / 100, 2);
+      }
+
+      // Random number in [1 - spread, 1 + spread].
+      function jitter(spread) {
+        return 1 + (Math.random() * 2 - 1) * spread;
+      }
+
+      // Main metronome: kick on the strong beats (1st, 3rd, 5th, 7th), snare on
+      // the weak ones (2nd, 4th, 6th). Only loudness, pitch and tone vary from
+      // hit to hit; the hit itself always starts exactly at `when`.
+      function drumSound(beatIndex, when) {
+        const context = getAudioContext();
+        const now = when ?? context.currentTime;
+        if (beatIndex % 2 === 0) kickSound(context, now, beatIndex === 0);
+        else snareSound(context, now);
+      }
+
+      function kickSound(context, now, downbeat) {
+        const velocity = (downbeat ? 1 : 0.82) * jitter(0.07);
+        const pitch = jitter(0.035);
+        const body = context.createOscillator();
+        const bodyGain = context.createGain();
+        body.type = "sine";
+        body.frequency.setValueAtTime(155 * pitch, now);
+        body.frequency.exponentialRampToValueAtTime(46 * pitch, now + 0.12);
+        bodyGain.gain.setValueAtTime(0.8 * velocity, now);
+        bodyGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32 * jitter(0.08));
+        body.connect(bodyGain).connect(beatBus);
+        body.start(now);
+        body.stop(now + 0.4);
+
+        // Short beater click on top of the body.
+        const click = context.createBufferSource();
+        const clickFilter = context.createBiquadFilter();
+        const clickGain = context.createGain();
+        click.buffer = noiseBuffer;
+        clickFilter.type = "lowpass";
+        clickFilter.frequency.value = 3200 * jitter(0.15);
+        clickGain.gain.setValueAtTime(0.28 * velocity, now);
+        clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.014);
+        click.connect(clickFilter).connect(clickGain).connect(beatBus);
+        click.start(now, Math.random() * 0.3);
+        click.stop(now + 0.02);
+      }
+
+      function snareSound(context, now) {
+        const velocity = jitter(0.12);
+        const pitch = jitter(0.04);
+
+        // Noise "wires".
+        const noise = context.createBufferSource();
+        const highpass = context.createBiquadFilter();
+        const bandpass = context.createBiquadFilter();
+        const noiseGain = context.createGain();
+        noise.buffer = noiseBuffer;
+        highpass.type = "highpass";
+        highpass.frequency.value = 1100;
+        bandpass.type = "bandpass";
+        bandpass.frequency.value = 2300 * jitter(0.18);
+        bandpass.Q.value = 0.6;
+        noiseGain.gain.setValueAtTime(0.5 * velocity, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.17 * jitter(0.12));
+        noise.connect(highpass).connect(bandpass).connect(noiseGain).connect(beatBus);
+        noise.start(now, Math.random() * 0.25);
+        noise.stop(now + 0.22);
+
+        // Drum shell tone.
+        const shell = context.createOscillator();
+        const shellGain = context.createGain();
+        shell.type = "triangle";
+        shell.frequency.setValueAtTime(215 * pitch, now);
+        shell.frequency.exponentialRampToValueAtTime(165 * pitch, now + 0.07);
+        shellGain.gain.setValueAtTime(0.34 * velocity, now);
+        shellGain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+        shell.connect(shellGain).connect(beatBus);
+        shell.start(now);
+        shell.stop(now + 0.12);
+      }
+
+      // Subdivision metronome: lower, hollow "wood block" (square wave through a
+      // lowpass, short pitch drop) so it can't be confused with the main tick.
+      function subClickSound(accented, when) {
+        const context = getAudioContext();
+        const now = when ?? context.currentTime;
         const oscillator = context.createOscillator();
+        const filter = context.createBiquadFilter();
         const gain = context.createGain();
-        oscillator.type = "sine";
-        oscillator.frequency.value = accented ? 1200 : 850;
-        gain.gain.setValueAtTime(accented ? 0.18 : 0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.055);
-        oscillator.connect(gain).connect(masterOutput);
+        const base = accented ? 560 : 400;
+        oscillator.type = "square";
+        oscillator.frequency.setValueAtTime(base * 1.25, now);
+        oscillator.frequency.exponentialRampToValueAtTime(base, now + 0.02);
+        filter.type = "lowpass";
+        filter.frequency.value = 1800;
+        gain.gain.setValueAtTime(accented ? 0.15 : 0.11, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+        oscillator.connect(filter).connect(gain).connect(subBus);
         oscillator.start(now);
-        oscillator.stop(now + 0.06);
+        oscillator.stop(now + 0.1);
       }
 
-      function playSeventhChord(rootIndex, chordType) {
+      function playSeventhChord(rootIndex, chordType, when) {
         const context = getAudioContext();
-        const now = context.currentTime;
+        const now = when ?? context.currentTime;
         const intervals = chordTypes[chordType].intervals;
         const voicing = buildVoicing(rootIndex, intervals);
         previousVoicing = voicing;
-        renderPlayedNotes(voicing);
-        const barDuration = 4 * interval() / 1000;
+        runAt(now, () => renderPlayedNotes(voicing));
+        const barDuration = currentBarDuration();
         const pianoRelease = Math.max(0.45, Math.min(2.35, barDuration * 0.78));
         const stringRelease = Math.max(1.1, Math.min(4.2, barDuration * 1.35));
         const chordGain = context.createGain();
@@ -1323,30 +1563,96 @@
         window.setTimeout(() => chordCard.classList.remove("beat"), 85);
       }
 
-      function tick() {
-        if (beat === 0) chooseChord();
-        clickSound(beat === 0);
-        updateDots();
-        flash();
-        beat = (beat + 1) % 4;
+      // Seconds per quarter note, and per whole bar.
+      function beatSeconds() {
+        return 60 / Number(tempo.value);
       }
 
-      function interval() {
-        return 60000 / Number(tempo.value);
+      function currentBarDuration() {
+        return barBeats * beatSeconds();
       }
 
-      function schedule() {
-        window.clearInterval(timerId);
-        timerId = window.setInterval(tick, interval());
+      // Builds the events of one bar as phases in [0, 1). Beats come first at
+      // equal phases so the two clicks of a coincidence stay in a stable order.
+      function buildBarEvents() {
+        const events = [];
+        for (let k = 0; k < barBeats; k += 1) events.push({ phase: k / barBeats, kind: "beat", index: k });
+        for (let j = 0; j < subParts; j += 1) events.push({ phase: j / subParts, kind: "sub", index: j });
+        events.sort((a, b) => a.phase - b.phase || (a.kind === "beat" ? -1 : 1));
+        return events;
+      }
+
+      function playEvent(event, when) {
+        if (event.kind === "beat") {
+          if (event.index === 0) chooseChord(when);
+          drumSound(event.index, when);
+          runAt(when, () => {
+            highlightBeatDot(event.index);
+            flash();
+          });
+        } else {
+          subClickSound(event.index === 0, when);
+          runAt(when, () => highlightSubDot(event.index));
+        }
+      }
+
+      // Look-ahead scheduler: every 25 ms, queue every click that falls inside
+      // the next 120 ms on the audio clock (sample-accurate, unlike setInterval).
+      function scheduler() {
+        const context = audioContext;
+        const horizon = context.currentTime + LOOKAHEAD_SEC;
+        for (;;) {
+          if (eventPointer >= barEvents.length) {
+            // Bar finished: start the next one, applying any new settings.
+            barStartTime += currentBarDuration();
+            barEvents = buildBarEvents();
+            eventPointer = 0;
+          }
+          const event = barEvents[eventPointer];
+          const when = barStartTime + event.phase * currentBarDuration();
+          if (when > horizon) break;
+          playEvent(event, Math.max(when, context.currentTime));
+          eventPointer += 1;
+        }
+      }
+
+      // A tempo change keeps the current position inside the bar: we rescale the
+      // bar start so the phase stays where it is, and later events use the new
+      // tempo straight away.
+      function rescaleForTempo(oldBeatSeconds) {
+        if (!running) return;
+        const now = audioContext.currentTime;
+        const phase = (now - barStartTime) / (barBeats * oldBeatSeconds);
+        barStartTime = now - phase * currentBarDuration();
+      }
+
+      // Changing the bar / subdivision while running restarts the bar a moment
+      // later, so the new pattern is heard from its downbeat.
+      function restartBar() {
+        if (!running) return;
+        clearPendingUi();
+        barStartTime = audioContext.currentTime + 0.06;
+        barEvents = buildBarEvents();
+        eventPointer = 0;
+        rebuildDotRows();
+      }
+
+      function clearPendingUi() {
+        pendingUiTimeouts.forEach(id => window.clearTimeout(id));
+        pendingUiTimeouts.clear();
       }
 
       function start() {
+        const context = getAudioContext();
         applyRandomPastelPalette();
         running = true;
         startPracticeTimer();
-        beat = 0;
-        tick();
-        schedule();
+        rebuildDotRows();
+        barStartTime = context.currentTime + 0.06;
+        barEvents = buildBarEvents();
+        eventPointer = 0;
+        scheduler();
+        schedulerId = window.setInterval(scheduler, SCHEDULER_MS);
         toggle.textContent = "Stop";
         toggle.classList.add("running");
         toggle.setAttribute("aria-pressed", "true");
@@ -1355,21 +1661,109 @@
       function stop() {
         running = false;
         stopPracticeTimer();
-        window.clearInterval(timerId);
-        timerId = undefined;
+        window.clearInterval(schedulerId);
+        schedulerId = undefined;
+        clearPendingUi();
         dots.forEach(dot => dot.classList.remove("active"));
+        subDots.forEach(dot => dot.classList.remove("active"));
         toggle.textContent = "Start";
         toggle.classList.remove("running");
         toggle.setAttribute("aria-pressed", "false");
       }
 
+      // ---- Polyrhythm selection -------------------------------------------
+      // "A:B" = a bar of A quarter notes plus a second metronome dividing that
+      // same bar into B equal parts. Pairs where one number divides the other
+      // (4:2, 3:6, 5:5, anything with 1...) are just a plain subdivision of the
+      // same pulse, so they are left out. Numbers go up to 7.
+      const POLY_MAX = 7;
+      const polyCombos = [];
+      for (let a = 2; a <= POLY_MAX; a += 1) {
+        for (let b = 2; b <= POLY_MAX; b += 1) {
+          if (a % b !== 0 && b % a !== 0) polyCombos.push({ a, b });
+        }
+      }
+      let polyButtons = [];
+
+      function buildPolyGrid() {
+        const fragment = document.createDocumentFragment();
+        polyButtons = polyCombos.map(combo => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "poly-option";
+          button.textContent = `${combo.a}:${combo.b}`;
+          button.dataset.beats = String(combo.a);
+          button.dataset.parts = String(combo.b);
+          button.setAttribute("aria-pressed", "false");
+          fragment.appendChild(button);
+          return button;
+        });
+        polyGrid.appendChild(fragment);
+        polyGrid.addEventListener("click", event => {
+          const button = event.target.closest(".poly-option");
+          if (!button) return;
+          const beats = Number(button.dataset.beats);
+          const parts = Number(button.dataset.parts);
+          // Clicking the active combination again switches polyrhythm off.
+          if (beats === barBeats && parts === subParts) setPolyrhythm(4, 0);
+          else setPolyrhythm(beats, parts);
+        });
+      }
+
+      function setPolyrhythm(beats, parts) {
+        barBeats = beats;
+        subParts = parts;
+        polyButtons.forEach(button => {
+          const selected = parts !== 0 && Number(button.dataset.beats) === beats && Number(button.dataset.parts) === parts;
+          button.classList.toggle("selected", selected);
+          button.setAttribute("aria-pressed", String(selected));
+        });
+        polyToggleButton.textContent = parts === 0 ? "Polyrhythm: Off" : `Polyrhythm: ${beats}:${parts}`;
+        polyToggleButton.classList.toggle("selected", parts !== 0);
+        helpText.textContent = helpMessage();
+        if (running) restartBar();
+        else rebuildDotRows();
+      }
+
+      function togglePolyPanel() {
+        const expanded = polyToggleButton.getAttribute("aria-expanded") === "true";
+        // The combinations and the two volume sliders open and close together.
+        polyGrid.hidden = expanded;
+        polyVolumes.hidden = expanded;
+        polyToggleButton.setAttribute("aria-expanded", String(!expanded));
+      }
+
+      function helpMessage() {
+        const base = subParts === 0
+          ? "A new chord sounds on the first beat of every 4/4 bar (kick on strong beats, snare on weak ones)."
+          : `Polyrhythm ${barBeats}:${subParts}: a bar of ${barBeats} beats (kick and snare) with ${subParts} equal parts over the same bar (low wood-block). A new chord sounds on each downbeat.`;
+        return `${base} Press the space bar to start or stop.`;
+      }
+
+      let knownBeatSeconds = beatSeconds();
       tempo.addEventListener("input", () => {
+        // The slider value has already changed by now, so the previous tempo is
+        // kept in knownBeatSeconds to rescale the running bar against it.
+        const oldBeatSeconds = knownBeatSeconds;
+        knownBeatSeconds = beatSeconds();
         tempoValue.value = `${tempo.value} BPM`;
         tempoValue.textContent = `${tempo.value} BPM`;
-        if (running) schedule();
+        rescaleForTempo(oldBeatSeconds);
       });
 
+      function bindVolume(slider, output, getBus) {
+        slider.addEventListener("input", () => {
+          output.value = slider.value;
+          output.textContent = slider.value;
+          const bus = getBus();
+          if (bus) bus.gain.setTargetAtTime(volumeToGain(slider.value), audioContext.currentTime, 0.015);
+        });
+      }
+      bindVolume(beatVolume, beatVolumeValue, () => beatBus);
+      bindVolume(subVolume, subVolumeValue, () => subBus);
+
       toggle.addEventListener("click", () => running ? stop() : start());
+      polyToggleButton.addEventListener("click", togglePolyPanel);
       transpositionButton.addEventListener("click", toggleTransposition);
       resetPracticeButton.addEventListener("click", resetPracticeTime);
       probToggleButton.addEventListener("click", toggleProbPanel);
@@ -1388,6 +1782,7 @@
 
       buildProbGrid();
       buildProbNotesGrid();
+      buildPolyGrid();
 
       // Seed the "next chord" preview before the metronome is ever started.
       queuedChord = createRandomChord();
