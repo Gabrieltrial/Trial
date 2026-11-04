@@ -625,7 +625,7 @@ const isWeb = /^https?:$/.test(location.protocol);
 const isHosted = isWeb && !LOCAL_HOSTS.test(location.hostname);
 const helperPort = new URLSearchParams(location.search).get('helper') || '8765';
 function helperHint() {
-  return 'For YouTube/SoundCloud search and audio extraction, run practice-player-server.py on this computer' +
+  return 'To search YouTube and play full songs, run practice-player-server.py on this computer' +
     (isHosted ? ' with --allow-origin ' + location.origin : ' and use the page it opens') + '.';
 }
 
@@ -1164,19 +1164,8 @@ function renderResults(groups, back) {
   showResults();
 }
 
-async function searchArchive(q) {
-  const u = 'https://archive.org/advancedsearch.php?q=' + encodeURIComponent('(' + q + ') AND mediatype:audio') +
-    '&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=creator&rows=12&page=1&output=json&sort%5B%5D=downloads+desc';
-  const r = await fetch(u); if (!r.ok) throw new Error('HTTP ' + r.status);
-  return (await r.json()).response.docs;
-}
-async function searchItunes(q) {
-  const r = await fetch('https://itunes.apple.com/search?media=music&entity=song&limit=10&term=' + encodeURIComponent(q));
-  if (!r.ok) throw new Error('HTTP ' + r.status);
-  return (await r.json()).results;
-}
 async function searchViaHelper(q) {
-  setStatus('Searching YouTube and SoundCloud…');
+  setStatus('Searching YouTube…');
   const r = await fetch(helperBase + '/api/search?q=' + encodeURIComponent(q));
   const j = await r.json();
   if (!r.ok) throw new Error(j.error || 'HTTP ' + r.status);
@@ -1189,48 +1178,8 @@ async function searchViaHelper(q) {
   setStatus(errs.length ? 'Some sources failed. ' + errs.join(' | ') : 'Tick the versions you want and press "Load selected", or click one to load it.', !!errs.length);
 }
 async function searchBrowserOnly(q) {
-  setStatus('Searching…');
-  const [ia, it] = await Promise.allSettled([searchArchive(q), searchItunes(q)]);
-  const groups = [];
-  if (ia.status === 'fulfilled' && ia.value.length) {
-    groups.push({
-      title: 'Internet Archive · full tracks (free or public-domain music)',
-      items: ia.value.map(d => {
-        const t = (Array.isArray(d.title) ? d.title[0] : d.title) || d.identifier;
-        const c = Array.isArray(d.creator) ? d.creator[0] : d.creator;
-        return { title: t + (c ? ' — ' + c : ''), small: 'files →', drill: () => showArchiveFiles(d.identifier, t, () => searchBrowserOnly(q)) };
-      })
-    });
-  }
-  if (it.status === 'fulfilled' && it.value.length) {
-    groups.push({
-      title: 'iTunes · 30-second previews only',
-      items: it.value.filter(d => d.previewUrl).map(d => ({ title: d.trackName, uploader: d.artistName, source: 'preview', url: d.previewUrl, name: d.artistName + ' - ' + d.trackName + ' (preview)', helper: false }))
-    });
-  }
-  if (groups.length) { renderResults(groups); setStatus('Pick a result.'); return; }
   hideResults();
-  if (ia.status === 'rejected' && it.status === 'rejected') {
-    const why = x => (x.reason && x.reason.message) || 'unknown error';
-    setStatus('Could not reach the search services (Internet Archive: ' + why(ia) + '; iTunes: ' + why(it) + '). ' + helperHint(), true);
-  } else setStatus('No results. ' + helperHint());
-}
-async function showArchiveFiles(id, title, back) {
-  setStatus('Loading file list…');
-  try {
-    const r = await fetch('https://archive.org/metadata/' + encodeURIComponent(id));
-    const j = await r.json();
-    const files = (j.files || []).filter(f => /\.(mp3|flac|ogg|oga|wav|m4a|opus)$/i.test(f.name));
-    files.sort((a, b) => (b.source === 'original') - (a.source === 'original') || a.name.localeCompare(b.name));
-    const items = files.slice(0, 80).map(f => ({
-      title: f.title ? f.title + ' (' + f.name + ')' : f.name,
-      uploader: (f.format || '') + (f.size ? ' ' + (f.size / 1048576).toFixed(1) + ' MB' : ''),
-      source: 'Internet Archive', name: f.name, helper: false,
-      url: 'https://archive.org/download/' + encodeURIComponent(id) + '/' + f.name.split('/').map(encodeURIComponent).join('/')
-    }));
-    renderResults([{ title, items }], back);
-    setStatus(items.length ? 'Pick a file.' : 'This item has no audio files.');
-  } catch (e) { console.error(e); setStatus('Could not get the file list: ' + e.message, true); }
+  setStatus('Searching YouTube needs the helper, which is not running. ' + helperHint(), true);
 }
 
 async function doSearch() {
@@ -1271,7 +1220,7 @@ async function detectHelper() {
     const j = await pingHelper(base);
     if (j) {
       helper = j; helperBase = base;
-      $('#q').placeholder = 'Search a song or an artist (YouTube, SoundCloud…), or paste a link';
+      $('#q').placeholder = 'Search a song or an artist (YouTube), or paste a link';
       return true;
     }
   }
