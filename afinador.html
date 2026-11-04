@@ -199,8 +199,7 @@
       <div class="metro-status" id="mstatus"></div>
     </div>
   </main>
-
-  <script>
+<script>
 class FFT {
   constructor(n) {
     this.n = n;
@@ -384,6 +383,16 @@ function parseGroups(text, num) {
   return parts.reduce((a, b) => a + b, 0) === num ? parts : null;
 }
 
+function parseAccents(text, num) {
+  const m = String(text || '').trim().match(/^@\s*([\d,\s]+)$/);
+  if (!m) return null;
+  const beats = m[1].split(/[,\s]+/).filter(Boolean).map(Number);
+  if (!beats.length || beats.some(b => !Number.isInteger(b) || b < 1 || b > num)) return null;
+  const levels = Array(num).fill(0);
+  beats.forEach(b => { levels[b - 1] = b === 1 ? 2 : 1; });
+  return levels;
+}
+
 function beatLevels(groups) {
   const levels = [];
   groups.forEach((g, gi) => {
@@ -401,11 +410,15 @@ class MetronomeScheduler {
   configure(cfg) {
     const prev = this.cfg;
     this.cfg = { ...prev, ...cfg };
-    this.levels = beatLevels(this.cfg.groups);
+    this.levels = this.pickLevels();
     if (this.running && (prev.num !== this.cfg.num || prev.mode !== this.cfg.mode)) this.restartPending = true;
   }
+  pickLevels() {
+    const c = this.cfg;
+    return c.levels && c.levels.length === c.num ? c.levels : beatLevels(c.groups);
+  }
   start() {
-    this.levels = beatLevels(this.cfg.groups);
+    this.levels = this.pickLevels();
     this.running = true;
     this.next = this.clock() + 0.06;
     this.beat = 0; this.bar = 0; this.cycle = 0; this.pos = 0; this.restartPending = false;
@@ -569,21 +582,28 @@ class MetronomeScheduler {
   window.addEventListener("beforeunload", () => { if (running) stop(); });
   resetDisplay();
 
+  const P = (label, num, den, g, extra = {}) => ({ label, num, den, g, ...extra });
   const PRESETS = [
-    ["2/4", 2, 4, "2"], ["3/4", 3, 4, "3"], ["4/4", 4, 4, "4"], ["6/4", 6, 4, "6"],
-    ["5/4 (3+2)", 5, 4, "3+2"], ["5/4 (2+3)", 5, 4, "2+3"], ["7/4 (4+3)", 7, 4, "4+3"], ["7/4 (3+4)", 7, 4, "3+4"],
-    ["3/8", 3, 8, "3"], ["6/8 (3+3)", 6, 8, "3+3"], ["9/8 (3+3+3)", 9, 8, "3+3+3"], ["12/8 (3+3+3+3)", 12, 8, "3+3+3+3"],
-    ["5/8 (3+2)", 5, 8, "3+2"], ["5/8 (2+3)", 5, 8, "2+3"],
-    ["7/8 (2+2+3)", 7, 8, "2+2+3"], ["7/8 (3+2+2)", 7, 8, "3+2+2"], ["7/8 (2+3+2)", 7, 8, "2+3+2"],
-    ["8/8 (3+3+2)", 8, 8, "3+3+2"], ["9/8 (2+2+2+3)", 9, 8, "2+2+2+3"], ["10/8 (3+2+3+2)", 10, 8, "3+2+3+2"], ["10/8 (2+3+2+3)", 10, 8, "2+3+2+3"],
-    ["11/8 (3+3+3+2)", 11, 8, "3+3+3+2"], ["11/8 (2+2+3+2+2)", 11, 8, "2+2+3+2+2"],
-    ["13/8 (3+3+3+2+2)", 13, 8, "3+3+3+2+2"], ["15/8 (3+3+3+3+3)", 15, 8, "3+3+3+3+3"],
-    ["Bulería · 12/4 (3+3+2+2+2)", 12, 4, "3+3+2+2+2", "Flamenco"], ["Soleá · 12/4 (3+3+2+2+2)", 12, 4, "3+3+2+2+2", "Flamenco"],
-    ["Alegrías · 12/4 (3+3+2+2+2)", 12, 4, "3+3+2+2+2", "Flamenco"], ["Soleá por bulería · 12/4 (3+3+2+2+2)", 12, 4, "3+3+2+2+2", "Flamenco"],
-    ["Seguiriya · 12/4 (2+2+3+3+2)", 12, 4, "2+2+3+3+2", "Flamenco"], ["Guajira · 12/4 (3+3+2+2+2)", 12, 4, "3+3+2+2+2", "Flamenco"],
-    ["Tangos · 4/4 (2+2)", 4, 4, "2+2", "Flamenco"], ["Tientos · 4/4 (2+2)", 4, 4, "2+2", "Flamenco"],
-    ["Farruca · 4/4 (2+2)", 4, 4, "2+2", "Flamenco"], ["Garrotín · 4/4 (2+2)", 4, 4, "2+2", "Flamenco"],
-    ["Sevillanas · 3/4", 3, 4, "3", "Flamenco"]
+    P("2/4", 2, 4, "2"), P("3/4", 3, 4, "3"), P("4/4", 4, 4, "4"), P("6/4", 6, 4, "6"),
+    P("5/4 (3+2)", 5, 4, "3+2"), P("5/4 (2+3)", 5, 4, "2+3"), P("7/4 (4+3)", 7, 4, "4+3"), P("7/4 (3+4)", 7, 4, "3+4"),
+    P("3/8", 3, 8, "3"), P("6/8 (3+3)", 6, 8, "3+3"), P("9/8 (3+3+3)", 9, 8, "3+3+3"), P("12/8 (3+3+3+3)", 12, 8, "3+3+3+3"),
+    P("5/8 (3+2)", 5, 8, "3+2"), P("5/8 (2+3)", 5, 8, "2+3"),
+    P("7/8 (2+2+3)", 7, 8, "2+2+3"), P("7/8 (3+2+2)", 7, 8, "3+2+2"), P("7/8 (2+3+2)", 7, 8, "2+3+2"),
+    P("8/8 (3+3+2)", 8, 8, "3+3+2"), P("9/8 (2+2+2+3)", 9, 8, "2+2+2+3"),
+    P("10/8 (3+2+3+2)", 10, 8, "3+2+3+2"), P("10/8 (2+3+2+3)", 10, 8, "2+3+2+3"),
+    P("11/8 (3+3+3+2)", 11, 8, "3+3+3+2"), P("11/8 (2+2+3+2+2)", 11, 8, "2+2+3+2+2"),
+    P("13/8 (3+3+3+2+2)", 13, 8, "3+3+3+2+2"), P("15/8 (3+3+3+3+3)", 15, 8, "3+3+3+3+3"),
+    P("Soleá · 95 BPM", 12, 4, "3+3+2+2+2", { bpm: 95, start: 12, flamenco: true, hint: "Soleá: 12 pulses, accents on 12-3-6-8-10. Traditional tempo 70–120 BPM (pulses of the 12-count)." }),
+    P("Soleá por bulería · 140 BPM", 12, 4, "3+3+2+2+2", { bpm: 140, start: 12, flamenco: true, hint: "Between soleá and bulería, same accents. Flamenco metronomes cover about 100–180 BPM for it; 140 is the middle." }),
+    P("Bulería · slower (Jerez, 196 BPM)", 12, 4, "3+3+2+2+2", { bpm: 196, start: 12, flamenco: true, hint: "Bulería accents 12-3-6-8-10. 196 is the slow setting of a Jerez bulería metronome; typical bulería runs 160–275." }),
+    P("Bulería · fast (Jerez, 230 BPM)", 12, 4, "3+3+2+2+2", { bpm: 230, start: 12, flamenco: true, hint: "Bulería accents 12-3-6-8-10. Fast festive bulería is usually 220–240 BPM." }),
+    P("Alegrías · 140 BPM", 12, 4, "3+3+2+2+2", { bpm: 140, start: 12, flamenco: true, hint: "Alegrías: same 12-3-6-8-10 accents; usually 100–180 BPM." }),
+    P("Seguiriya · 140 BPM", 12, 4, "2+2+3+3+2", { bpm: 140, start: 8, flamenco: true, hint: "Seguiriya: five uneven pulses 2-2-3-3-2 starting on beat 8 of the 12-count (accents 8-10-12-3-6). Flamenco metronomes span 80–230; tempo is the least certain here, and it is often played freely." }),
+    P("Guajira · 170 BPM", 12, 4, "3+3+2+2+2", { bpm: 170, start: 12, flamenco: true, hint: "Guajira: accents 12-3-6-8-10. Metronome range about 120–220 BPM; 170 is the middle." }),
+    P("Tangos · 130 BPM", 4, 4, "@2,3,4", { bpm: 130, flamenco: true, hint: "Tangos: 4 beats, accents on 2-3-4 (the 1 is soft). Metronome range about 90–180 BPM; 130 is near the middle." }),
+    P("Tientos · 90 BPM", 4, 4, "@2,4", { bpm: 90, flamenco: true, hint: "Tientos: 4 beats, accents on 2 and 4, slower than tangos. Metronome range about 70–140 BPM." }),
+    P("Farruca · 130 BPM", 8, 4, "2+2+2+2", { bpm: 130, flamenco: true, hint: "Farruca: 8 beats, accents on 1-3-5-7. Metronome range about 70–190 BPM; 130 is the middle." }),
+    P("Sevillanas · 3/4 · 150 BPM", 3, 4, "3", { bpm: 150, flamenco: true, hint: "Sevillanas: 3 beats, accent on the first. Metronome range about 100–220 BPM." })
   ];
   const PARTIALS = [
     ["1 bar on · 1 off", 1, 1], ["2 bars on · 2 off", 2, 2], ["4 bars on · 4 off", 4, 4], ["3 bars on · 1 off", 3, 1],
@@ -599,15 +619,15 @@ class MetronomeScheduler {
   };
 
   let mode = "off", bpm = 100, metroCtx = null, timer = null, visQueue = [], visRaf = null, dotEls = [], lastDot = null;
-  let groups = [4];
+  let groups = [4], accLevels = null;
   const sched = new MetronomeScheduler(() => (metroCtx ? metroCtx.currentTime : 0), onBeat);
 
   let flamencoGroup = null;
   PRESETS.forEach((p, i) => {
     const o = document.createElement("option");
-    o.value = String(i); o.textContent = p[0];
-    if (p[4]) {
-      if (!flamencoGroup) { flamencoGroup = document.createElement("optgroup"); flamencoGroup.label = p[4]; els.preset.append(flamencoGroup); }
+    o.value = String(i); o.textContent = p.label;
+    if (p.flamenco) {
+      if (!flamencoGroup) { flamencoGroup = document.createElement("optgroup"); flamencoGroup.label = "Flamenco"; els.preset.append(flamencoGroup); }
       flamencoGroup.append(o);
     } else els.preset.append(o);
   });
@@ -633,8 +653,10 @@ class MetronomeScheduler {
     const num = clampInt(els.num.value, 1, 32, 4);
     const den = clampInt(els.den.value, 2, 16, 4);
     const text = els.groups.value.trim();
-    const parsed = text ? parseGroups(text, num) : null;
-    els.groups.style.borderColor = text && !parsed ? "#e0605a" : "";
+    const acc = text ? parseAccents(text, num) : null;
+    const parsed = text && !acc ? parseGroups(text, num) : null;
+    els.groups.style.borderColor = text && !parsed && !acc ? "#e0605a" : "";
+    accLevels = acc;
     groups = parsed || defaultGroups(num, den);
     els.groups.placeholder = groups.join("+");
     return { num, den };
@@ -642,15 +664,17 @@ class MetronomeScheduler {
 
   function syncPresetSelect() {
     const num = clampInt(els.num.value, 1, 32, 4), den = clampInt(els.den.value, 2, 16, 4);
-    const g = groups.join("+");
-    const i = PRESETS.findIndex(p => p[1] === num && p[2] === den && p[3] === g);
+    const g = els.groups.value.trim() || groups.join("+");
+    const cur = PRESETS[Number(els.preset.value)];
+    const same = p => p.num === num && p.den === den && p.g === g;
+    const i = cur && same(cur) ? Number(els.preset.value) : PRESETS.findIndex(same);
     els.preset.value = i >= 0 ? String(i) : "custom";
   }
 
   function buildDots(num) {
     els.dots.textContent = "";
     dotEls = []; lastDot = null;
-    const levels = beatLevels(groups);
+    const levels = accLevels || beatLevels(groups);
     let idx = 0;
     groups.forEach(g => {
       const box = document.createElement("div"); box.className = "grp";
@@ -678,7 +702,7 @@ class MetronomeScheduler {
   function pushConfig() {
     const { num, den } = readMeter();
     sched.configure({
-      bpm, num, den, groups, mode: mode === "partial" ? "partial" : "on",
+      bpm, num, den, groups, levels: accLevels, mode: mode === "partial" ? "partial" : "on",
       play: clampInt(els.play.value, 1, 64, 8), mute0: clampInt(els.mute.value, 1, 16, 1),
       muteStep: clampInt(els.step.value, 0, 8, 1), muteMax: clampInt(els.max.value, 1, 32, 4), after: els.after.value
     });
@@ -805,11 +829,13 @@ class MetronomeScheduler {
   els.preset.addEventListener("change", () => {
     if (els.preset.value === "custom") return;
     const p = PRESETS[Number(els.preset.value)];
-    els.num.value = p[1]; els.den.value = String(p[2]); els.groups.value = p[3];
+    els.num.value = p.num; els.den.value = String(p.den); els.groups.value = p.g;
+    els.preset.title = p.hint || "";
+    if (p.bpm) setBpm(p.bpm);
     rebuildMeter();
   });
   [els.num, els.den, els.groups].forEach(el => el.addEventListener("change", rebuildMeter));
-  els.groups.addEventListener("input", () => { if (parseGroups(els.groups.value, clampInt(els.num.value, 1, 32, 4)) || !els.groups.value.trim()) rebuildMeter(); });
+  els.groups.addEventListener("input", () => { if (parseAccents(els.groups.value, clampInt(els.num.value, 1, 32, 4)) || parseGroups(els.groups.value, clampInt(els.num.value, 1, 32, 4)) || !els.groups.value.trim()) rebuildMeter(); });
   [els.play, els.mute, els.step, els.max, els.after].forEach(el => el.addEventListener("change", () => { pushConfig(); save(); }));
   els.vol.addEventListener("input", save);
   els.range.addEventListener("input", () => setBpm(els.range.value));
@@ -833,7 +859,4 @@ class MetronomeScheduler {
   setBpm(bpm);
   rebuildMeter();
 })();
-
-  </script>
-</body>
-</html>
+</script></body></html>
