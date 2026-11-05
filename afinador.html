@@ -108,7 +108,7 @@
     border-radius: 9px; padding: 5px 8px; min-height: 34px; min-width: 0;
   }
   input.num { width: 64px; text-align: center; }
-  input.txt { width: 100px; }
+  input.txt { flex: 1; min-width: 100px; }
   .bpm { font-size: 2.2rem; font-weight: 800; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; width: 5.2ch; background: none; border: none; color: var(--accent); text-align: center; padding: 0; }
   .bpm:focus-visible { outline: 2px solid var(--accent-strong); border-radius: 6px; }
   .bpm-row { justify-content: center; margin-top: 16px; }
@@ -182,7 +182,7 @@
         <select id="den" class="sel" aria-label="Note value">
           <option>2</option><option selected>4</option><option>8</option><option>16</option>
         </select>
-        <input id="groups" class="txt" type="text" placeholder="grouping" aria-label="Beat grouping, for example 2+2+3" title="Beat grouping, for example 2+2+3. The first beat of each group is accented. Leave empty for the automatic grouping.">
+        <input id="groups" class="txt" type="text" placeholder="grouping, e.g. 3+3+2+2+2 or @2,4" aria-label="Beat grouping, for example 2+2+3" title="Beat grouping, for example 2+2+3. The first beat of each group is accented. Leave empty for the automatic grouping.">
       </div>
       <div class="row"><label for="vol">Volume</label><input type="range" id="vol" min="0" max="1" step="0.01" value="0.8"></div>
       <div class="partial-box" id="partialBox" hidden>
