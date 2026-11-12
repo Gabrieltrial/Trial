@@ -204,9 +204,9 @@ output{font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
       <span class="lbl">Backing</span>
       <div class="seg" id="backSeg" role="group" aria-label="Backing level: removes the saxophone">
         <button data-l="0" aria-pressed="true" title="Original mix (B cycles the levels)">Off</button>
-        <button data-l="1" aria-pressed="false" title="Level 1: removes the saxophone and lowers the unticked instruments by about 6 dB">1</button>
-        <button data-l="2" aria-pressed="false" title="Level 2: removes the saxophone and lowers the unticked instruments by about 12 dB">2</button>
-        <button data-l="3" aria-pressed="false" title="Level 3: removes the saxophone and lowers the unticked instruments by about 18 dB">3</button>
+        <button data-l="1" aria-pressed="false" title="Level 1: always removes the saxophone (-18 dB) and lowers the unticked instruments by about 6 dB">1</button>
+        <button data-l="2" aria-pressed="false" title="Level 2: always removes the saxophone (-30 dB) and lowers the unticked instruments by about 12 dB">2</button>
+        <button data-l="3" aria-pressed="false" title="Level 3: removes the saxophone almost completely (-45 dB) and lowers the unticked instruments by about 18 dB">3</button>
       </div>
       <div class="seg tg" id="backTg" role="group" aria-label="Instruments to keep">
         <button data-k="drums" class="toggle" aria-pressed="true" title="Keep the drums">Drums</button>
@@ -1248,6 +1248,7 @@ const pitchRatio = () => Math.pow(2, (semis * 100 + cents) / 1200);
 const SAX_TYPES = { soprano: [190, 1500], alto: [120, 1150], tenor: [90, 850], baritone: [60, 580] };
 const SAX_DB = [0, -6, -15, -30];
 const BACK_DB = [0, -6, -12, -18];
+const SAX_REMOVE_DB = [0, -18, -30, -45];
 const BASS_CFG = { fmin: 35, fmax: 250, tau: 0.3, lam: 0.012, jump: 0.35, vpen: 0.12, win: 0.186, hi: 700 };
 let saxLevel = 0, backLevel = 0, saxRun = null, dspWorkerUrl = null, harmPref = 'auto';
 const backSel = { drums: true, bass: true, harm: true };
@@ -1275,7 +1276,7 @@ function saxInfo(p) {
     const v = audio.sax.voiced;
     s = 'Sax focus ' + saxLevel + ' · melody in ' + Math.round(v * 100) + '%' + (v < 0.2 ? ' · weak effect' : '');
   } else if (backLevel > 0 && backValid(audio)) {
-    s = 'Backing ' + backLevel + ' · keeping ' + keptList() + ' · the rest ' + BACK_DB[backLevel] + ' dB' + (audio.back.keys && harmPref === 'auto' ? ' · harmonic instrument: guess' : '');
+    s = 'Backing ' + backLevel + ' · keeping ' + keptList() + ' · sax ' + SAX_REMOVE_DB[backLevel] + ' dB · unticked ' + BACK_DB[backLevel] + ' dB' + (audio.back.keys && harmPref === 'auto' ? ' · harmonic instrument: guess' : '');
   } else s = '';
   el.textContent = s; el.title = s;
   const hb = $('#hBtn'); if (hb) hb.textContent = harmName(audio);
@@ -1348,7 +1349,7 @@ function applyMix() {
   } else if (backLevel > 0 && backValid(t)) {
     const gU = Math.pow(10, BACK_DB[backLevel] / 20);
     const gB = backSel.bass ? 1 : gU, gD = backSel.drums ? 1 : gU, gH = backSel.harm ? 1 : gU;
-    const aS = gU - gH, aB = gB - gH, aD = gD - gH, S = t.sax, B = t.back;
+    const gS = Math.pow(10, SAX_REMOVE_DB[backLevel] / 20), aS = gS - gH, aB = gB - gH, aD = gD - gH, S = t.sax, B = t.back;
     L = new Float32Array(X0.length);
     for (let i = 0; i < L.length; i++) L[i] = gH * X0[i] + aS * S.SL[i] + aB * B.BL[i] + aD * B.DL[i];
     if (X1) { R = new Float32Array(X1.length); for (let i = 0; i < R.length; i++) R[i] = gH * X1[i] + aS * S.SR[i] + aB * B.BR[i] + aD * B.DR[i]; }
