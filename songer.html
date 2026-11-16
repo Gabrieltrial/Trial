@@ -1,3 +1,8 @@
+Fet: ara es converteix tot sol en enganxar, sense cap botó de conversió. Detecta els dos formats (`[Am]Hola` i `Hola Am món`) i posa els acords a sobre de la lletra. Només si s'ha convertit alguna cosa surt un avís petit amb l'enllaç "Desfés", per si algun cop es confon.
+
+Abans de substituir el fitxer, fes una còpia amb "Exporta".
+
+```html
 <!DOCTYPE html>
 <html lang="ca">
 <head>
@@ -19,7 +24,7 @@
  .btn.red{background:#b33}
  .btn:disabled{opacity:.4}
  input[type=text],textarea,select{width:100%;padding:8px;border:1px solid #bbb;border-radius:6px;background:#fff}
- textarea{font-family:ui-monospace,Menlo,Consolas,monospace;min-height:380px}
+ textarea{font-family:ui-monospace,Menlo,Consolas,monospace;min-height:380px;white-space:pre;overflow:auto}
  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
  .item{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px 12px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;gap:8px}
  .item a{cursor:pointer;flex:1}
@@ -27,6 +32,8 @@
  pre{background:#fff;border:1px solid #ddd;border-radius:8px;padding:14px;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.35;white-space:pre}
  .c{color:#b5402a;font-weight:bold}
  .box{background:#fff;border:1px dashed #999;border-radius:8px;padding:10px;margin:10px 0}
+ .note{background:#e7f3e7;border:1px solid #9c9;border-radius:6px;padding:6px 10px;margin:8px 0;font-size:14px}
+ .note a{color:#225;text-decoration:underline;cursor:pointer;margin-left:8px}
  label{display:block;margin:10px 0 3px;font-weight:600}
  @media print{header,.noprint{display:none}pre{border:0}}
 </style>
@@ -56,7 +63,7 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const $=s=>document.querySelector(s);
 
-let view={name:'songs'}, shift=0, flat=false, fs=16;
+let view={name:'songs'}, shift=0, flat=false, fs=16, prevTxt=null;
 
 /* ---------- acords ---------- */
 function isChordLine(l){
@@ -81,6 +88,70 @@ function tLine(line,n,useFlat){
   });
 }
 
+/* ---------- conversió automàtica: acords dins del text -> acords a sobre ---------- */
+// "[Am]Hola [F]món"  ->  "Am   F" / "Hola món"
+function inlineToAbove(line){
+  const re=/\[([^\]]+)\]/g;
+  let lyr='',ch='',last=0,m,found=false;
+  while((m=re.exec(line))){
+    const c=m[1].trim();
+    if(!(CH.test(c)||/^N\.?C\.?$/i.test(c))) continue; // "[Chorus]" i similars es deixen tal qual
+    found=true;
+    lyr+=line.slice(last,m.index); last=re.lastIndex;
+    const pos=Math.max(lyr.length,ch?ch.length+1:0);
+    ch=ch.padEnd(pos,' ')+c;
+  }
+  if(!found) return null;
+  lyr+=line.slice(last);
+  return lyr.trim()?[ch,lyr.replace(/\s+$/,'')]:[ch];
+}
+// "Hola Am món F"  ->  "     Am   F" / "Hola món"   (acords entre paraules)
+function mixedToAbove(line){
+  const toks=line.trim().split(/\s+/);
+  const amb=t=>t==='A'||t==='Am'||t==='Em';        // també poden ser paraules (a, am, em)
+  const sure=toks.some(t=>CH.test(t)&&!amb(t));
+  const isC=t=>CH.test(t)&&(!amb(t)||sure);
+  if(!toks.some(isC)||toks.every(isC)) return null;
+  let lyr='',ch='';
+  for(const t of toks){
+    if(isC(t)){
+      if(lyr&&!lyr.endsWith(' ')) lyr+=' ';
+      const pos=Math.max(lyr.length,ch?ch.length+1:0);
+      ch=ch.padEnd(pos,' ')+t;
+    }else{
+      lyr+=(lyr&&!lyr.endsWith(' ')?' ':'')+t;
+    }
+  }
+  return [ch.trimEnd(),lyr.trimEnd()];
+}
+function fixText(t,mixed){
+  const meta={}; let n=0;
+  t=t.replace(/\r/g,'').replace(/\u00a0/g,' ').replace(/\t/g,'    ')
+     .replace(/\[\/?(?:ch|tab)\]/gi,'');
+  const out=[];
+  for(const line of t.split('\n')){
+    const d=line.match(/^\s*\{\s*([a-z_]+)\s*:?\s*(.*?)\s*\}\s*$/i);   // directives ChordPro
+    if(d){
+      const k=d[1].toLowerCase(),v=d[2];
+      if(k==='title'||k==='t') meta.title=v;
+      else if(k==='artist'||k==='subtitle'||k==='st') meta.artist=v;
+      else if(k==='key') meta.key=v;
+      else if(['comment','c','ci','comment_italic'].includes(k)) out.push(v);
+      continue;
+    }
+    if(/\[[^\]]+\]/.test(line)){
+      const r=inlineToAbove(line);
+      if(r){out.push(...r);n++;continue}
+    }
+    if(mixed&&!isChordLine(line)){
+      const r=mixedToAbove(line);
+      if(r){out.push(...r);n++;continue}
+    }
+    out.push(line);
+  }
+  return {text:out.join('\n'),meta,n};
+}
+
 /* ---------- navegació ---------- */
 function go(v){view=v;if(v.name==='song')shift=0;render()}
 function render(){
@@ -95,8 +166,8 @@ function songsView(){
   $('#app').innerHTML=`
    <div class="row"><input type="text" id="q" placeholder="Cerca per títol o autor..." oninput="drawSongs()" style="flex:1">
    <button class="btn" onclick="go({name:'edit',id:null})">+ Nova cançó</button>
-   <button class="btn alt" onclick="document.getElementById('txts').click()">Importa .txt</button>
-   <input type="file" id="txts" accept=".txt,.cho,.crd" multiple hidden onchange="importTxt(this)"></div>
+   <button class="btn alt" onclick="document.getElementById('txts').click()">Importa .txt / .cho</button>
+   <input type="file" id="txts" accept=".txt,.cho,.crd,.chopro,.chordpro,.pro" multiple hidden onchange="importTxt(this)"></div>
    <div id="res"></div>`;
   drawSongs();
 }
@@ -112,7 +183,11 @@ function drawSongs(){
 function importTxt(inp){
   [...inp.files].forEach(f=>{
     const r=new FileReader();
-    r.onload=()=>{db.songs.push({id:uid(),title:f.name.replace(/\.[^.]+$/,''),artist:'',key:'',text:r.result});save();drawSongs()};
+    r.onload=()=>{
+      const f2=fixText(r.result,true);
+      db.songs.push({id:uid(),title:f2.meta.title||f.name.replace(/\.[^.]+$/,''),artist:f2.meta.artist||'',key:f2.meta.key||'',text:f2.text});
+      save();drawSongs();
+    };
     r.readAsText(f);
   });
 }
@@ -160,6 +235,7 @@ function addToList(sid){
 function editView(){
   const s=view.id?db.songs.find(x=>x.id===view.id):{title:'',artist:'',key:'',text:''};
   const isNew=!view.id;
+  prevTxt=null;
   $('#app').innerHTML=`
    <h2>${isNew?'Nova cançó':'Edita cançó'}</h2>
    <label>Títol</label><input type="text" id="t" value="${esc(s.title)}" oninput="updLinks()">
@@ -168,15 +244,36 @@ function editView(){
    ${isNew?`<div class="box"><b>Busca la cançó:</b> (s'obre en una pestanya nova; copia el text i enganxa'l a sota)
      <div class="row" id="links"></div></div>`:''}
    <label>Lletra amb els acords a sobre (text pla)</label>
-   <textarea id="x" placeholder="   Am        F
+   <div id="note" class="note noprint" style="display:none"></div>
+   <textarea id="x" onpaste="setTimeout(autoFix,0)" placeholder="   Am        F
 Aquí va la lletra...">${esc(s.text)}</textarea>
    <div class="row">
     <button class="btn" onclick="saveSong('${view.id||''}')">Desa</button>
     <button class="btn alt" onclick="${view.id?`go({name:'song',id:'${view.id}'})`:`go({name:'songs'})`}">Cancel·la</button>
     ${view.id?`<button class="btn red" onclick="delSong('${view.id}')">Esborra</button>`:''}
    </div>
-   <p><small>Consell: copia el text amb els acords tal com surt a la web. Els acords han d'estar en notació anglesa (C, D, E, F, G, A, B).</small></p>`;
+   <p><small>En enganxar un text amb acords (dins la lletra com <code>[Am]Hola</code> o entre les paraules com <code>Hola Am món</code>), es posen sols a sobre de la lletra. Els acords han d'estar en notació anglesa (C, D, E, F, G, A, B).</small></p>`;
   if(isNew)updLinks();
+}
+function autoFix(){
+  const ta=$('#x'); if(!ta)return;
+  const r=fixText(ta.value,true);
+  if(r.text===ta.value)return;
+  prevTxt=ta.value; ta.value=r.text;
+  if(r.meta.title&&!$('#t').value.trim()) $('#t').value=r.meta.title;
+  if(r.meta.artist&&!$('#a').value.trim()) $('#a').value=r.meta.artist;
+  if(r.meta.key&&!$('#k').value.trim()) $('#k').value=r.meta.key;
+  updLinks();
+  const note=$('#note');
+  if(r.n){
+    note.innerHTML=`✔ ${r.n} línies amb els acords posats a sobre de la lletra. <a onclick="undoFix()">Desfés</a>`;
+    note.style.display='block';
+  }
+}
+function undoFix(){
+  if(prevTxt===null)return;
+  $('#x').value=prevTxt; prevTxt=null;
+  $('#note').style.display='none';
 }
 function updLinks(){
   const el=$('#links'); if(!el)return;
@@ -190,7 +287,7 @@ function updLinks(){
   ].map(([n,u])=>`<a class="btn alt" style="text-decoration:none" target="_blank" rel="noopener" href="${u}">${n}</a>`).join('');
 }
 function saveSong(id){
-  const o={title:$('#t').value.trim()||'Sense títol',artist:$('#a').value.trim(),key:$('#k').value.trim(),text:$('#x').value.replace(/\r/g,'')};
+  const o={title:$('#t').value.trim()||'Sense títol',artist:$('#a').value.trim(),key:$('#k').value.trim(),text:fixText($('#x').value,false).text};
   if(id){Object.assign(db.songs.find(s=>s.id===id),o)}else{id=uid();db.songs.push({id,...o})}
   save();go({name:'song',id});
 }
@@ -258,3 +355,14 @@ render();
 </script>
 </body>
 </html>
+```
+
+**Què fa ara, tot automàtic en enganxar:**
+- Acords dins la lletra (`[Am]Hola [F]món`): els passa a la línia de sobre, alineats amb la síl·laba.
+- Acords entre les paraules (`Hola Am món F`): també.
+- Etiquetes de pàgines com `[ch]Am[/ch]` o `{title: ...}`: les neteja, i si el títol, l'autor o la tonalitat estan buits, els omple.
+- Els salts de pàgina de web ("nbsp") i les tabulacions els converteix en espais, que és el que fa que els acords quedin alineats.
+
+**Dues limitacions:**
+- Si una web ja t'ha donat els acords a sobre però desalineats perquè ha perdut els espais en copiar, això no es pot reconstruir. En aquest cas, la solució és copiar des d'una altra web.
+- En una línia de lletra, les paraules `A`, `Am` i `Em` només es tracten com a acords si la mateixa línia en té algun altre de segur. Si una vegada es confon, prem "Desfés".
