@@ -6,12 +6,12 @@
 <title>Cançoner</title>
 <style>
  *{box-sizing:border-box}
- body{font-family:system-ui,sans-serif;margin:0;background:#f6f4ef;color:#222}
+ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;margin:0;background:#f6f4ef;color:#222}
  header{background:#2b3a42;color:#fff;padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
  header h1{font-size:18px;margin:0 16px 0 0}
  header button{background:#3d5360;color:#fff;border:0;padding:8px 14px;border-radius:6px;cursor:pointer}
  header button.on{background:#e0a030;color:#222}
- main{max-width:900px;margin:0 auto;padding:16px}
+ main{margin:0 auto;padding:12px 16px}
  button,select,input,textarea{font:inherit}
  button{cursor:pointer}
  .btn{background:#2b3a42;color:#fff;border:0;padding:7px 12px;border-radius:6px}
@@ -24,13 +24,51 @@
  .item{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px 12px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;gap:8px}
  .item a{cursor:pointer;flex:1}
  .item small{color:#777}
- pre{background:#fff;border:1px solid #ddd;border-radius:8px;padding:14px;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.35;white-space:pre}
- .c{color:#b5402a;font-weight:bold}
  .box{background:#fff;border:1px dashed #999;border-radius:8px;padding:10px;margin:10px 0}
- .note{background:#e7f3e7;border:1px solid #9c9;border-radius:6px;padding:6px 10px;margin:8px 0;font-size:14px}
+ .note{background:#e7f3e7;border:1px solid #9c9;border-radius:6px;padding:6px 10px;margin:8px 0;font-size:14px;line-height:1.5}
  .note a{color:#225;text-decoration:underline;cursor:pointer;margin-left:8px}
  label{display:block;margin:10px 0 3px;font-weight:600}
- @media print{header,.noprint{display:none}pre{border:0}}
+
+ /* ---- vista de la cançó ---- */
+ .bar{margin:0 0 8px}
+ .bar .row{margin:4px 0}
+ .ttl{font-size:19px;margin:2px 0}
+ .ttl span{color:#666;font-size:15px;margin-left:8px}
+ .tb{background:#1f6f5c;font-weight:700;padding:9px 14px}
+ .trind{font-weight:700;min-width:105px;text-align:center}
+ .trind.act{color:#c2410c}
+ .sep{width:10px}
+ .btn.sz{min-width:36px;padding:4px 8px;line-height:1.2;font-weight:700}
+ .btn.sz.on{background:#2b3a42;color:#fff}
+ .bar select{width:auto;padding:6px}
+ .bar label{display:inline;margin:0;font-weight:400}
+ .onlyprint{display:none}
+
+ .sheet{
+   --chord:#c2410c;
+   font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+   font-size:var(--fs,19px);line-height:1.3;color:#1b1b1b;
+   background:#fff;border:1px solid #ddd;border-radius:10px;padding:14px 18px;
+   column-gap:2.4em;column-rule:1px solid #e6e1d6;
+ }
+ .ln{break-inside:avoid;page-break-inside:avoid;-webkit-column-break-inside:avoid;margin:0 0 .55em}
+ .lw{white-space:nowrap}
+ .sheet.wrap .lw{white-space:normal}
+ .sg{display:inline-block}
+ .ch{display:block;white-space:pre;
+   font-family:ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace;
+   font-weight:800;font-size:1.1em;line-height:1.15;color:var(--chord);padding-right:.55em}
+ .tx{display:block;white-space:pre;line-height:1.25}
+ .ln.co .ch.inl{display:inline-block;padding-right:0;margin-right:1.1em}
+ .ln.pl{white-space:pre-wrap}
+ .sec{font-weight:700;text-transform:uppercase;font-size:.78em;letter-spacing:.08em;color:#5b6b73;margin:.9em 0 .35em;break-after:avoid;-webkit-column-break-after:avoid}
+ .sp{height:.5em}
+
+ @media print{
+  header,.noprint{display:none}
+  .onlyprint{display:block}
+  .sheet{border:0;padding:0}
+ }
 </style>
 </head>
 <body>
@@ -52,15 +90,19 @@ const IDX={C:0,'C#':1,Db:1,D:2,'D#':3,Eb:3,E:4,F:5,'F#':6,Gb:6,G:7,'G#':8,Ab:8,A
 /* acord sol (token sencer) */
 const CH=/^[A-G][#b]?(?:maj|min|m|M|dim|aug|sus|add|\+|°|ø|-)?(?:[0-9]+|(?:sus|add|maj|dim|aug|alt|b|#|-|\+)[0-9]*)*(?:\/[A-G][#b]?)?$/;
 const NEUTRAL=/^(\||\|\||x\d+|\(?x\d+\)?|-|N\.C\.?)$/;
+const SIZES=[15,19,24];   // mides de la lletra (px): petita, mitjana, gran
 
 let db={songs:[],lists:[]};
 try{db=JSON.parse(localStorage.getItem('cansoner'))||db}catch(e){}
 const save=()=>{try{localStorage.setItem('cansoner',JSON.stringify(db))}catch(e){alert('No es pot desar al navegador')}};
+let prefs={size:1,cols:0,flat:false};
+try{Object.assign(prefs,JSON.parse(localStorage.getItem('cansoner_prefs'))||{})}catch(e){}
+const savePrefs=()=>{try{localStorage.setItem('cansoner_prefs',JSON.stringify(prefs))}catch(e){}};
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const $=s=>document.querySelector(s);
 
-let view={name:'songs'}, shift=0, flat=false, fs=16, prevTxt=null;
+let view={name:'songs'}, shift=0, prevTxt=null, prevTA=null;
 
 /* ---------- acords: transport ---------- */
 function isChordLine(l){
@@ -75,15 +117,7 @@ function tChord(tok,n,useFlat){
   const tr=r=>arr[((IDX[r]+n)%12+12)%12];
   return tr(m[1])+m[2]+(m[3]?'/'+tr(m[3]):'');
 }
-function tLine(line,n,useFlat){
-  return line.replace(/(\S+)(\s*)/g,(_,tok,sp)=>{
-    if(!CH.test(tok)) return tok+sp;
-    const nt=tChord(tok,n,useFlat);
-    let k=sp.length;
-    if(k>0) k=Math.max(1,k-(nt.length-tok.length));
-    return nt+' '.repeat(k);
-  });
-}
+const chordTok=(t,n,useFlat)=>((CH.test(t)&&n)?tChord(t,n,useFlat):t);
 
 /* ---------- conversió automàtica: acords dins la línia -> acords a sobre ---------- */
 const AMB=new Set(['A','Am','Em']);                       // també poden ser paraules
@@ -163,12 +197,99 @@ function inlineToAbove(line){
   lyr+=line.slice(last);
   return lyr.trim()?[ch,lyr.replace(/\s+$/,'')]:[ch];
 }
+
+/* ---------- neteja: elimina el que no és lletra ni acords + detecta títol i autor ---------- */
+const LABEL_T=/^\s*(?:t[ií]tol|title|song|can[cç]ó|canci[oó]n|nom)\s*[:：]\s*(.+?)\s*$/i;
+const LABEL_A=/^\s*(?:autor(?:a)?|artista?|author|by|int[èe]rpret|cantant|band|grup|group|composer|compositor|written\s+by|lletra\s+i\s+m[uú]sica)\s*[:：]\s*(.+?)\s*$/i;
+const CHORDS_BY=/^(.{1,80}?)\s+(?:chords?(?:\s*&\s*lyrics)?|tabs?|acordes|acords|cifra|lyrics?)\s+(?:by|de|per)\s+(.{1,60})$/i;
+/* línies "etiqueta: valor" que no són cançó */
+const LABEL_J=/^\s*(?:key|tom|tonalitat|tonalidad|tono|capo|tuning|afinaci[oó]n?|tempo|bpm|difficulty|dificultat|dificultad|rating|votes?|views?|hits|album|[àa]lbum|year|any|a[ñn]o|genre|g[eè]nere|g[eé]nero|submitted\s+by|updated|last\s+update(?:d)?|last\s+edit(?:ed)?|transcribed\s+by|chords?\s+by|tabs?\s+by|strumming|chords?\s+used|acordes|acords|date|data|fecha|time\s+signature|comp[aà]s)\s*[:：]\s*.*$/i;
+/* línies que són només un botó o un menú de la web */
+const J_WORD=/^\s*(?:chords?|tabs?|lyrics?|letra|acordes|acords|cifra|share|print|download|edit|favou?rites?|autoscroll|auto-?scroll|transpose|simplify|tuner|metronome|capo|report|reportar|compartir|imprimir|baixar|descargar|advertisement|ads?|sponsored|related|comments?|comentaris|rate|pro|premium|official|show\s+chords|hide\s+chords|chord\s+diagrams?|chord\s+chart|more|less|show\s+all|play|ver\s+v[ií]deo|aprender|tablature|ultimate[\s-]*guitar|cifra\s*club|chordie|songsterr|e-?chords)\s*$/i;
+const J_MISC=[
+ /^\s*[A-Ga-g]?[#b]?\s*\|[-\dhpbrxs\/\\~()^|*.\s]{4,}$/,                                   // tablatura
+ /^\s*[xX\d]{6}\s*$/,                                                                      // digitació d'un acord
+ /^\s*capo\s*(?:on\s*)?(?:the\s*)?\d+\w*\s*(?:fret)?\s*$/i,
+ /^\s*key\s+of\s+\S+\s*$/i,
+ /^\s*(?:bpm|tempo)\s*[=:]?\s*\d+\s*(?:bpm)?\s*$/i,
+ /^\s*(?:standard|drop\s*[a-g]#?|half[\s-]*step\s+down)\s+tuning\s*$/i,
+ /^\s*(?:submit|send|report)\s+(?:a\s+)?(?:correction|corrections|problem|error)\b.*$/i,
+ /^\s*(?:chords?|acordes|acords)\s+(?:for|de|of)\s+.{1,80}$/i,
+ /(?:https?:\/\/|www\.|@[\w-]+\.\w{2,}|\b[a-z0-9-]+\.(?:com|net|org|es|cat|br|io|fm)\b)/i, // enllaços i correus
+ /(?:©|\(c\)\s*\d{4}|copyright|all\s+rights\s+reserved|todos\s+los\s+derechos|tots\s+els\s+drets)/i
+];
+function isJunk(l){
+  if(!l||!l.trim()) return false;
+  return LABEL_J.test(l)||J_WORD.test(l)||J_MISC.some(r=>r.test(l));
+}
+function isContentLine(l){
+  return isChordLine(l)||isSection(l)||/\[[A-G][^\]]*\]/.test(l)||!!parseMixed(l,false);
+}
+function cleanTitle(s){
+  s=String(s||'').trim().replace(/^(?:chords?|tabs?|acordes?|acords?|cifra|lyrics?)\s+(?:for|de|of)\s+/i,'');
+  let p;
+  do{
+    p=s;
+    s=s.replace(/\s*[\(\[]?\s*\b(?:ver(?:si[oó]n)?\.?\s*\d+|official|chords?(?:\s*&\s*lyrics)?|tabs?|lyrics?|letra|cifra|acordes|acords)\s*[\)\]]?\s*$/i,'').trim();
+  }while(s!==p);
+  return s.replace(/^["“”'‘’]+|["“”'‘’]+$/g,'').replace(/[\s:,;-]+$/,'').trim();
+}
+/* mira la capçalera (el que hi ha abans de la primera línia d'acords) i en treu el títol i l'autor */
+function extractMeta(lines){
+  const meta={},drop=new Set();
+  const isDir=l=>/^\s*\{.*\}\s*$/.test(l);
+  const cs=lines.findIndex(l=>l.trim()&&!isJunk(l)&&!isDir(l)&&isContentLine(l));
+  const zoneEnd=cs>=0?cs:Math.min(lines.length,25);
+  const idx=[];
+  for(let i=0;i<zoneEnd;i++) if(lines[i].trim()&&!isDir(lines[i])) idx.push(i);
+  const dropZone=cs>=0&&idx.length<=10;      // capçalera curta: tot el que hi ha abans dels acords es descarta
+  const cand=[];
+  for(const i of idx){
+    const l=lines[i].trim(); let m;
+    if((m=l.match(LABEL_T))){if(!meta.title)meta.title=cleanTitle(m[1]);drop.add(i);continue}
+    if((m=l.match(LABEL_A))){if(!meta.artist)meta.artist=cleanTitle(m[1]);drop.add(i);continue}
+    if((m=l.match(CHORDS_BY))){
+      if(!meta.title)meta.title=cleanTitle(m[1]);
+      if(!meta.artist)meta.artist=cleanTitle(m[2]);
+      drop.add(i);continue;
+    }
+    if(isJunk(lines[i])){drop.add(i);continue}
+    if(dropZone){
+      if((m=l.match(/^[Bb]y\s+([A-ZÀ-Þ][^,.;!?]{1,40})$/))){if(!meta.artist)meta.artist=cleanTitle(m[1]);drop.add(i);continue}
+      drop.add(i);
+      if(l.length<=80) cand.push(l);
+    }
+  }
+  if(dropZone&&cand.length){
+    if(!meta.title){
+      const c0=cand.shift();
+      const m=c0.match(/^(.{1,70}?)\s+[-–—]\s+(.{1,50})$/);      // "Títol - Autor"
+      if(m){meta.title=cleanTitle(m[1]);if(!meta.artist)meta.artist=cleanTitle(m[2]);}
+      else meta.title=cleanTitle(c0);
+    }
+    if(!meta.artist&&cand.length&&cand[0].length<=45) meta.artist=cleanTitle(cand[0]);
+  }
+  if(!meta.title)delete meta.title;
+  if(!meta.artist)delete meta.artist;
+  return {meta,drop};
+}
+
 function fixText(t){
-  const meta={}; let n=0;
+  const meta={}; let n=0,removed=0;
   t=t.replace(/\r\n?/g,'\n').replace(/\u00a0/g,' ').replace(/\t/g,'    ').replace(/\[\/?(?:ch|tab)\]/gi,'');
-  const lines=t.split('\n');
+  let lines=t.split('\n').map(l=>l.replace(/\s+$/,''));
+  // 1) títol i autor de la capçalera
+  const ex=extractMeta(lines);
+  Object.assign(meta,ex.meta);
+  // 2) fora la capçalera i les línies que no són lletra ni acords
+  const kept=[];
+  lines.forEach((l,i)=>{
+    if(ex.drop.has(i)||isJunk(l)){if(l.trim())removed++;return}
+    kept.push(/^[\s\-_=*~.•·|]{3,}$/.test(l)?'':l);
+  });
+  lines=kept;
+  // 3) acords a sobre de la lletra
   const plain=l=>!isChordLine(l)&&!SKIP.test(l)&&!/\[[^\]]+\]/.test(l);
-  // si hi ha com a mínim 2 línies clarament amb acords, s'accepten també les de només un acord solt
   const lenient=lines.filter(l=>plain(l)&&parseMixed(l,false)).length>=2;
   const out=[];
   for(const line of lines){
@@ -177,7 +298,6 @@ function fixText(t){
       const k=d[1].toLowerCase(),v=d[2];
       if(k==='title'||k==='t') meta.title=v;
       else if(k==='artist'||k==='subtitle'||k==='st') meta.artist=v;
-      else if(k==='key') meta.key=v;
       else if(['comment','c','ci','comment_italic'].includes(k)) out.push(v);
       continue;
     }
@@ -192,14 +312,94 @@ function fixText(t){
     if(r){out.push(...r);n++;continue}
     out.push(line);
   }
-  return {text:out.join('\n'),meta,n};
+  const text=out.join('\n').replace(/\n{3,}/g,'\n\n').replace(/^\n+|\n+$/g,'');
+  return {text,meta,n,removed};
 }
+
+/* ---------- dibuix de la cançó: acords a sobre de la lletra ---------- */
+const SECW=/^\s*[\[(]?\s*(?:verse|chorus|pre-?chorus|bridge|intro|outro|interlude|instrumental|solo|refrain|coda|estrofa|tornada|estribillo|introducci[oó])(?:\s*(?:\d+|x\d+|[ivx]{1,3}))*\s*[\])]?\s*:?\s*$/i;
+function isSection(l){
+  if(SECW.test(l)) return true;
+  const m=l.match(/^\s*\[([^\]]{1,30})\]\s*$/);
+  return !!m&&!CH.test(m[1].trim());
+}
+function segHTML(c,tx){
+  return '<span class="sg"><span class="ch">'+(c?esc(c):'&nbsp;')+'</span><span class="tx">'+(tx?esc(tx):'&nbsp;')+'</span></span>';
+}
+function pairHTML(cl,ll,n,useFlat){
+  const ch=[]; const re=/\S+/g; let m;
+  while((m=re.exec(cl))) ch.push({i:m.index,t:chordTok(m[0],n,useFlat)});
+  ll=ll.replace(/\s+$/,'');
+  let h='';
+  const first=Math.min(ch[0].i,ll.length);
+  if(first>0) h+=segHTML('',ll.slice(0,first));
+  for(let k=0;k<ch.length;k++){
+    const a=Math.min(ch[k].i,ll.length);
+    const b=k+1<ch.length?Math.min(ch[k+1].i,ll.length):ll.length;
+    h+=segHTML(ch[k].t,ll.slice(a,b));
+  }
+  return '<div class="ln"><span class="lw">'+h+'</span></div>';
+}
+function chordOnlyHTML(cl,n,useFlat){
+  const h=cl.trim().split(/\s+/).map(t=>'<span class="ch inl">'+esc(chordTok(t,n,useFlat))+'</span>').join('');
+  return '<div class="ln co"><span class="lw">'+h+'</span></div>';
+}
+function sheetHTML(text,n,useFlat){
+  const L=String(text||'').replace(/\r/g,'').replace(/\t/g,'    ').split('\n').map(x=>x.replace(/\s+$/,''));
+  let out='',i=0,blank=true;
+  while(i<L.length){
+    const l=L[i];
+    if(!l.trim()){ if(!blank) out+='<div class="sp"></div>'; blank=true; i++; continue; }
+    blank=false;
+    if(isChordLine(l)){
+      const nx=L[i+1];
+      if(nx!==undefined&&nx.trim()&&!isChordLine(nx)&&!isSection(nx)){
+        out+=pairHTML(l,nx,n,useFlat); i+=2; continue;
+      }
+      out+=chordOnlyHTML(l,n,useFlat); i++; continue;
+    }
+    if(isSection(l)){
+      out+='<div class="sec">'+esc(l.trim().replace(/^[\[(]\s*/,'').replace(/\s*[\])]$/,'').replace(/:$/,''))+'</div>'; i++; continue;
+    }
+    out+='<div class="ln pl">'+esc(l)+'</div>'; i++;
+  }
+  return out;
+}
+
+/* ajusta les columnes perquè càpiga tota la cançó a la pantalla */
+function fitSong(){
+  const sh=$('#sheet'); if(!sh)return;
+  const cs=getComputedStyle(sh);
+  sh.classList.remove('wrap');
+  sh.style.columnCount=1;
+  const W=sh.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
+  const gap=parseFloat(cs.columnGap)||32;
+  let mx=parseFloat(cs.fontSize)*14;                 // amplada mínima d'una columna
+  sh.querySelectorAll('.lw').forEach(e=>{mx=Math.max(mx,e.getBoundingClientRect().width)});
+  if(mx>W) sh.classList.add('wrap');
+  const maxCols=Math.max(1,Math.min(3,Math.floor((W+gap)/(mx+gap))));
+  let n;
+  if(prefs.cols>0){
+    n=Math.min(prefs.cols,maxCols);
+  }else{
+    const avail=Math.max(260,window.innerHeight-(sh.getBoundingClientRect().top+window.scrollY)-18);
+    n=maxCols;
+    for(let k=1;k<=maxCols;k++){
+      sh.style.columnCount=k;
+      if(sh.scrollHeight<=avail){n=k;break}
+    }
+  }
+  sh.style.columnCount=n;
+}
+let rzT;
+window.addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(()=>{if(view.name==='song')fitSong()},150)});
 
 /* ---------- navegació ---------- */
 function go(v){view=v;if(v.name==='song')shift=0;render()}
 function render(){
   $('#n-songs').className=['songs','song','edit'].includes(view.name)?'on':'';
   $('#n-lists').className=['lists','list'].includes(view.name)?'on':'';
+  $('#app').style.maxWidth=view.name==='song'?'1500px':'900px';
   ({songs:songsView,song:songView,edit:editView,lists:listsView,list:listView})[view.name]();
   window.scrollTo(0,0);
 }
@@ -219,7 +419,7 @@ function drawSongs(){
   const arr=db.songs.filter(s=>(s.title+' '+s.artist).toLowerCase().includes(q))
     .sort((a,b)=>a.title.localeCompare(b.title,'ca'));
   $('#res').innerHTML=arr.length?arr.map(s=>`<div class="item">
-    <a onclick="go({name:'song',id:'${s.id}'})"><b>${esc(s.title)}</b> <small>${esc(s.artist)} ${s.key?'· '+esc(s.key):''}</small></a>
+    <a onclick="go({name:'song',id:'${s.id}'})"><b>${esc(s.title)}</b> <small>${esc(s.artist)}</small></a>
     <button class="btn alt" onclick="go({name:'edit',id:'${s.id}'})">Edita</button></div>`).join('')
     :'<p>Encara no hi ha cap cançó. Prem "Nova cançó".</p>';
 }
@@ -228,7 +428,7 @@ function importTxt(inp){
     const r=new FileReader();
     r.onload=()=>{
       const f2=fixText(r.result);
-      db.songs.push({id:uid(),title:f2.meta.title||f.name.replace(/\.[^.]+$/,''),artist:f2.meta.artist||'',key:f2.meta.key||'',text:f2.text});
+      db.songs.push({id:uid(),title:f2.meta.title||f.name.replace(/\.[^.]+$/,''),artist:f2.meta.artist||'',text:f2.text});
       save();drawSongs();
     };
     r.readAsText(f);
@@ -247,28 +447,38 @@ function songView(){
      <button class="btn alt" ${next?`onclick="go({name:'song',id:'${next}',list:'${lst.id}'})"`:'disabled'}>▶</button>
      <button class="btn alt" onclick="go({name:'list',id:'${lst.id}'})">Torna a la llista</button></div>`;
   }
-  const body=s.text.split('\n').map(l=>isChordLine(l)?`<span class="c">${esc(shift?tLine(l,shift,flat):l)}</span>`:esc(l)).join('\n');
-  const curKey=s.key?tChord(s.key.trim(),shift,flat):'';
+  const a=Math.abs(shift);
+  const tl=shift===0?'Original':(shift>0?'+':'−')+a+' '+(a===1?'semitò':'semitons');
+  const sizeBtn=(i,lab,px)=>`<button class="btn alt sz ${prefs.size===i?'on':''}" style="font-size:${px}px" title="${lab}" onclick="setSize(${i})">A</button>`;
+  const colSel='<select title="Columnes" onchange="setCols(this.value)">'+
+    [['0','Columnes: auto'],['1','1 columna'],['2','2 columnes'],['3','3 columnes']]
+    .map(([v,t])=>`<option value="${v}" ${String(prefs.cols)===v?'selected':''}>${t}</option>`).join('')+'</select>';
   $('#app').innerHTML=`${nav}
-   <h2 style="margin:6px 0">${esc(s.title)}</h2>
-   <div>${esc(s.artist)} ${s.key?`· Tonalitat: <b>${esc(curKey)}</b> ${shift?`(original ${esc(s.key)})`:''}`:''}</div>
-   <div class="row noprint">
-    <button class="btn" onclick="tr(-1)">− semitò</button>
-    <button class="btn" onclick="tr(1)">+ semitò</button>
-    <button class="btn alt" onclick="shift=0;render()">Original</button>
-    <span>${shift>0?'+':''}${shift}</span>
-    <label style="display:inline;margin:0"><input type="checkbox" ${flat?'checked':''} onchange="flat=this.checked;render()"> bemolls (b)</label>
-    <button class="btn alt" onclick="fs=Math.max(10,fs-2);render()">A−</button>
-    <button class="btn alt" onclick="fs+=2;render()">A+</button>
-    <button class="btn alt" onclick="window.print()">Imprimeix</button>
-    <button class="btn alt" onclick="go({name:'edit',id:'${s.id}'})">Edita</button>
+   <div class="bar noprint">
+    <div class="ttl"><b>${esc(s.title)}</b><span>${esc(s.artist)}</span></div>
+    <div class="row">
+     <button class="btn tb" onclick="tr(-1)">Transposa ▼</button>
+     <button class="btn tb" onclick="tr(1)">Transposa ▲</button>
+     <span class="trind ${shift?'act':''}">${tl}</span>
+     ${shift?`<button class="btn alt" onclick="shift=0;render()">Original</button>`:''}
+     <span class="sep"></span>
+     ${sizeBtn(0,'Lletra petita',12)}${sizeBtn(1,'Lletra mitjana',16)}${sizeBtn(2,'Lletra gran',20)}
+     ${colSel}
+     <label><input type="checkbox" ${prefs.flat?'checked':''} onchange="prefs.flat=this.checked;savePrefs();render()"> bemolls (♭)</label>
+     <button class="btn alt" onclick="window.print()">Imprimeix</button>
+     <button class="btn alt" onclick="go({name:'edit',id:'${s.id}'})">Edita</button>
+    </div>
    </div>
-   <pre style="font-size:${fs}px">${body}</pre>
+   <h2 class="onlyprint" style="margin:0 0 8px">${esc(s.title)} <small style="font-weight:400">${esc(s.artist)}</small></h2>
+   <div id="sheet" class="sheet" style="--fs:${SIZES[prefs.size]}px">${sheetHTML(s.text,shift,prefs.flat)}</div>
    <div class="row noprint"><select id="addl" style="max-width:260px"><option value="">Afegeix a una llista...</option>
      ${db.lists.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select>
      <button class="btn" onclick="addToList('${s.id}')">Afegeix</button></div>`;
+  fitSong();
 }
-function tr(n){shift+=n;render()}
+function tr(n){shift+=n;if(Math.abs(shift)>=12)shift=0;render()}
+function setSize(i){prefs.size=i;savePrefs();render()}
+function setCols(v){prefs.cols=+v;savePrefs();fitSong()}
 function addToList(sid){
   const l=db.lists.find(x=>x.id===$('#addl').value); if(!l)return;
   if(!l.songs.includes(sid)){l.songs.push(sid);save()}
@@ -276,14 +486,13 @@ function addToList(sid){
 }
 
 function editView(){
-  const s=view.id?db.songs.find(x=>x.id===view.id):{title:'',artist:'',key:'',text:''};
+  const s=view.id?db.songs.find(x=>x.id===view.id):{title:'',artist:'',text:''};
   const isNew=!view.id;
-  prevTxt=null;
+  prevTxt=null;prevTA=null;
   $('#app').innerHTML=`
    <h2>${isNew?'Nova cançó':'Edita cançó'}</h2>
    <label>Títol</label><input type="text" id="t" value="${esc(s.title)}" oninput="updLinks()">
    <label>Autor</label><input type="text" id="a" value="${esc(s.artist)}" oninput="updLinks()">
-   <label>Tonalitat original (ex.: Am, G, Bb)</label><input type="text" id="k" value="${esc(s.key)}" style="max-width:150px">
    ${isNew?`<div class="box"><b>Busca la cançó:</b> (s'obre en una pestanya nova; copia el text i enganxa'l a sota)
      <div class="row" id="links"></div></div>`:''}
    <label>Lletra amb els acords a sobre (text pla)</label>
@@ -295,17 +504,18 @@ Aquí va la lletra...">${esc(s.text)}</textarea>
     <button class="btn alt" onclick="${view.id?`go({name:'song',id:'${view.id}'})`:`go({name:'songs'})`}">Cancel·la</button>
     ${view.id?`<button class="btn red" onclick="delSong('${view.id}')">Esborra</button>`:''}
    </div>
-   <p><small>En enganxar un text amb els acords dins la línia (<code>Csitting Am on the F dock</code>, <code>[Am]Hola [F]món</code>…), els acords es posen sols a sobre de la lletra. Els acords han d'estar en notació anglesa (C, D, E, F, G, A, B).</small></p>`;
+   <p><small>En enganxar el text d'una web, el programa deixa només la lletra i els acords (treu capo, tonalitat, enllaços, botons, tablatures…), posa els acords a sobre de la lletra i omple el títol i l'autor si estan buits. Els acords han d'estar en notació anglesa (C, D, E, F, G, A, B).</small></p>`;
   if(isNew)updLinks();
 }
 function onPaste(e){
   const cd=e.clipboardData||window.clipboardData; if(!cd)return;
   const txt=cd.getData('text/plain'); if(!txt)return;
   const r=fixText(txt);
-  if(r.text===txt&&!Object.keys(r.meta).length) return;          // res a convertir: enganxat normal
+  if(r.text===txt&&!Object.keys(r.meta).length) return;          // res a netejar: enganxat normal
   e.preventDefault();
   const ta=e.target;
   prevTxt=ta.value;
+  prevTA={t:$('#t').value,a:$('#a').value};
   ta.focus();
   let done=false;
   try{done=document.execCommand('insertText',false,r.text)}catch(err){}
@@ -316,17 +526,32 @@ function onPaste(e){
   }
   if(r.meta.title&&!$('#t').value.trim()) $('#t').value=r.meta.title;
   if(r.meta.artist&&!$('#a').value.trim()) $('#a').value=r.meta.artist;
-  if(r.meta.key&&!$('#k').value.trim()) $('#k').value=r.meta.key;
   updLinks();
-  const note=$('#note');
-  if(r.n){
-    note.innerHTML=`✔ ${r.n} línies amb els acords posats a sobre de la lletra. <a onclick="undoFix()">Desfés</a>`;
-    note.style.display='block';
+  showNote(r);
+}
+function showNote(r){
+  const parts=[];
+  if(r.n) parts.push('✔ '+r.n+' línies amb els acords posats a sobre de la lletra.');
+  if(r.removed) parts.push('✔ '+r.removed+' línies que no eren lletra ni acords eliminades.');
+  if(r.meta.title||r.meta.artist){
+    const T=$('#t').value.trim(),A=$('#a').value.trim();
+    parts.push('✔ Títol: <b>'+esc(T||'—')+'</b> · Autor: <b>'+esc(A||'—')+'</b> <a onclick="swapTA()">Intercanvia</a>');
   }
+  const note=$('#note');
+  if(!parts.length){note.style.display='none';return}
+  note.innerHTML=parts.join('<br>')+' <a onclick="undoFix()">Desfés tot</a>';
+  note.style.display='block';
+}
+function swapTA(){
+  const t=$('#t'),a=$('#a'),v=t.value;
+  t.value=a.value;a.value=v;updLinks();
+  const note=$('#note');
+  if(note) note.innerHTML=note.innerHTML.replace(/Títol: <b>.*?<\/b> · Autor: <b>.*?<\/b>/,'Títol: <b>'+esc(t.value||'—')+'</b> · Autor: <b>'+esc(a.value||'—')+'</b>');
 }
 function undoFix(){
-  if(prevTxt===null)return;
-  $('#x').value=prevTxt; prevTxt=null;
+  if(prevTxt!==null) $('#x').value=prevTxt;
+  if(prevTA){$('#t').value=prevTA.t;$('#a').value=prevTA.a;updLinks()}
+  prevTxt=null;prevTA=null;
   $('#note').style.display='none';
 }
 function updLinks(){
@@ -341,7 +566,7 @@ function updLinks(){
   ].map(([n,u])=>`<a class="btn alt" style="text-decoration:none" target="_blank" rel="noopener" href="${u}">${n}</a>`).join('');
 }
 function saveSong(id){
-  const o={title:$('#t').value.trim()||'Sense títol',artist:$('#a').value.trim(),key:$('#k').value.trim(),text:$('#x').value.replace(/\r/g,'')};
+  const o={title:$('#t').value.trim()||'Sense títol',artist:$('#a').value.trim(),text:$('#x').value.replace(/\r/g,'')};
   if(id){Object.assign(db.songs.find(s=>s.id===id),o)}else{id=uid();db.songs.push({id,...o})}
   save();go({name:'song',id});
 }
@@ -409,7 +634,7 @@ function importDb(inp){
 /* ---------- descarrega el programa (HTML net, sense les teves cançons) ---------- */
 function downloadApp(){
   const c=document.documentElement.cloneNode(true);
-  c.querySelector('#app').innerHTML='';
+  const app=c.querySelector('#app'); app.innerHTML=''; app.removeAttribute('style');
   c.querySelectorAll('header button').forEach(b=>b.classList.remove('on'));
   const html='<!DOCTYPE html>\n'+c.outerHTML;
   const b=new Blob([html],{type:'text/html'});
