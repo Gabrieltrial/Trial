@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cançoner</title>
+<style>
+ *{box-sizing:border-box}
+ body{font-family:system-ui,sans-serif;margin:0;background:#f6f4ef;color:#222}
+ header{background:#2b3a42;color:#fff;padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+ header h1{font-size:18px;margin:0 16px 0 0}
+ header button{background:#3d5360;color:#fff;border:0;padding:8px 14px;border-radius:6px;cursor:pointer}
+ header button.on{background:#e0a030;color:#222}
+ main{max-width:900px;margin:0 auto;padding:16px}
+ button,select,input,textarea{font:inherit}
+ button{cursor:pointer}
+ .btn{background:#2b3a42;color:#fff;border:0;padding:7px 12px;border-radius:6px}
+ .btn.alt{background:#ddd;color:#222}
+ .btn.red{background:#b33}
+ .btn:disabled{opacity:.4}
+ input[type=text],textarea,select{width:100%;padding:8px;border:1px solid #bbb;border-radius:6px;background:#fff}
+ textarea{font-family:ui-monospace,Menlo,Consolas,monospace;min-height:380px}
+ .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+ .item{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px 12px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;gap:8px}
+ .item a{cursor:pointer;flex:1}
+ .item small{color:#777}
+ pre{background:#fff;border:1px solid #ddd;border-radius:8px;padding:14px;overflow:auto;font-family:ui-monospace,Menlo,Consolas,monospace;line-height:1.35;white-space:pre}
+ .c{color:#b5402a;font-weight:bold}
+ .box{background:#fff;border:1px dashed #999;border-radius:8px;padding:10px;margin:10px 0}
+ label{display:block;margin:10px 0 3px;font-weight:600}
+ @media print{header,.noprint{display:none}pre{border:0}}
+</style>
+</head>
+<body>
+<header>
+ <h1>🎸 Cançoner</h1>
+ <button id="n-songs" onclick="go({name:'songs'})">Cançons</button>
+ <button id="n-lists" onclick="go({name:'lists'})">Llistes</button>
+ <button onclick="exportDb()">Exporta</button>
+ <button onclick="document.getElementById('imp').click()">Importa</button>
+ <input type="file" id="imp" accept=".json" hidden onchange="importDb(this)">
+</header>
+<main id="app"></main>
+
+<script>
+const NS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const NF=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const IDX={C:0,'C#':1,Db:1,D:2,'D#':3,Eb:3,E:4,F:5,'F#':6,Gb:6,G:7,'G#':8,Ab:8,A:9,'A#':10,Bb:10,B:11};
+const CH=/^[A-G][#b]?(?:maj|min|m|M|dim|aug|sus|add|\+|°|ø|-)?(?:[0-9]+|(?:sus|add|maj|dim|aug|alt|b|#|-|\+)[0-9]*)*(?:\/[A-G][#b]?)?$/;
+const NEUTRAL=/^(\||\|\||x\d+|\(?x\d+\)?|-|N\.C\.?)$/;
+
+let db={songs:[],lists:[]};
+try{db=JSON.parse(localStorage.getItem('cansoner'))||db}catch(e){}
+const save=()=>{try{localStorage.setItem('cansoner',JSON.stringify(db))}catch(e){alert('No es pot desar al navegador')}};
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const $=s=>document.querySelector(s);
+
+let view={name:'songs'}, shift=0, flat=false, fs=16;
+
+/* ---------- acords ---------- */
+function isChordLine(l){
+  const t=l.trim(); if(!t) return false;
+  const toks=t.split(/\s+/);
+  return toks.every(x=>CH.test(x)||NEUTRAL.test(x)) && toks.some(x=>CH.test(x));
+}
+function tChord(tok,n,useFlat){
+  const m=tok.match(/^([A-G][#b]?)([^\/]*)(?:\/([A-G][#b]?))?$/);
+  if(!m) return tok;
+  const arr=useFlat?NF:NS;
+  const tr=r=>arr[((IDX[r]+n)%12+12)%12];
+  return tr(m[1])+m[2]+(m[3]?'/'+tr(m[3]):'');
+}
+function tLine(line,n,useFlat){
+  return line.replace(/(\S+)(\s*)/g,(_,tok,sp)=>{
+    if(!CH.test(tok)) return tok+sp;
+    const nt=tChord(tok,n,useFlat);
+    let k=sp.length;
+    if(k>0) k=Math.max(1,k-(nt.length-tok.length));
+    return nt+' '.repeat(k);
+  });
+}
+
+/* ---------- navegació ---------- */
+function go(v){view=v;if(v.name==='song')shift=0;render()}
+function render(){
+  $('#n-songs').className=['songs','song','edit'].includes(view.name)?'on':'';
+  $('#n-lists').className=['lists','list'].includes(view.name)?'on':'';
+  ({songs:songsView,song:songView,edit:editView,lists:listsView,list:listView})[view.name]();
+  window.scrollTo(0,0);
+}
+
+/* ---------- cançons ---------- */
+function songsView(){
+  $('#app').innerHTML=`
+   <div class="row"><input type="text" id="q" placeholder="Cerca per títol o autor..." oninput="drawSongs()" style="flex:1">
+   <button class="btn" onclick="go({name:'edit',id:null})">+ Nova cançó</button>
+   <button class="btn alt" onclick="document.getElementById('txts').click()">Importa .txt</button>
+   <input type="file" id="txts" accept=".txt,.cho,.crd" multiple hidden onchange="importTxt(this)"></div>
+   <div id="res"></div>`;
+  drawSongs();
+}
+function drawSongs(){
+  const q=($('#q')?.value||'').toLowerCase();
+  const arr=db.songs.filter(s=>(s.title+' '+s.artist).toLowerCase().includes(q))
+    .sort((a,b)=>a.title.localeCompare(b.title,'ca'));
+  $('#res').innerHTML=arr.length?arr.map(s=>`<div class="item">
+    <a onclick="go({name:'song',id:'${s.id}'})"><b>${esc(s.title)}</b> <small>${esc(s.artist)} ${s.key?'· '+esc(s.key):''}</small></a>
+    <button class="btn alt" onclick="go({name:'edit',id:'${s.id}'})">Edita</button></div>`).join('')
+    :'<p>Encara no hi ha cap cançó. Prem "Nova cançó".</p>';
+}
+function importTxt(inp){
+  [...inp.files].forEach(f=>{
+    const r=new FileReader();
+    r.onload=()=>{db.songs.push({id:uid(),title:f.name.replace(/\.[^.]+$/,''),artist:'',key:'',text:r.result});save();drawSongs()};
+    r.readAsText(f);
+  });
+}
+
+function songView(){
+  const s=db.songs.find(x=>x.id===view.id); if(!s){go({name:'songs'});return}
+  const lst=view.list&&db.lists.find(l=>l.id===view.list);
+  let nav='';
+  if(lst){
+    const i=lst.songs.indexOf(s.id);
+    const prev=lst.songs[i-1], next=lst.songs[i+1];
+    nav=`<div class="row noprint"><button class="btn alt" ${prev?`onclick="go({name:'song',id:'${prev}',list:'${lst.id}'})"`:'disabled'}>◀</button>
+     <span>${esc(lst.name)} · ${i+1}/${lst.songs.length}</span>
+     <button class="btn alt" ${next?`onclick="go({name:'song',id:'${next}',list:'${lst.id}'})"`:'disabled'}>▶</button>
+     <button class="btn alt" onclick="go({name:'list',id:'${lst.id}'})">Torna a la llista</button></div>`;
+  }
+  const body=s.text.split('\n').map(l=>isChordLine(l)?`<span class="c">${esc(shift?tLine(l,shift,flat):l)}</span>`:esc(l)).join('\n');
+  const curKey=s.key?tChord(s.key.trim(),shift,flat):'';
+  $('#app').innerHTML=`${nav}
+   <h2 style="margin:6px 0">${esc(s.title)}</h2>
+   <div>${esc(s.artist)} ${s.key?`· Tonalitat: <b>${esc(curKey)}</b> ${shift?`(original ${esc(s.key)})`:''}`:''}</div>
+   <div class="row noprint">
+    <button class="btn" onclick="tr(-1)">− semitò</button>
+    <button class="btn" onclick="tr(1)">+ semitò</button>
+    <button class="btn alt" onclick="shift=0;render()">Original</button>
+    <span>${shift>0?'+':''}${shift}</span>
+    <label style="display:inline;margin:0"><input type="checkbox" ${flat?'checked':''} onchange="flat=this.checked;render()"> bemolls (b)</label>
+    <button class="btn alt" onclick="fs=Math.max(10,fs-2);render()">A−</button>
+    <button class="btn alt" onclick="fs+=2;render()">A+</button>
+    <button class="btn alt" onclick="window.print()">Imprimeix</button>
+    <button class="btn alt" onclick="go({name:'edit',id:'${s.id}'})">Edita</button>
+   </div>
+   <pre style="font-size:${fs}px">${body}</pre>
+   <div class="row noprint"><select id="addl" style="max-width:260px"><option value="">Afegeix a una llista...</option>
+     ${db.lists.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select>
+     <button class="btn" onclick="addToList('${s.id}')">Afegeix</button></div>`;
+}
+function tr(n){shift+=n;render()}
+function addToList(sid){
+  const l=db.lists.find(x=>x.id===$('#addl').value); if(!l)return;
+  if(!l.songs.includes(sid)){l.songs.push(sid);save()}
+  alert('Afegida a "'+l.name+'"');
+}
+
+function editView(){
+  const s=view.id?db.songs.find(x=>x.id===view.id):{title:'',artist:'',key:'',text:''};
+  const isNew=!view.id;
+  $('#app').innerHTML=`
+   <h2>${isNew?'Nova cançó':'Edita cançó'}</h2>
+   <label>Títol</label><input type="text" id="t" value="${esc(s.title)}" oninput="updLinks()">
+   <label>Autor</label><input type="text" id="a" value="${esc(s.artist)}" oninput="updLinks()">
+   <label>Tonalitat original (ex.: Am, G, Bb)</label><input type="text" id="k" value="${esc(s.key)}" style="max-width:150px">
+   ${isNew?`<div class="box"><b>Busca la cançó:</b> (s'obre en una pestanya nova; copia el text i enganxa'l a sota)
+     <div class="row" id="links"></div></div>`:''}
+   <label>Lletra amb els acords a sobre (text pla)</label>
+   <textarea id="x" placeholder="   Am        F
+Aquí va la lletra...">${esc(s.text)}</textarea>
+   <div class="row">
+    <button class="btn" onclick="saveSong('${view.id||''}')">Desa</button>
+    <button class="btn alt" onclick="${view.id?`go({name:'song',id:'${view.id}'})`:`go({name:'songs'})`}">Cancel·la</button>
+    ${view.id?`<button class="btn red" onclick="delSong('${view.id}')">Esborra</button>`:''}
+   </div>
+   <p><small>Consell: copia el text amb els acords tal com surt a la web. Els acords han d'estar en notació anglesa (C, D, E, F, G, A, B).</small></p>`;
+  if(isNew)updLinks();
+}
+function updLinks(){
+  const el=$('#links'); if(!el)return;
+  const q=encodeURIComponent(($('#t').value+' '+$('#a').value).trim());
+  const g=(extra)=>`https://www.google.com/search?q=${q}+${encodeURIComponent(extra)}`;
+  el.innerHTML=[
+   ['Ultimate Guitar',g('chords site:ultimate-guitar.com')],
+   ['Cifraclub',g('site:cifraclub.com')],
+   ['Chordie',g('site:chordie.com')],
+   ['Google (lletra i acords)',g('lletra acords')]
+  ].map(([n,u])=>`<a class="btn alt" style="text-decoration:none" target="_blank" rel="noopener" href="${u}">${n}</a>`).join('');
+}
+function saveSong(id){
+  const o={title:$('#t').value.trim()||'Sense títol',artist:$('#a').value.trim(),key:$('#k').value.trim(),text:$('#x').value.replace(/\r/g,'')};
+  if(id){Object.assign(db.songs.find(s=>s.id===id),o)}else{id=uid();db.songs.push({id,...o})}
+  save();go({name:'song',id});
+}
+function delSong(id){
+  if(!confirm('Segur que vols esborrar aquesta cançó?'))return;
+  db.songs=db.songs.filter(s=>s.id!==id);
+  db.lists.forEach(l=>l.songs=l.songs.filter(x=>x!==id));
+  save();go({name:'songs'});
+}
+
+/* ---------- llistes ---------- */
+function listsView(){
+  $('#app').innerHTML=`
+   <div class="row"><input type="text" id="nl" placeholder="Nom de la nova llista (ex.: Concert Nadal)" style="flex:1">
+   <button class="btn" onclick="newList()">+ Crea llista</button></div>
+   ${db.lists.map(l=>`<div class="item"><a onclick="go({name:'list',id:'${l.id}'})"><b>${esc(l.name)}</b> <small>${l.songs.length} cançons</small></a></div>`).join('')||'<p>Encara no tens cap llista.</p>'}`;
+}
+function newList(){
+  const n=$('#nl').value.trim(); if(!n)return;
+  const l={id:uid(),name:n,songs:[]};db.lists.push(l);save();go({name:'list',id:l.id});
+}
+function listView(){
+  const l=db.lists.find(x=>x.id===view.id); if(!l){go({name:'lists'});return}
+  const avail=db.songs.filter(s=>!l.songs.includes(s.id)).sort((a,b)=>a.title.localeCompare(b.title,'ca'));
+  $('#app').innerHTML=`
+   <h2 style="margin:6px 0">${esc(l.name)}</h2>
+   <div class="row">
+    <button class="btn" ${l.songs.length?`onclick="go({name:'song',id:'${l.songs[0]}',list:'${l.id}'})"`:'disabled'}>▶ Mode concert</button>
+    <button class="btn alt" onclick="renList('${l.id}')">Reanomena</button>
+    <button class="btn red" onclick="delList('${l.id}')">Esborra llista</button>
+    <button class="btn alt" onclick="go({name:'lists'})">Totes les llistes</button>
+   </div>
+   ${l.songs.map((sid,i)=>{const s=db.songs.find(x=>x.id===sid);if(!s)return'';
+     return `<div class="item"><a onclick="go({name:'song',id:'${sid}',list:'${l.id}'})">${i+1}. <b>${esc(s.title)}</b> <small>${esc(s.artist)}</small></a>
+      <span><button class="btn alt" onclick="mv('${l.id}',${i},-1)">↑</button>
+      <button class="btn alt" onclick="mv('${l.id}',${i},1)">↓</button>
+      <button class="btn red" onclick="rm('${l.id}',${i})">✕</button></span></div>`}).join('')}
+   <div class="row"><select id="as"><option value="">Afegeix una cançó de la biblioteca...</option>
+    ${avail.map(s=>`<option value="${s.id}">${esc(s.title)} — ${esc(s.artist)}</option>`).join('')}</select>
+    <button class="btn" onclick="addSong('${l.id}')">Afegeix</button></div>`;
+}
+const getL=id=>db.lists.find(x=>x.id===id);
+function mv(id,i,d){const a=getL(id).songs,j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];save();render()}
+function rm(id,i){getL(id).songs.splice(i,1);save();render()}
+function addSong(id){const v=$('#as').value;if(!v)return;getL(id).songs.push(v);save();render()}
+function renList(id){const l=getL(id),n=prompt('Nou nom:',l.name);if(n){l.name=n;save();render()}}
+function delList(id){if(confirm('Esborrar la llista? (les cançons es conserven)')){db.lists=db.lists.filter(l=>l.id!==id);save();go({name:'lists'})}}
+
+/* ---------- còpia de seguretat ---------- */
+function exportDb(){
+  const b=new Blob([JSON.stringify(db)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(b);
+  a.download='cansoner-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+}
+function importDb(inp){
+  const f=inp.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{try{const d=JSON.parse(r.result);
+    if(!d.songs||!d.lists)throw 0;
+    if(confirm('Això substituirà el contingut actual. Continuar?')){db=d;save();go({name:'songs'})}
+  }catch(e){alert('Fitxer no vàlid')}};
+  r.readAsText(f);
+}
+render();
+</script>
+</body>
+</html>
