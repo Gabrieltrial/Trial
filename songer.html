@@ -25,8 +25,8 @@
  .item a{cursor:pointer;flex:1}
  .item small{color:#777}
  .box{background:#fff;border:1px dashed #999;border-radius:8px;padding:10px;margin:10px 0}
- .note{background:#e7f3e7;border:1px solid #9c9;border-radius:6px;padding:6px 10px;margin:8px 0;font-size:14px;line-height:1.5}
- .note a{color:#225;text-decoration:underline;cursor:pointer;margin-left:8px}
+ .nt{background:#e7f3e7;border:1px solid #9c9;border-radius:6px;padding:6px 10px;margin:8px 0;font-size:14px;line-height:1.5}
+ .nt a{color:#225;text-decoration:underline;cursor:pointer;margin-left:8px}
  label{display:block;margin:10px 0 3px;font-weight:600}
 
  /* ---- vista de la cançó ---- */
@@ -36,7 +36,7 @@
  .ttl span{color:#666;font-size:15px;margin-left:8px}
  .tb{background:#1f6f5c;font-weight:700;padding:9px 14px}
  .trind{font-weight:700;min-width:105px;text-align:center}
- .trind.act{color:#c2410c}
+ .trind.act{color:#d9480f}
  .sep{width:10px}
  .btn.sz{min-width:36px;padding:4px 8px;line-height:1.2;font-weight:700}
  .btn.sz.on{background:#2b3a42;color:#fff}
@@ -45,23 +45,25 @@
  .onlyprint{display:none}
 
  .sheet{
-   --chord:#c2410c;
+   --chord:#d9480f;                                   /* color dels acords */
+   --lyric:Georgia,"Times New Roman",Times,serif;     /* tipus de lletra de la cançó (només la lletra) */
    font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
    font-size:var(--fs,19px);line-height:1.3;color:#1b1b1b;
    background:#fff;border:1px solid #ddd;border-radius:10px;padding:14px 18px;
    column-gap:2.4em;column-rule:1px solid #e6e1d6;
  }
- .ln{break-inside:avoid;page-break-inside:avoid;-webkit-column-break-inside:avoid;margin:0 0 .55em}
+ .ln{break-inside:avoid;page-break-inside:avoid;-webkit-column-break-inside:avoid;margin:0 0 .6em}
  .lw{white-space:nowrap}
  .sheet.wrap .lw{white-space:normal}
  .sg{display:inline-block}
  .ch{display:block;white-space:pre;
    font-family:ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace;
-   font-weight:800;font-size:1.1em;line-height:1.15;color:var(--chord);padding-right:.55em}
- .tx{display:block;white-space:pre;line-height:1.25}
+   font-weight:800;font-size:calc(var(--fs,19px)*1.2);line-height:1.15;color:var(--chord);padding-right:.5em}
+ .tx{display:block;white-space:pre;font-family:var(--lyric);font-size:var(--fs,19px);line-height:1.25}
  .ln.co .ch.inl{display:inline-block;padding-right:0;margin-right:1.1em}
- .ln.pl{white-space:pre-wrap}
- .sec{font-weight:700;text-transform:uppercase;font-size:.78em;letter-spacing:.08em;color:#5b6b73;margin:.9em 0 .35em;break-after:avoid;-webkit-column-break-after:avoid}
+ .ln.pl{white-space:pre-wrap;font-family:var(--lyric);font-size:var(--fs,19px)}
+ .sec{font-weight:700;text-transform:uppercase;font-size:.78em;letter-spacing:.08em;color:#5b6b73;margin:1em 0 .4em;break-after:avoid;-webkit-column-break-after:avoid}
+ .note{font-style:italic;font-size:.82em;color:#6b6f76;margin:1em 0 1em .2em;padding-left:.7em;border-left:3px solid #d8d2c4;break-inside:avoid;-webkit-column-break-inside:avoid}
  .sp{height:.5em}
 
  @media print{
@@ -119,40 +121,42 @@ function tChord(tok,n,useFlat){
 }
 const chordTok=(t,n,useFlat)=>((CH.test(t)&&n)?tChord(t,n,useFlat):t);
 
-/* ---------- conversió automàtica: acords dins la línia -> acords a sobre ---------- */
+/* ---------- acords dins la línia -> acords a sobre ---------- */
 const AMB=new Set(['A','Am','Em']);                       // també poden ser paraules
 const VOWEL=/[aeiouyáéíóúàèìòùïüöäëâêîôû]/i;
 const ONSET={B:'lr',C:'hlr',D:'rw',F:'lr',G:'hlnrw'};      // 2a lletra consonant possible en una paraula normal
-const STOP=new Set('del dels cel cat bat cup bit fit din gin con don bin fin eat gas bus gun fun bun ben den bel gel bon for cor dor can ban dan fan amsterdam'.split(' '));
+const STOP=new Set('del dels cel cat bat cup bit fit din gin con don bin fin eat gas bus gun fun bun ben den bel gel bon for cor dor can ban dan fan'.split(' '));
 const LEAD=new Set("and all as at an are is in it if into on of out over up under us ask after again always another around away any am also almost alone about above en el un una es al amb i'm i'll i've i'd".split(' '));
+const LEAD2=new Set([...LEAD,...'even ever every only one too you your we he she him his the to for but or so not no now then when how who what where here there just still can got get go from with that this they them our'.split(' ')]);
 const SKIP=/^\s*(?:key|capo|tuning|tono|tonalidad|tonalitat|afinaci[oó]|bpm|tempo|artist|autor|title|t[ií]tol|album|[àa]lbum)\b/i;
 
-/* acord + paraula enganxats: "Csitting", "Gmorning", "Cmaj7sun", "C#and" */
+/* acord + paraula enganxats: "Csitting", "Gmorning", "Cmaj7sun", "C#and", "Asushello" */
 const GLUE=new RegExp(
- '^([A-G](?:#|b(?=[\\dm/]))?'+                  // arrel (b només si va seguida de xifra, m o /)
- '(?:(?:maj|min|dim|aug|sus|add)(?=\\d))?'+     // qualitat llarga, només si hi ha xifra darrere
- '(?:m(?![aeiouyáéíóúàèìòùïüöä]))?'+            // menor: Cmaybe = C + maybe, Cmsitting = Cm + sitting
+ '^([A-G](?:#|b(?=[\\dm/]))?'+
+ '(?:(?:maj|min|dim|aug|sus|add)(?=\\d)|sus(?=[a-zà-ÿ]{2}))?'+
+ '(?:m(?![aeiouyáéíóúàèìòùïüöä]))?'+
  '\\d{0,2}'+
  '(?:(?:[#b+-]|sus|add|alt)\\d{1,2})*'+
- '(?:/[A-G]#?)?)'+                              // baix (C/G)
- '([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’-]*[^\\sA-Za-zÀ-ÿ]*)$'); // la paraula
+ '(?:/[A-G]#?)?)'+
+ '([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’-]*[^\\sA-Za-zÀ-ÿ]*)$');
 
 function glueKind(tok){
   const m=tok.match(GLUE); if(!m) return null;
   const pre=m[1], rem=m[2];
   const word=rem.replace(/[^A-Za-zÀ-ÿ'’-]+$/,'');
   const low=word.replace(/[^a-zà-öø-ÿ]/g,'');
-  if(low.length<2||!VOWEL.test(low)) return null;               // la resta ha de ser una paraula
-  if((pre==='Am'||pre==='Em')&&/^[bpmn]/i.test(rem)) return null; // Embrace, Empty, Amber...
+  if(low.length<2||!VOWEL.test(low)) return null;
+  if((pre==='Am'||pre==='Em')&&/^[bpmn]/i.test(rem)) return null;
   const key=tok.toLowerCase().replace(/’/g,"'").replace(/[^a-zà-öø-ÿ']+$/,'');
-  if(STOP.has(key)) return null;
-  let dec=pre.length>1;                                          // #, m, 7, sus, /baix... = acord segur
+  const stop=STOP.has(key);
+  let dec=pre.length>1;
   if(!dec){
     const c=rem[0];
-    if(/[A-ZÀ-Þ]/.test(c)) dec=/[a-zà-öø-ÿ]/.test(rem.slice(1)); // CSitting
-    else if(pre!=='A'&&pre!=='E'&&!VOWEL.test(c)) dec=!(ONSET[pre]||'').includes(c.toLowerCase()); // Cs.. Gm.. Dt..
+    if(/[A-ZÀ-Þ]/.test(c)) dec=/[a-zà-öø-ÿ]/.test(rem.slice(1));
+    else if(pre!=='A'&&pre!=='E'&&!VOWEL.test(c)) dec=!(ONSET[pre]||'').includes(c.toLowerCase());
   }
-  return {chord:pre,rest:rem,dec,lead:LEAD.has(word.toLowerCase().replace(/’/g,"'"))};
+  const w=word.toLowerCase().replace(/’/g,"'");
+  return {chord:pre,rest:rem,dec,stop,word:w,lead:LEAD.has(w)};
 }
 const core=t=>t.replace(/^[(\[]+/,'').replace(/[)\],.;:]+$/,'');
 
@@ -161,7 +165,7 @@ function parseMixed(line,lenient){
     const c=core(t);
     if(CH.test(c)) return {t,k:AMB.has(c)?'Samb':'S',chord:c};
     const g=glueKind(t);
-    if(g) return {t,k:g.dec?'Gdec':(g.lead?'Glead':'W'),chord:g.chord,rest:g.rest};
+    if(g&&!g.stop) return {t,k:g.dec?'Gdec':(g.lead?'Glead':'W'),chord:g.chord,rest:g.rest};
     return {t,k:'W'};
   });
   const ev=cls.filter(x=>x.k==='S'||x.k==='Gdec').length;
@@ -169,7 +173,7 @@ function parseMixed(line,lenient){
   const strong=(total>=2&&ev>=1)||cls.some(x=>x.k==='Gdec')||cls.some(x=>x.k==='S'&&x.chord.length>1);
   if(!ev||(!strong&&!lenient)) return null;
   const ok=x=>x.k==='S'||x.k==='Gdec'||x.k==='Samb'||x.k==='Glead';
-  if(cls.every(ok)&&cls.every(x=>!x.rest)) return null;          // ja és una línia d'acords
+  if(cls.every(ok)&&cls.every(x=>!x.rest)) return null;
   let lyr='',ch='';
   for(const x of cls){
     if(lyr&&!lyr.endsWith(' ')) lyr+=' ';
@@ -187,7 +191,7 @@ function inlineToAbove(line){
   let lyr='',ch='',last=0,m,found=false;
   while((m=re.exec(line))){
     const c=m[1].trim();
-    if(!(CH.test(c)||/^N\.?C\.?$/i.test(c))) continue;          // "[Chorus]" es deixa tal qual
+    if(!(CH.test(c)||/^N\.?C\.?$/i.test(c))) continue;
     found=true;
     lyr+=line.slice(last,m.index); last=re.lastIndex;
     const pos=Math.max(lyr.length,ch?ch.length+1:0);
@@ -198,24 +202,215 @@ function inlineToAbove(line){
   return lyr.trim()?[ch,lyr.replace(/\s+$/,'')]:[ch];
 }
 
+/* ---------- còpies malmeses: acords partits, dins de les paraules, amb guionets i "sus" solts ---------- */
+const EMB=/^[A-G](?:#|b(?=[0-9m\/\-]|$))?(?:maj[79]?|min7?|m(?![aeiouyáéíóúàèìòùïüöäëâêîôû])[679]?|dim7?|aug|sus[24]?|add[29]|[0-9]{1,2})?(?:\/[A-G](?:#|b)?)?/;
+/* paraules habituals: serveixen per saber que el que queda després d'una lletra d'acord és una paraula de debò */
+const COMMON=new Set(`and all are but can did does for from get got had has have her him his how its just let not now off one our out over say she that the their them then there they this too was were what when who why will with you your
+even ever only still away again around always another any about above after also alone almost among along been before being below between both came come could day down each else end every first found give going good great here home into keep kind know last left life like little long look made make many may more most much must never new next night old once other own right same seem should since some such take tell than these thing think those through time under until upon want way well where which while whole without would yes yet
+baby girl boy love heart face eyes hand hands head mind soul sun sky rain wind fire water road town city street house door floor wall window light dark black white red blue green gold silver dream dreams song songs sing sang voice words word name names world people friend friends mother father mama papa man woman men women child children king queen god lord devil angel heaven hell wild free fall falling flying crying dying lying running walking talking living loving looking waiting wanting feeling coming getting making taking giving leaving breaking changing burning turning learning dancing singing playing saying thinking knowing doing being having seeing hearing standing sitting
+cold gold bold gone feel dear bear beat boat coat bite dare care card cart eat ago bit bat cat fit fat gin fin bin cup
+amb com per que més molt sense sobre entre fins cap fer ser estar vull tinc quan també però cada tots totes meva teu seu nostre amor cor vida ara aquí allà sempre mai tot res algú ningú casa mar cel terra nit dia sol lluna vent foc aigua gent llum camí temps
+mundo cielo tierra noche corazón siempre nunca todo nada tiempo`.split(/\s+/));
+const TWO=new Set('in on of to up us my me no so as at is it if or we he be do go an am'.split(' '));
+const STOPSUS=['sustain','sustanc','sustant','suspect','suspen','suspic','suspir','sushi','susan','susie','sussex','suscept'];
+/* línia amb senyals de còpia malmesa */
+const GARBLE=/[a-zà-öø-ÿ][A-G]|\b[A-G](?:#|b)?sus|(?:^|[\s-])sus(?=[A-Za-zÀ-ÿ'’]|[\s-]|$)|\b[A-G](?:#|b)?-[A-G]/;
+
+/* després d'un guionet: continua una cadena d'acords? */
+function chainOK(r){
+  if(/^sus(?=$|-|[A-Za-z])/.test(r)) return true;
+  const m=r.match(EMB); if(!m) return false;
+  const ch=m[0], aft=r[ch.length];
+  if(!/^[A-G][#b]?$/.test(ch)) return true;
+  return aft===undefined||aft==='-';
+}
+/* hi ha un acord al principi de s? (o: s es l'inici d'una part de paraula) → retorna l'acord o null */
+function bChord(s,o){
+  const m=s.match(EMB); if(!m) return null;
+  const ch=m[0], se=s.indexOf('-'), seg=se<0?s:s.slice(0,se);
+  if(ch.length>seg.length) return null;
+  const rest=seg.slice(ch.length), bare=/^[A-G][#b]?$/.test(ch);
+  if(!bare&&/(?:maj|min|dim|aug|add)$/.test(ch)&&rest) return null;     // Dim, Added...
+  if(/m$/.test(ch)&&/^[bpmn]/i.test(rest)) return null;                   // Embrace, Empty...
+  if(o.mid){                                                              // majúscula enmig d'una paraula
+    return (rest===''||/^[a-zà-öø-ÿ'’.,;:!?)"]/.test(rest))?ch:null;
+  }
+  if(rest===''){
+    if(se>=0) return chainOK(s.slice(se+1))?ch:null;
+    return (!bare||o.chain)?ch:null;
+  }
+  if(/^[a-zà-öø-ÿ]/.test(rest)){
+    const low=rest.replace(/[^a-zà-öø-ÿ]/g,'');
+    if(!bare) return (low.length>=2&&VOWEL.test(low))?ch:null;           // Asusmama, Dsusfree
+    const w=rest.toLowerCase().replace(/[^a-zà-öø-ÿ']/g,'');
+    const full=(ch+rest).toLowerCase().replace(/[^a-zà-öø-ÿ']/g,'');
+    const okLen=w.length>=3||TWO.has(w);
+    return (o.glue2&&!o.first&&okLen&&COMMON.has(w)&&!COMMON.has(full))?ch:null;   // Deven
+  }
+  if(/^['’.,;:!?)"]/.test(rest)) return (!bare||o.glue2||o.chain)?ch:null;
+  return null;
+}
+/* talla una paraula en trossos: text, acords i "sus" solts */
+function scanTok(t,o){
+  const ops=[];let i=0,ts=0,chain=false,ws=-1;
+  const flush=to=>{if(to>ts)ops.push({k:'t',s:t.slice(ts,to),from:ts,to})};
+  while(i<t.length){
+    const c=t[i],prev=i?t[i-1]:'';
+    const boundary=(i===0||prev==='-'||i===ws);
+    /* "sus" solt davant d'una paraula */
+    if(boundary&&t.startsWith('sus',i)){
+      const rest=t.slice(i+3);
+      const run=(t.slice(i).match(/^[A-Za-zÀ-ÿ'’]+/)||[''])[0].toLowerCase().replace(/’/g,"'");
+      if(!STOPSUS.some(p=>run.startsWith(p))){
+        const letters=rest.replace(/[^A-Za-zÀ-ÿ].*$/,'');
+        const wordAfter=letters.length>=2&&(/^[A-Z]/.test(letters)||VOWEL.test(letters));
+        const chainAfter=rest[0]==='-'&&chainOK(rest.slice(1));
+        if(wordAfter||chainAfter||(rest===''&&chain)){
+          flush(i);ops.push({k:'s',from:i,to:i+3,free:(!wordAfter)});
+          i+=3;ts=i;chain=true;ws=i;continue;
+        }
+      }
+    }
+    /* acord */
+    if(/[A-G]/.test(c)){
+      let o2=null;
+      if(boundary) o2={glue2:o.glue2,first:o.first&&i===0,chain,mid:false};
+      else if(/[a-zà-öø-ÿ]/.test(prev)&&!/^(?:Mc|Mac)$/.test(t.slice(0,i))) o2={glue2:o.glue2,first:false,chain:false,mid:true};
+      if(o2){
+        const ch=bChord(t.slice(i),o2);
+        if(ch){
+          flush(i);
+          ops.push({k:'c',tok:ch,from:i,to:i+ch.length,def:(!/^[A-G][#b]?$/.test(ch))||o2.mid});
+          i+=ch.length;ts=i;chain=true;continue;
+        }
+      }
+    }
+    /* guionets que només serveixen per enganxar acords */
+    if(c==='-'){
+      const nx=t.slice(i+1);
+      if(ts===i&&chain){ts=i+1;i++;continue}
+      if(/^[A-G]/.test(nx)&&bChord(nx,{glue2:o.glue2,first:false,chain:false,mid:false})){flush(i);ts=i+1;i++;continue}
+      if(/^sus(?=$|-|[A-Z])/.test(nx)){flush(i);ts=i+1;i++;continue}
+    }
+    chain=false;i++;
+  }
+  flush(t.length);
+  return ops;
+}
+/* acord (sense qualitat) de la línia de sobre, proper a la posició r d'un "sus" solt */
+function nearIdx(pc,r){
+  let best=-1,bd=99;
+  pc.forEach((c,i)=>{
+    if(!/^[A-G][#b]?$/.test(c.tok)) return;
+    const d=c.col-r;
+    if(d>=-2&&d<=4){const sc=Math.abs(d-1);if(sc<bd){bd=sc;best=i}}
+  });
+  return best;
+}
+/* raw = línia de lletra amb trossos d'acords; P = línia d'acords de sobre (o null) */
+function fuseLine(raw,P){
+  const toks=[];{const re=/\S+/g;let m;while((m=re.exec(raw)))toks.push({s:m[0],r:m.index});}
+  const pc=[];if(P){const re=/\S+/g;let m;while((m=re.exec(P)))pc.push({col:m.index,tok:m[0]});}
+  let scans=toks.map((tk,ix)=>scanTok(tk.s,{glue2:false,first:ix===0}));
+  const defs=scans.reduce((n,ops)=>n+ops.filter(o=>(o.k==='c'&&o.def)||o.k==='s').length,0);
+  if(defs>=2||(defs>=1&&pc.length)) scans=toks.map((tk,ix)=>scanTok(tk.s,{glue2:true,first:ix===0}));
+  let clean='',changed=false;
+  const emb=[],maps=[];
+  toks.forEach((tk,ti)=>{
+    const ops=scans[ti];
+    ops.forEach(o=>{
+      if(o.k==='s'){
+        if(!o.free){const ix=nearIdx(pc,tk.r+o.from);if(ix>=0)pc[ix].tok+='sus'}
+        changed=true;
+      }else if(o.k==='c') changed=true;
+    });
+    const hasT=ops.some(o=>o.k==='t');
+    if(hasT&&clean&&!clean.endsWith(' ')) clean+=' ';
+    const c0=clean.length,cm=[];
+    const at=new Array(tk.s.length).fill(null);
+    ops.forEach(o=>{for(let q=o.from;q<o.to;q++)at[q]=o});
+    const trail=[];
+    for(let q=0;q<tk.s.length;q++){
+      cm[q]=clean.length-c0;
+      const o=at[q];
+      if(!o) continue;
+      if(o.k==='t') clean+=tk.s[q];
+      else if(o.k==='c'&&q===o.from){
+        const after=ops.some(x=>x.k==='t'&&x.from>=o.to);
+        if(after) emb.push({pos:clean.length,tok:o.tok});
+        else trail.push(o.tok);
+      }
+    }
+    cm[tk.s.length]=clean.length-c0;
+    if(trail.length){
+      const p=clean.length+((clean&&!clean.endsWith(' '))?1:0);       // principi de la paraula següent
+      trail.forEach(t=>emb.push({pos:p,tok:t}));
+    }
+    maps.push({r:tk.r,len:tk.s.length,c0,cm});
+  });
+  clean=clean.replace(/\s+$/,'');
+  if(!changed&&!emb.length) return null;
+  const toClean=r=>{
+    for(const m of maps){
+      if(r<m.r) return m.c0;
+      if(r<=m.r+m.len) return m.c0+m.cm[Math.min(r-m.r,m.len)];
+    }
+    return clean.length;
+  };
+  const Q=pc.map(c=>({pos:toClean(c.col),tok:c.tok}));
+  const E=emb.map(e=>({pos:e.pos,tok:e.tok,used:false})),keep=[];
+  Q.forEach(q=>{                                   // acords de la línia de sobre i de dins la lletra: sense duplicats
+    const j=E.findIndex(e=>!e.used&&Math.abs(e.pos-q.pos)<=4&&e.tok[0]===q.tok[0]&&(e.tok.startsWith(q.tok)||q.tok.startsWith(e.tok)));
+    if(j<0){keep.push(q);return}
+    E[j].used=true;
+    if(q.tok.length>E[j].tok.length)E[j].tok=q.tok;
+  });
+  const all=keep.concat(E).sort((a,b)=>a.pos-b.pos);
+  let ch='';
+  for(const c of all){const p=Math.max(c.pos,ch?ch.length+1:0);ch=ch.padEnd(p,' ')+c.tok}
+  return {chord:ch,lyric:clean};
+}
+
+/* ---------- indicacions (intro, solo, 2x...): en cursiva, no són lletra ---------- */
+const N_STRONG=/\b(?:intro|outro|solo|riffs?|interlude|instrumental|capo|fret|bar\s*chords?|chord\s*breaks?|tacet|arpeggios?|tremolo|ad[\s-]?lib|fade[\s-]?out|ritardando|repeat|second\s+guitar|lead\s+guitar|x\s?\d+|\d+\s?x)\b/i;
+const N_START=/^(?:intro|outro|solo|riffs?|interlude|instrumental|capo|repeat|play|tacet|fade|bar\s*chords?|chord\s*break|second\s+guitar|lead\s+guitar|guitar\s+(?:solo|riff)|x\s?\d|\d+\s?x)\b/i;
+const SECW=/^\s*[\[(]?\s*(?:verse|chorus|pre-?chorus|bridge|intro|outro|interlude|instrumental|solo|refrain|coda|estrofa|tornada|estribillo|introducci[oó])(?:\s*(?:\d+|x\d+|[ivx]{1,3}))*\s*[\])]?\s*:?\s*$/i;
+function isSection(l){
+  if(SECW.test(l)) return true;
+  const m=l.match(/^\s*\[([^\]]{1,30})\]\s*$/);
+  return !!m&&!CH.test(m[1].trim());
+}
+/* retorna el text de la indicació si la línia ho és, o null */
+function noteText(l){
+  const t=String(l||'').trim();
+  if(!t) return null;
+  if(/^#/.test(t)) return t.replace(/^#+\s*/,'');
+  if(SECW.test(t)||isChordLine(t)) return null;
+  const lab=t.match(/^[^\s:]{1,15}:\s+(\S.*)$/);
+  if(lab&&isChordLine(lab[1])) return null;
+  if(!N_STRONG.test(t)) return null;
+  const inner=t.replace(/^[(\[]\s*/,'').replace(/\s*[)\]]$/,'').trim();
+  const wrapped=/^[(\[]/.test(t)||/[)\]]$/.test(t);
+  const caps=t===t.toUpperCase()&&/[A-Z]{3}/.test(t);
+  return (wrapped||caps||N_START.test(inner))?inner:null;
+}
+
 /* ---------- neteja: elimina el que no és lletra ni acords + detecta títol i autor ---------- */
 const LABEL_T=/^\s*(?:t[ií]tol|title|song|can[cç]ó|canci[oó]n|nom)\s*[:：]\s*(.+?)\s*$/i;
 const LABEL_A=/^\s*(?:autor(?:a)?|artista?|author|by|int[èe]rpret|cantant|band|grup|group|composer|compositor|written\s+by|lletra\s+i\s+m[uú]sica)\s*[:：]\s*(.+?)\s*$/i;
 const CHORDS_BY=/^(.{1,80}?)\s+(?:chords?(?:\s*&\s*lyrics)?|tabs?|acordes|acords|cifra|lyrics?)\s+(?:by|de|per)\s+(.{1,60})$/i;
-/* línies "etiqueta: valor" que no són cançó */
 const LABEL_J=/^\s*(?:key|tom|tonalitat|tonalidad|tono|capo|tuning|afinaci[oó]n?|tempo|bpm|difficulty|dificultat|dificultad|rating|votes?|views?|hits|album|[àa]lbum|year|any|a[ñn]o|genre|g[eè]nere|g[eé]nero|submitted\s+by|updated|last\s+update(?:d)?|last\s+edit(?:ed)?|transcribed\s+by|chords?\s+by|tabs?\s+by|strumming|chords?\s+used|acordes|acords|date|data|fecha|time\s+signature|comp[aà]s)\s*[:：]\s*.*$/i;
-/* línies que són només un botó o un menú de la web */
 const J_WORD=/^\s*(?:chords?|tabs?|lyrics?|letra|acordes|acords|cifra|share|print|download|edit|favou?rites?|autoscroll|auto-?scroll|transpose|simplify|tuner|metronome|capo|report|reportar|compartir|imprimir|baixar|descargar|advertisement|ads?|sponsored|related|comments?|comentaris|rate|pro|premium|official|show\s+chords|hide\s+chords|chord\s+diagrams?|chord\s+chart|more|less|show\s+all|play|ver\s+v[ií]deo|aprender|tablature|ultimate[\s-]*guitar|cifra\s*club|chordie|songsterr|e-?chords)\s*$/i;
 const J_MISC=[
- /^\s*[A-Ga-g]?[#b]?\s*\|[-\dhpbrxs\/\\~()^|*.\s]{4,}$/,                                   // tablatura
- /^\s*[xX\d]{6}\s*$/,                                                                      // digitació d'un acord
+ /^\s*[A-Ga-g]?[#b]?\s*\|[-\dhpbrxs\/\\~()^|*.\s]{4,}$/,
+ /^\s*[xX\d]{6}\s*$/,
  /^\s*capo\s*(?:on\s*)?(?:the\s*)?\d+\w*\s*(?:fret)?\s*$/i,
  /^\s*key\s+of\s+\S+\s*$/i,
  /^\s*(?:bpm|tempo)\s*[=:]?\s*\d+\s*(?:bpm)?\s*$/i,
  /^\s*(?:standard|drop\s*[a-g]#?|half[\s-]*step\s+down)\s+tuning\s*$/i,
  /^\s*(?:submit|send|report)\s+(?:a\s+)?(?:correction|corrections|problem|error)\b.*$/i,
  /^\s*(?:chords?|acordes|acords)\s+(?:for|de|of)\s+.{1,80}$/i,
- /(?:https?:\/\/|www\.|@[\w-]+\.\w{2,}|\b[a-z0-9-]+\.(?:com|net|org|es|cat|br|io|fm)\b)/i, // enllaços i correus
+ /(?:https?:\/\/|www\.|@[\w-]+\.\w{2,}|\b[a-z0-9-]+\.(?:com|net|org|es|cat|br|io|fm)\b)/i,
  /(?:©|\(c\)\s*\d{4}|copyright|all\s+rights\s+reserved|todos\s+los\s+derechos|tots\s+els\s+drets)/i
 ];
 function isJunk(l){
@@ -223,7 +418,7 @@ function isJunk(l){
   return LABEL_J.test(l)||J_WORD.test(l)||J_MISC.some(r=>r.test(l));
 }
 function isContentLine(l){
-  return isChordLine(l)||isSection(l)||/\[[A-G][^\]]*\]/.test(l)||!!parseMixed(l,false);
+  return isChordLine(l)||isSection(l)||/\[[A-G][^\]]*\]/.test(l)||GARBLE.test(l)||!!parseMixed(l,false);
 }
 function cleanTitle(s){
   s=String(s||'').trim().replace(/^(?:chords?|tabs?|acordes?|acords?|cifra|lyrics?)\s+(?:for|de|of)\s+/i,'');
@@ -234,15 +429,14 @@ function cleanTitle(s){
   }while(s!==p);
   return s.replace(/^["“”'‘’]+|["“”'‘’]+$/g,'').replace(/[\s:,;-]+$/,'').trim();
 }
-/* mira la capçalera (el que hi ha abans de la primera línia d'acords) i en treu el títol i l'autor */
 function extractMeta(lines){
   const meta={},drop=new Set();
   const isDir=l=>/^\s*\{.*\}\s*$/.test(l);
-  const cs=lines.findIndex(l=>l.trim()&&!isJunk(l)&&!isDir(l)&&isContentLine(l));
+  const cs=lines.findIndex(l=>l.trim()&&!isJunk(l)&&!isDir(l)&&noteText(l)===null&&isContentLine(l));
   const zoneEnd=cs>=0?cs:Math.min(lines.length,25);
   const idx=[];
   for(let i=0;i<zoneEnd;i++) if(lines[i].trim()&&!isDir(lines[i])) idx.push(i);
-  const dropZone=cs>=0&&idx.length<=10;      // capçalera curta: tot el que hi ha abans dels acords es descarta
+  const dropZone=cs>=0&&idx.length<=10;
   const cand=[];
   for(const i of idx){
     const l=lines[i].trim(); let m;
@@ -253,7 +447,7 @@ function extractMeta(lines){
       if(!meta.artist)meta.artist=cleanTitle(m[2]);
       drop.add(i);continue;
     }
-    if(isJunk(lines[i])){drop.add(i);continue}
+    if(isJunk(lines[i])||noteText(lines[i])!==null){drop.add(i);continue}
     if(dropZone){
       if((m=l.match(/^[Bb]y\s+([A-ZÀ-Þ][^,.;!?]{1,40})$/))){if(!meta.artist)meta.artist=cleanTitle(m[1]);drop.add(i);continue}
       drop.add(i);
@@ -263,7 +457,7 @@ function extractMeta(lines){
   if(dropZone&&cand.length){
     if(!meta.title){
       const c0=cand.shift();
-      const m=c0.match(/^(.{1,70}?)\s+[-–—]\s+(.{1,50})$/);      // "Títol - Autor"
+      const m=c0.match(/^(.{1,70}?)\s+[-–—]\s+(.{1,50})$/);
       if(m){meta.title=cleanTitle(m[1]);if(!meta.artist)meta.artist=cleanTitle(m[2]);}
       else meta.title=cleanTitle(c0);
     }
@@ -275,7 +469,7 @@ function extractMeta(lines){
 }
 
 function fixText(t){
-  const meta={}; let n=0,removed=0;
+  const meta={}; let n=0,removed=0,notes=0;
   t=t.replace(/\r\n?/g,'\n').replace(/\u00a0/g,' ').replace(/\t/g,'    ').replace(/\[\/?(?:ch|tab)\]/gi,'');
   let lines=t.split('\n').map(l=>l.replace(/\s+$/,''));
   // 1) títol i autor de la capçalera
@@ -289,40 +483,51 @@ function fixText(t){
   });
   lines=kept;
   // 3) acords a sobre de la lletra
-  const plain=l=>!isChordLine(l)&&!SKIP.test(l)&&!/\[[^\]]+\]/.test(l);
+  const plain=l=>!isChordLine(l)&&!SKIP.test(l)&&!/\[[^\]]+\]/.test(l)&&!GARBLE.test(l)&&noteText(l)===null;
   const lenient=lines.filter(l=>plain(l)&&parseMixed(l,false)).length>=2;
-  const out=[];
+  const out=[]; let lastChord=false;
   for(const line of lines){
     const d=line.match(/^\s*\{\s*([a-z_]+)\s*:?\s*(.*?)\s*\}\s*$/i);   // directives ChordPro
     if(d){
       const k=d[1].toLowerCase(),v=d[2];
       if(k==='title'||k==='t') meta.title=v;
       else if(k==='artist'||k==='subtitle'||k==='st') meta.artist=v;
-      else if(['comment','c','ci','comment_italic'].includes(k)) out.push(v);
+      else if(['comment','c','ci','comment_italic'].includes(k)){out.push('# '+v);notes++}
+      lastChord=false;
       continue;
     }
-    if(isChordLine(line)||SKIP.test(line)){out.push(line);continue}
+    if(isChordLine(line)||SKIP.test(line)){out.push(line);lastChord=isChordLine(line);continue}
+    const nt=noteText(line);
+    if(nt!==null){if(nt!==''){out.push('# '+nt);notes++}lastChord=false;continue}
     if(/\[[^\]]+\]/.test(line)){
       const r=inlineToAbove(line);
-      if(r){out.push(...r);n++;continue}
+      if(r){out.push(...r);n++;lastChord=false;continue}
     }
     const lab=line.match(/^\s*([^\s:]{1,15}:)\s+(\S.*)$/);               // "Intro: C G Am F"
-    if(lab&&isChordLine(lab[2])){out.push(lab[1],lab[2]);n++;continue}
+    if(lab&&isChordLine(lab[2])){out.push(lab[1],lab[2]);n++;lastChord=false;continue}
+    if(GARBLE.test(line)){                                                // còpia malmesa
+      const P=lastChord?out[out.length-1]:null;
+      const r=fuseLine(line,P);
+      if(r){
+        if(P) out.pop();
+        if(r.chord.trim()) out.push(r.chord);
+        if(r.lyric.trim()) out.push(r.lyric);
+        n++; lastChord=!r.lyric.trim()&&!!r.chord.trim(); continue;
+      }
+    }
     const r=parseMixed(line,lenient);
-    if(r){out.push(...r);n++;continue}
-    out.push(line);
+    if(r){out.push(...r);n++;lastChord=false;continue}
+    out.push(line); lastChord=false;
   }
   const text=out.join('\n').replace(/\n{3,}/g,'\n\n').replace(/^\n+|\n+$/g,'');
-  return {text,meta,n,removed};
+  return {text,meta,n,removed,notes};
+}
+/* hi ha res a netejar o convertir en aquest text? */
+function needsFix(t){
+  return String(t||'').split('\n').some(l=>/\[[A-G][^\]]*\]/.test(l)||(!isChordLine(l)&&GARBLE.test(l))||(!/^\s*#/.test(l)&&noteText(l)!==null));
 }
 
 /* ---------- dibuix de la cançó: acords a sobre de la lletra ---------- */
-const SECW=/^\s*[\[(]?\s*(?:verse|chorus|pre-?chorus|bridge|intro|outro|interlude|instrumental|solo|refrain|coda|estrofa|tornada|estribillo|introducci[oó])(?:\s*(?:\d+|x\d+|[ivx]{1,3}))*\s*[\])]?\s*:?\s*$/i;
-function isSection(l){
-  if(SECW.test(l)) return true;
-  const m=l.match(/^\s*\[([^\]]{1,30})\]\s*$/);
-  return !!m&&!CH.test(m[1].trim());
-}
 function segHTML(c,tx){
   return '<span class="sg"><span class="ch">'+(c?esc(c):'&nbsp;')+'</span><span class="tx">'+(tx?esc(tx):'&nbsp;')+'</span></span>';
 }
@@ -353,13 +558,18 @@ function sheetHTML(text,n,useFlat){
     blank=false;
     if(isChordLine(l)){
       const nx=L[i+1];
-      if(nx!==undefined&&nx.trim()&&!isChordLine(nx)&&!isSection(nx)){
+      if(nx!==undefined&&nx.trim()&&!isChordLine(nx)&&!isSection(nx)&&noteText(nx)===null){
         out+=pairHTML(l,nx,n,useFlat); i+=2; continue;
       }
       out+=chordOnlyHTML(l,n,useFlat); i++; continue;
     }
     if(isSection(l)){
       out+='<div class="sec">'+esc(l.trim().replace(/^[\[(]\s*/,'').replace(/\s*[\])]$/,'').replace(/:$/,''))+'</div>'; i++; continue;
+    }
+    const nt=noteText(l);
+    if(nt!==null){
+      if(nt!=='') out+='<div class="note">'+esc(nt)+'</div>';
+      i++; continue;
     }
     out+='<div class="ln pl">'+esc(l)+'</div>'; i++;
   }
@@ -374,7 +584,7 @@ function fitSong(){
   sh.style.columnCount=1;
   const W=sh.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
   const gap=parseFloat(cs.columnGap)||32;
-  let mx=parseFloat(cs.fontSize)*14;                 // amplada mínima d'una columna
+  let mx=parseFloat(cs.fontSize)*14;
   sh.querySelectorAll('.lw').forEach(e=>{mx=Math.max(mx,e.getBoundingClientRect().width)});
   if(mx>W) sh.classList.add('wrap');
   const maxCols=Math.max(1,Math.min(3,Math.floor((W+gap)/(mx+gap))));
@@ -437,6 +647,15 @@ function importTxt(inp){
 
 function songView(){
   const s=db.songs.find(x=>x.id===view.id); if(!s){go({name:'songs'});return}
+  if(needsFix(s.text)){                                   // cançons desades abans: es posen al dia soles
+    const f=fixText(s.text);
+    if(f.text.trim()&&f.text!==s.text){
+      s.text=f.text;
+      if(f.meta.title&&(!s.title||s.title==='Sense títol')) s.title=f.meta.title;
+      if(f.meta.artist&&!s.artist) s.artist=f.meta.artist;
+      save();
+    }
+  }
   const lst=view.list&&db.lists.find(l=>l.id===view.list);
   let nav='';
   if(lst){
@@ -496,7 +715,7 @@ function editView(){
    ${isNew?`<div class="box"><b>Busca la cançó:</b> (s'obre en una pestanya nova; copia el text i enganxa'l a sota)
      <div class="row" id="links"></div></div>`:''}
    <label>Lletra amb els acords a sobre (text pla)</label>
-   <div id="note" class="note noprint" style="display:none"></div>
+   <div id="note" class="nt noprint" style="display:none"></div>
    <textarea id="x" onpaste="onPaste(event)" placeholder="   Am        F
 Aquí va la lletra...">${esc(s.text)}</textarea>
    <div class="row">
@@ -504,7 +723,7 @@ Aquí va la lletra...">${esc(s.text)}</textarea>
     <button class="btn alt" onclick="${view.id?`go({name:'song',id:'${view.id}'})`:`go({name:'songs'})`}">Cancel·la</button>
     ${view.id?`<button class="btn red" onclick="delSong('${view.id}')">Esborra</button>`:''}
    </div>
-   <p><small>En enganxar el text d'una web, el programa deixa només la lletra i els acords (treu capo, tonalitat, enllaços, botons, tablatures…), posa els acords a sobre de la lletra i omple el títol i l'autor si estan buits. Els acords han d'estar en notació anglesa (C, D, E, F, G, A, B).</small></p>`;
+   <p><small>En enganxar el text d'una web, el programa deixa la lletra i els acords (acords a sobre de la lletra, també si venien trencats o enganxats a les paraules), treu capo, tonalitat, enllaços i botons, i omple el títol i l'autor si estan buits. Les indicacions (intro, solo, 2x…) es guarden amb un <code>#</code> al davant i es veuen en cursiva; si en vols afegir una, escriu <code># el text</code> en una línia. Els acords han d'estar en notació anglesa (C, D, E, F, G, A, B).</small></p>`;
   if(isNew)updLinks();
 }
 function onPaste(e){
@@ -532,6 +751,7 @@ function onPaste(e){
 function showNote(r){
   const parts=[];
   if(r.n) parts.push('✔ '+r.n+' línies amb els acords posats a sobre de la lletra.');
+  if(r.notes) parts.push('✔ '+r.notes+' indicacions (intro, solo…) posades en cursiva.');
   if(r.removed) parts.push('✔ '+r.removed+' línies que no eren lletra ni acords eliminades.');
   if(r.meta.title||r.meta.artist){
     const T=$('#t').value.trim(),A=$('#a').value.trim();
@@ -566,7 +786,9 @@ function updLinks(){
   ].map(([n,u])=>`<a class="btn alt" style="text-decoration:none" target="_blank" rel="noopener" href="${u}">${n}</a>`).join('');
 }
 function saveSong(id){
-  const o={title:$('#t').value.trim()||'Sense títol',artist:$('#a').value.trim(),text:$('#x').value.replace(/\r/g,'')};
+  let text=$('#x').value.replace(/\r/g,'');
+  if(needsFix(text)){const f=fixText(text);if(f.text.trim())text=f.text}
+  const o={title:$('#t').value.trim()||'Sense títol',artist:$('#a').value.trim(),text};
   if(id){Object.assign(db.songs.find(s=>s.id===id),o)}else{id=uid();db.songs.push({id,...o})}
   save();go({name:'song',id});
 }
