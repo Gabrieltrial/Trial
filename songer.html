@@ -1,871 +1,900 @@
-<!DOCTYPE html>
-<html lang="ca">
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cançoner</title>
-<style>
- *{box-sizing:border-box}
- body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;margin:0;background:#f6f4ef;color:#222}
- header{background:#2b3a42;color:#fff;padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
- header h1{font-size:18px;margin:0 16px 0 0}
- header button{background:#3d5360;color:#fff;border:0;padding:8px 14px;border-radius:6px;cursor:pointer}
- header button.on{background:#e0a030;color:#222}
- main{margin:0 auto;padding:12px 16px}
- button,select,input,textarea{font:inherit}
- button{cursor:pointer}
- .btn{background:#2b3a42;color:#fff;border:0;padding:7px 12px;border-radius:6px}
- .btn.alt{background:#ddd;color:#222}
- .btn.red{background:#b33}
- .btn:disabled{opacity:.4}
- input[type=text],textarea,select{width:100%;padding:8px;border:1px solid #bbb;border-radius:6px;background:#fff}
- textarea{font-family:ui-monospace,Menlo,Consolas,monospace;min-height:380px;white-space:pre;overflow:auto}
- .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
- .item{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px 12px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;gap:8px}
- .item a{cursor:pointer;flex:1}
- .item small{color:#777}
- .box{background:#fff;border:1px dashed #999;border-radius:8px;padding:10px;margin:10px 0}
- .nt{background:#e7f3e7;border:1px solid #9c9;border-radius:6px;padding:6px 10px;margin:8px 0;font-size:14px;line-height:1.5}
- .nt a{color:#225;text-decoration:underline;cursor:pointer;margin-left:8px}
- label{display:block;margin:10px 0 3px;font-weight:600}
-
- /* ---- vista de la cançó ---- */
- .bar{margin:0 0 8px}
- .bar .row{margin:4px 0}
- .ttl{font-size:19px;margin:2px 0}
- .ttl span{color:#666;font-size:15px;margin-left:8px}
- .tb{background:#1f6f5c;font-weight:700;padding:9px 14px}
- .trind{font-weight:700;min-width:105px;text-align:center}
- .trind.act{color:#d9480f}
- .sep{width:10px}
- .btn.sz{min-width:36px;padding:4px 8px;line-height:1.2;font-weight:700}
- .btn.sz.on{background:#2b3a42;color:#fff}
- .bar select{width:auto;padding:6px}
- .bar label{display:inline;margin:0;font-weight:400}
- .onlyprint{display:none}
-
- .sheet{
-   --chord:#d9480f;                                   /* color dels acords */
-   --lyric:Georgia,"Times New Roman",Times,serif;     /* tipus de lletra de la cançó (només la lletra) */
-   font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
-   font-size:var(--fs,19px);line-height:1.3;color:#1b1b1b;
-   background:#fff;border:1px solid #ddd;border-radius:10px;padding:14px 18px;
-   column-gap:2.4em;column-rule:1px solid #e6e1d6;
- }
- .ln{break-inside:avoid;page-break-inside:avoid;-webkit-column-break-inside:avoid;margin:0 0 .6em}
- .lw{white-space:nowrap}
- .sheet.wrap .lw{white-space:normal}
- .sg{display:inline-block}
- .ch{display:block;white-space:pre;
-   font-family:ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace;
-   font-weight:800;font-size:calc(var(--fs,19px)*1.2);line-height:1.15;color:var(--chord);padding-right:.5em}
- .tx{display:block;white-space:pre;font-family:var(--lyric);font-size:var(--fs,19px);line-height:1.25}
- .ln.co .ch.inl{display:inline-block;padding-right:0;margin-right:1.1em}
- .ln.pl{white-space:pre-wrap;font-family:var(--lyric);font-size:var(--fs,19px)}
- .sec{font-weight:700;text-transform:uppercase;font-size:.78em;letter-spacing:.08em;color:#5b6b73;margin:1em 0 .4em;break-after:avoid;-webkit-column-break-after:avoid}
- .note{font-style:italic;font-size:.82em;color:#6b6f76;margin:1em 0 1em .2em;padding-left:.7em;border-left:3px solid #d8d2c4;break-inside:avoid;-webkit-column-break-inside:avoid}
- .sp{height:.5em}
-
- @media print{
-  header,.noprint{display:none}
-  .onlyprint{display:block}
-  .sheet{border:0;padding:0}
- }
-</style>
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title></title>
+  <meta name="Generator" content="Cocoa HTML Writer">
+  <meta name="CocoaVersion" content="2575.5">
+  <style type="text/css">
+    body {background-color: #f4f1eb}
+    p.p2 {margin: 0.0px 0.0px 0.0px 0.0px; text-align: center; font: 12.0px 'Helvetica Neue'; color: #ffffff; -webkit-text-stroke: #ffffff; background-color: #2f414d}
+    p.p3 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px 'Helvetica Neue'; color: #1a1a1a; -webkit-text-stroke: #1a1a1a; min-height: 15.0px}
+    p.p4 {margin: 0.0px 0.0px 0.0px 0.0px; font: 12.0px 'Helvetica Neue'; color: #1a1a1a; -webkit-text-stroke: #1a1a1a}
+    span.s1 {font: 18.0px '.Apple Color Emoji UI'; font-kerning: none; background-color: #212c33}
+    span.s2 {font-kerning: none; background-color: #212c33}
+    span.s3 {font-kerning: none}
+    span.s4 {font: 12.0px 'Hiragino Sans'; font-kerning: none}
+  </style>
 </head>
 <body>
-<header>
- <h1>🎸 Cançoner</h1>
- <button id="n-songs" onclick="go({name:'songs'})">Cançons</button>
- <button id="n-lists" onclick="go({name:'lists'})">Llistes</button>
- <button onclick="exportDb()">Exporta cançons</button>
- <button onclick="document.getElementById('imp').click()">Importa cançons</button>
- <button onclick="downloadApp()">⬇ Descarrega</button>
- <input type="file" id="imp" accept=".json" hidden onchange="importDb(this)">
-</header>
-<main id="app"></main>
-
-<script>
-const NS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-const NF=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
-const IDX={C:0,'C#':1,Db:1,D:2,'D#':3,Eb:3,E:4,F:5,'F#':6,Gb:6,G:7,'G#':8,Ab:8,A:9,'A#':10,Bb:10,B:11};
-/* acord sol (token sencer) */
-const CH=/^[A-G][#b]?(?:maj|min|m|M|dim|aug|sus|add|\+|°|ø|-)?(?:[0-9]+|(?:sus|add|maj|dim|aug|alt|b|#|-|\+)[0-9]*)*(?:\/[A-G][#b]?)?$/;
-const NEUTRAL=/^(\||\|\||x\d+|\(?x\d+\)?|-|N\.C\.?)$/;
-const SIZES=[15,19,24];   // mides de la lletra (px): petita, mitjana, gran
-
-let db={songs:[],lists:[]};
-try{db=JSON.parse(localStorage.getItem('cansoner'))||db}catch(e){}
-const save=()=>{try{localStorage.setItem('cansoner',JSON.stringify(db))}catch(e){alert('No es pot desar al navegador')}};
-let prefs={size:1,cols:0,flat:false};
-try{Object.assign(prefs,JSON.parse(localStorage.getItem('cansoner_prefs'))||{})}catch(e){}
-const savePrefs=()=>{try{localStorage.setItem('cansoner_prefs',JSON.stringify(prefs))}catch(e){}};
-const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const $=s=>document.querySelector(s);
-
-let view={name:'songs'}, shift=0, prevTxt=null, prevTA=null;
-
-/* ---------- acords: transport ---------- */
-function isChordLine(l){
-  const t=l.trim(); if(!t) return false;
-  const toks=t.split(/\s+/);
-  return toks.every(x=>CH.test(x)||NEUTRAL.test(x)) && toks.some(x=>CH.test(x));
-}
-function tChord(tok,n,useFlat){
-  const m=tok.match(/^([A-G][#b]?)([^\/]*)(?:\/([A-G][#b]?))?$/);
-  if(!m) return tok;
-  const arr=useFlat?NF:NS;
-  const tr=r=>arr[((IDX[r]+n)%12+12)%12];
-  return tr(m[1])+m[2]+(m[3]?'/'+tr(m[3]):'');
-}
-const chordTok=(t,n,useFlat)=>((CH.test(t)&&n)?tChord(t,n,useFlat):t);
-
-/* ---------- acords dins la línia -> acords a sobre ---------- */
-const AMB=new Set(['A','Am','Em']);                       // també poden ser paraules
-const VOWEL=/[aeiouyáéíóúàèìòùïüöäëâêîôû]/i;
-const ONSET={B:'lr',C:'hlr',D:'rw',F:'lr',G:'hlnrw'};      // 2a lletra consonant possible en una paraula normal
-const STOP=new Set('del dels cel cat bat cup bit fit din gin con don bin fin eat gas bus gun fun bun ben den bel gel bon for cor dor can ban dan fan'.split(' '));
-const LEAD=new Set("and all as at an are is in it if into on of out over up under us ask after again always another around away any am also almost alone about above en el un una es al amb i'm i'll i've i'd".split(' '));
-const LEAD2=new Set([...LEAD,...'even ever every only one too you your we he she him his the to for but or so not no now then when how who what where here there just still can got get go from with that this they them our'.split(' ')]);
-const SKIP=/^\s*(?:key|capo|tuning|tono|tonalidad|tonalitat|afinaci[oó]|bpm|tempo|artist|autor|title|t[ií]tol|album|[àa]lbum)\b/i;
-
-/* acord + paraula enganxats: "Csitting", "Gmorning", "Cmaj7sun", "C#and", "Asushello" */
-const GLUE=new RegExp(
- '^([A-G](?:#|b(?=[\\dm/]))?'+
- '(?:(?:maj|min|dim|aug|sus|add)(?=\\d)|sus(?=[a-zà-ÿ]{2}))?'+
- '(?:m(?![aeiouyáéíóúàèìòùïüöä]))?'+
- '\\d{0,2}'+
- '(?:(?:[#b+-]|sus|add|alt)\\d{1,2})*'+
- '(?:/[A-G]#?)?)'+
- '([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’-]*[^\\sA-Za-zÀ-ÿ]*)$');
-
-function glueKind(tok){
-  const m=tok.match(GLUE); if(!m) return null;
-  const pre=m[1], rem=m[2];
-  const word=rem.replace(/[^A-Za-zÀ-ÿ'’-]+$/,'');
-  const low=word.replace(/[^a-zà-öø-ÿ]/g,'');
-  if(low.length<2||!VOWEL.test(low)) return null;
-  if((pre==='Am'||pre==='Em')&&/^[bpmn]/i.test(rem)) return null;
-  const key=tok.toLowerCase().replace(/’/g,"'").replace(/[^a-zà-öø-ÿ']+$/,'');
-  const stop=STOP.has(key);
-  let dec=pre.length>1;
-  if(!dec){
-    const c=rem[0];
-    if(/[A-ZÀ-Þ]/.test(c)) dec=/[a-zà-öø-ÿ]/.test(rem.slice(1));
-    else if(pre!=='A'&&pre!=='E'&&!VOWEL.test(c)) dec=!(ONSET[pre]||'').includes(c.toLowerCase());
-  }
-  const w=word.toLowerCase().replace(/’/g,"'");
-  return {chord:pre,rest:rem,dec,stop,word:w,lead:LEAD.has(w)};
-}
-const core=t=>t.replace(/^[(\[]+/,'').replace(/[)\],.;:]+$/,'');
-
-function parseMixed(line,lenient){
-  const cls=line.trim().split(/\s+/).map(t=>{
-    const c=core(t);
-    if(CH.test(c)) return {t,k:AMB.has(c)?'Samb':'S',chord:c};
-    const g=glueKind(t);
-    if(g&&!g.stop) return {t,k:g.dec?'Gdec':(g.lead?'Glead':'W'),chord:g.chord,rest:g.rest};
-    return {t,k:'W'};
-  });
-  const ev=cls.filter(x=>x.k==='S'||x.k==='Gdec').length;
-  const total=ev+cls.filter(x=>x.k==='Samb').length;
-  const strong=(total>=2&&ev>=1)||cls.some(x=>x.k==='Gdec')||cls.some(x=>x.k==='S'&&x.chord.length>1);
-  if(!ev||(!strong&&!lenient)) return null;
-  const ok=x=>x.k==='S'||x.k==='Gdec'||x.k==='Samb'||x.k==='Glead';
-  if(cls.every(ok)&&cls.every(x=>!x.rest)) return null;
-  let lyr='',ch='';
-  for(const x of cls){
-    if(lyr&&!lyr.endsWith(' ')) lyr+=' ';
-    if(ok(x)){
-      const pos=Math.max(lyr.length,ch?ch.length+1:0);
-      ch=ch.padEnd(pos,' ')+x.chord;
-      if(x.rest) lyr+=x.rest;
-    }else lyr+=x.t;
-  }
-  return lyr.trim()?[ch.trimEnd(),lyr.trimEnd()]:[ch.trimEnd()];
-}
-/* "[Am]Hola [F]món" */
-function inlineToAbove(line){
-  const re=/\[([^\]]+)\]/g;
-  let lyr='',ch='',last=0,m,found=false;
-  while((m=re.exec(line))){
-    const c=m[1].trim();
-    if(!(CH.test(c)||/^N\.?C\.?$/i.test(c))) continue;
-    found=true;
-    lyr+=line.slice(last,m.index); last=re.lastIndex;
-    const pos=Math.max(lyr.length,ch?ch.length+1:0);
-    ch=ch.padEnd(pos,' ')+c;
-  }
-  if(!found) return null;
-  lyr+=line.slice(last);
-  return lyr.trim()?[ch,lyr.replace(/\s+$/,'')]:[ch];
-}
-
-/* ---------- còpies malmeses: acords partits, dins de les paraules, amb guionets i "sus" solts ---------- */
-const EMB=/^[A-G](?:#|b(?=[0-9m\/\-]|$))?(?:maj[79]?|min7?|m(?![aeiouyáéíóúàèìòùïüöäëâêîôû])[679]?|dim7?|aug|sus[24]?|add[29]|[0-9]{1,2})?(?:\/[A-G](?:#|b)?)?/;
-/* paraules habituals: serveixen per saber que el que queda després d'una lletra d'acord és una paraula de debò */
-const COMMON=new Set(`and all are but can did does for from get got had has have her him his how its just let not now off one our out over say she that the their them then there they this too was were what when who why will with you your
-even ever only still away again around always another any about above after also alone almost among along been before being below between both came come could day down each else end every first found give going good great here home into keep kind know last left life like little long look made make many may more most much must never new next night old once other own right same seem should since some such take tell than these thing think those through time under until upon want way well where which while whole without would yes yet
-baby girl boy love heart face eyes hand hands head mind soul sun sky rain wind fire water road town city street house door floor wall window light dark black white red blue green gold silver dream dreams song songs sing sang voice words word name names world people friend friends mother father mama papa man woman men women child children king queen god lord devil angel heaven hell wild free fall falling flying crying dying lying running walking talking living loving looking waiting wanting feeling coming getting making taking giving leaving breaking changing burning turning learning dancing singing playing saying thinking knowing doing being having seeing hearing standing sitting
-cold gold bold gone feel dear bear beat boat coat bite dare care card cart eat ago bit bat cat fit fat gin fin bin cup
-amb com per que més molt sense sobre entre fins cap fer ser estar vull tinc quan també però cada tots totes meva teu seu nostre amor cor vida ara aquí allà sempre mai tot res algú ningú casa mar cel terra nit dia sol lluna vent foc aigua gent llum camí temps
-mundo cielo tierra noche corazón siempre nunca todo nada tiempo`.split(/\s+/));
-const TWO=new Set('in on of to up us my me no so as at is it if or we he be do go an am'.split(' '));
-const STOPSUS=['sustain','sustanc','sustant','suspect','suspen','suspic','suspir','sushi','susan','susie','sussex','suscept'];
-/* línia amb senyals de còpia malmesa */
-const GARBLE=/[a-zà-öø-ÿ][A-G]|\b[A-G](?:#|b)?sus|(?:^|[\s-])sus(?=[A-Za-zÀ-ÿ'’]|[\s-]|$)|\b[A-G](?:#|b)?-[A-G]/;
-
-/* després d'un guionet: continua una cadena d'acords? */
-function chainOK(r){
-  if(/^sus(?=$|-|[A-Za-z])/.test(r)) return true;
-  const m=r.match(EMB); if(!m) return false;
-  const ch=m[0], aft=r[ch.length];
-  if(!/^[A-G][#b]?$/.test(ch)) return true;
-  return aft===undefined||aft==='-';
-}
-/* hi ha un acord al principi de s? (o: s es l'inici d'una part de paraula) → retorna l'acord o null */
-function bChord(s,o){
-  const m=s.match(EMB); if(!m) return null;
-  const ch=m[0], se=s.indexOf('-'), seg=se<0?s:s.slice(0,se);
-  if(ch.length>seg.length) return null;
-  const rest=seg.slice(ch.length), bare=/^[A-G][#b]?$/.test(ch);
-  if(!bare&&/(?:maj|min|dim|aug|add)$/.test(ch)&&rest) return null;     // Dim, Added...
-  if(/m$/.test(ch)&&/^[bpmn]/i.test(rest)) return null;                   // Embrace, Empty...
-  if(o.mid){                                                              // majúscula enmig d'una paraula
-    return (rest===''||/^[a-zà-öø-ÿ'’.,;:!?)"]/.test(rest))?ch:null;
-  }
-  if(rest===''){
-    if(se>=0) return chainOK(s.slice(se+1))?ch:null;
-    return (!bare||o.chain)?ch:null;
-  }
-  if(/^[a-zà-öø-ÿ]/.test(rest)){
-    const low=rest.replace(/[^a-zà-öø-ÿ]/g,'');
-    if(!bare) return (low.length>=2&&VOWEL.test(low))?ch:null;           // Asusmama, Dsusfree
-    const w=rest.toLowerCase().replace(/[^a-zà-öø-ÿ']/g,'');
-    const full=(ch+rest).toLowerCase().replace(/[^a-zà-öø-ÿ']/g,'');
-    const okLen=w.length>=3||TWO.has(w);
-    return (o.glue2&&!o.first&&okLen&&COMMON.has(w)&&!COMMON.has(full))?ch:null;   // Deven
-  }
-  if(/^['’.,;:!?)"]/.test(rest)) return (!bare||o.glue2||o.chain)?ch:null;
-  return null;
-}
-/* talla una paraula en trossos: text, acords i "sus" solts */
-function scanTok(t,o){
-  const ops=[];let i=0,ts=0,chain=false,ws=-1;
-  const flush=to=>{if(to>ts)ops.push({k:'t',s:t.slice(ts,to),from:ts,to})};
-  while(i<t.length){
-    const c=t[i],prev=i?t[i-1]:'';
-    const boundary=(i===0||prev==='-'||i===ws);
-    /* "sus" solt davant d'una paraula */
-    if(boundary&&t.startsWith('sus',i)){
-      const rest=t.slice(i+3);
-      const run=(t.slice(i).match(/^[A-Za-zÀ-ÿ'’]+/)||[''])[0].toLowerCase().replace(/’/g,"'");
-      if(!STOPSUS.some(p=>run.startsWith(p))){
-        const letters=rest.replace(/[^A-Za-zÀ-ÿ].*$/,'');
-        const wordAfter=letters.length>=2&&(/^[A-Z]/.test(letters)||VOWEL.test(letters));
-        const chainAfter=rest[0]==='-'&&chainOK(rest.slice(1));
-        if(wordAfter||chainAfter||(rest===''&&chain)){
-          flush(i);ops.push({k:'s',from:i,to:i+3,free:(!wordAfter)});
-          i+=3;ts=i;chain=true;ws=i;continue;
-        }
-      }
-    }
-    /* acord */
-    if(/[A-G]/.test(c)){
-      let o2=null;
-      if(boundary) o2={glue2:o.glue2,first:o.first&&i===0,chain,mid:false};
-      else if(/[a-zà-öø-ÿ]/.test(prev)&&!/^(?:Mc|Mac)$/.test(t.slice(0,i))) o2={glue2:o.glue2,first:false,chain:false,mid:true};
-      if(o2){
-        const ch=bChord(t.slice(i),o2);
-        if(ch){
-          flush(i);
-          ops.push({k:'c',tok:ch,from:i,to:i+ch.length,def:(!/^[A-G][#b]?$/.test(ch))||o2.mid});
-          i+=ch.length;ts=i;chain=true;continue;
-        }
-      }
-    }
-    /* guionets que només serveixen per enganxar acords */
-    if(c==='-'){
-      const nx=t.slice(i+1);
-      if(ts===i&&chain){ts=i+1;i++;continue}
-      if(/^[A-G]/.test(nx)&&bChord(nx,{glue2:o.glue2,first:false,chain:false,mid:false})){flush(i);ts=i+1;i++;continue}
-      if(/^sus(?=$|-|[A-Z])/.test(nx)){flush(i);ts=i+1;i++;continue}
-    }
-    chain=false;i++;
-  }
-  flush(t.length);
-  return ops;
-}
-/* acord (sense qualitat) de la línia de sobre, proper a la posició r d'un "sus" solt */
-function nearIdx(pc,r){
-  let best=-1,bd=99;
-  pc.forEach((c,i)=>{
-    if(!/^[A-G][#b]?$/.test(c.tok)) return;
-    const d=c.col-r;
-    if(d>=-2&&d<=4){const sc=Math.abs(d-1);if(sc<bd){bd=sc;best=i}}
-  });
-  return best;
-}
-/* raw = línia de lletra amb trossos d'acords; P = línia d'acords de sobre (o null) */
-function fuseLine(raw,P){
-  const toks=[];{const re=/\S+/g;let m;while((m=re.exec(raw)))toks.push({s:m[0],r:m.index});}
-  const pc=[];if(P){const re=/\S+/g;let m;while((m=re.exec(P)))pc.push({col:m.index,tok:m[0]});}
-  let scans=toks.map((tk,ix)=>scanTok(tk.s,{glue2:false,first:ix===0}));
-  const defs=scans.reduce((n,ops)=>n+ops.filter(o=>(o.k==='c'&&o.def)||o.k==='s').length,0);
-  if(defs>=2||(defs>=1&&pc.length)) scans=toks.map((tk,ix)=>scanTok(tk.s,{glue2:true,first:ix===0}));
-  let clean='',changed=false;
-  const emb=[],maps=[];
-  toks.forEach((tk,ti)=>{
-    const ops=scans[ti];
-    ops.forEach(o=>{
-      if(o.k==='s'){
-        if(!o.free){const ix=nearIdx(pc,tk.r+o.from);if(ix>=0)pc[ix].tok+='sus'}
-        changed=true;
-      }else if(o.k==='c') changed=true;
-    });
-    const hasT=ops.some(o=>o.k==='t');
-    if(hasT&&clean&&!clean.endsWith(' ')) clean+=' ';
-    const c0=clean.length,cm=[];
-    const at=new Array(tk.s.length).fill(null);
-    ops.forEach(o=>{for(let q=o.from;q<o.to;q++)at[q]=o});
-    const trail=[];
-    for(let q=0;q<tk.s.length;q++){
-      cm[q]=clean.length-c0;
-      const o=at[q];
-      if(!o) continue;
-      if(o.k==='t') clean+=tk.s[q];
-      else if(o.k==='c'&&q===o.from){
-        const after=ops.some(x=>x.k==='t'&&x.from>=o.to);
-        if(after) emb.push({pos:clean.length,tok:o.tok});
-        else trail.push(o.tok);
-      }
-    }
-    cm[tk.s.length]=clean.length-c0;
-    if(trail.length){
-      const p=clean.length+((clean&&!clean.endsWith(' '))?1:0);       // principi de la paraula següent
-      trail.forEach(t=>emb.push({pos:p,tok:t}));
-    }
-    maps.push({r:tk.r,len:tk.s.length,c0,cm});
-  });
-  clean=clean.replace(/\s+$/,'');
-  if(!changed&&!emb.length) return null;
-  const toClean=r=>{
-    for(const m of maps){
-      if(r<m.r) return m.c0;
-      if(r<=m.r+m.len) return m.c0+m.cm[Math.min(r-m.r,m.len)];
-    }
-    return clean.length;
-  };
-  const Q=pc.map(c=>({pos:toClean(c.col),tok:c.tok}));
-  const E=emb.map(e=>({pos:e.pos,tok:e.tok,used:false})),keep=[];
-  Q.forEach(q=>{                                   // acords de la línia de sobre i de dins la lletra: sense duplicats
-    const j=E.findIndex(e=>!e.used&&Math.abs(e.pos-q.pos)<=4&&e.tok[0]===q.tok[0]&&(e.tok.startsWith(q.tok)||q.tok.startsWith(e.tok)));
-    if(j<0){keep.push(q);return}
-    E[j].used=true;
-    if(q.tok.length>E[j].tok.length)E[j].tok=q.tok;
-  });
-  const all=keep.concat(E).sort((a,b)=>a.pos-b.pos);
-  let ch='';
-  for(const c of all){const p=Math.max(c.pos,ch?ch.length+1:0);ch=ch.padEnd(p,' ')+c.tok}
-  return {chord:ch,lyric:clean};
-}
-
-/* ---------- indicacions (intro, solo, 2x...): en cursiva, no són lletra ---------- */
-const N_STRONG=/\b(?:intro|outro|solo|riffs?|interlude|instrumental|capo|fret|bar\s*chords?|chord\s*breaks?|tacet|arpeggios?|tremolo|ad[\s-]?lib|fade[\s-]?out|ritardando|repeat|second\s+guitar|lead\s+guitar|x\s?\d+|\d+\s?x)\b/i;
-const N_START=/^(?:intro|outro|solo|riffs?|interlude|instrumental|capo|repeat|play|tacet|fade|bar\s*chords?|chord\s*break|second\s+guitar|lead\s+guitar|guitar\s+(?:solo|riff)|x\s?\d|\d+\s?x)\b/i;
-const SECW=/^\s*[\[(]?\s*(?:verse|chorus|pre-?chorus|bridge|intro|outro|interlude|instrumental|solo|refrain|coda|estrofa|tornada|estribillo|introducci[oó])(?:\s*(?:\d+|x\d+|[ivx]{1,3}))*\s*[\])]?\s*:?\s*$/i;
-function isSection(l){
-  if(SECW.test(l)) return true;
-  const m=l.match(/^\s*\[([^\]]{1,30})\]\s*$/);
-  return !!m&&!CH.test(m[1].trim());
-}
-/* retorna el text de la indicació si la línia ho és, o null */
-function noteText(l){
-  const t=String(l||'').trim();
-  if(!t) return null;
-  if(/^#/.test(t)) return t.replace(/^#+\s*/,'');
-  if(SECW.test(t)||isChordLine(t)) return null;
-  const lab=t.match(/^[^\s:]{1,15}:\s+(\S.*)$/);
-  if(lab&&isChordLine(lab[1])) return null;
-  if(!N_STRONG.test(t)) return null;
-  const inner=t.replace(/^[(\[]\s*/,'').replace(/\s*[)\]]$/,'').trim();
-  const wrapped=/^[(\[]/.test(t)||/[)\]]$/.test(t);
-  const caps=t===t.toUpperCase()&&/[A-Z]{3}/.test(t);
-  return (wrapped||caps||N_START.test(inner))?inner:null;
-}
-
-/* ---------- neteja: elimina el que no és lletra ni acords + detecta títol i autor ---------- */
-const LABEL_T=/^\s*(?:t[ií]tol|title|song|can[cç]ó|canci[oó]n|nom)\s*[:：]\s*(.+?)\s*$/i;
-const LABEL_A=/^\s*(?:autor(?:a)?|artista?|author|by|int[èe]rpret|cantant|band|grup|group|composer|compositor|written\s+by|lletra\s+i\s+m[uú]sica)\s*[:：]\s*(.+?)\s*$/i;
-const CHORDS_BY=/^(.{1,80}?)\s+(?:chords?(?:\s*&\s*lyrics)?|tabs?|acordes|acords|cifra|lyrics?)\s+(?:by|de|per)\s+(.{1,60})$/i;
-const LABEL_J=/^\s*(?:key|tom|tonalitat|tonalidad|tono|capo|tuning|afinaci[oó]n?|tempo|bpm|difficulty|dificultat|dificultad|rating|votes?|views?|hits|album|[àa]lbum|year|any|a[ñn]o|genre|g[eè]nere|g[eé]nero|submitted\s+by|updated|last\s+update(?:d)?|last\s+edit(?:ed)?|transcribed\s+by|chords?\s+by|tabs?\s+by|strumming|chords?\s+used|acordes|acords|date|data|fecha|time\s+signature|comp[aà]s)\s*[:：]\s*.*$/i;
-const J_WORD=/^\s*(?:chords?|tabs?|lyrics?|letra|acordes|acords|cifra|share|print|download|edit|favou?rites?|autoscroll|auto-?scroll|transpose|simplify|tuner|metronome|capo|report|reportar|compartir|imprimir|baixar|descargar|advertisement|ads?|sponsored|related|comments?|comentaris|rate|pro|premium|official|show\s+chords|hide\s+chords|chord\s+diagrams?|chord\s+chart|more|less|show\s+all|play|ver\s+v[ií]deo|aprender|tablature|ultimate[\s-]*guitar|cifra\s*club|chordie|songsterr|e-?chords)\s*$/i;
-const J_MISC=[
- /^\s*[A-Ga-g]?[#b]?\s*\|[-\dhpbrxs\/\\~()^|*.\s]{4,}$/,
- /^\s*[xX\d]{6}\s*$/,
- /^\s*capo\s*(?:on\s*)?(?:the\s*)?\d+\w*\s*(?:fret)?\s*$/i,
- /^\s*key\s+of\s+\S+\s*$/i,
- /^\s*(?:bpm|tempo)\s*[=:]?\s*\d+\s*(?:bpm)?\s*$/i,
- /^\s*(?:standard|drop\s*[a-g]#?|half[\s-]*step\s+down)\s+tuning\s*$/i,
- /^\s*(?:submit|send|report)\s+(?:a\s+)?(?:correction|corrections|problem|error)\b.*$/i,
- /^\s*(?:chords?|acordes|acords)\s+(?:for|de|of)\s+.{1,80}$/i,
- /(?:https?:\/\/|www\.|@[\w-]+\.\w{2,}|\b[a-z0-9-]+\.(?:com|net|org|es|cat|br|io|fm)\b)/i,
- /(?:©|\(c\)\s*\d{4}|copyright|all\s+rights\s+reserved|todos\s+los\s+derechos|tots\s+els\s+drets)/i
-];
-function isJunk(l){
-  if(!l||!l.trim()) return false;
-  return LABEL_J.test(l)||J_WORD.test(l)||J_MISC.some(r=>r.test(l));
-}
-function isContentLine(l){
-  return isChordLine(l)||isSection(l)||/\[[A-G][^\]]*\]/.test(l)||GARBLE.test(l)||!!parseMixed(l,false);
-}
-function cleanTitle(s){
-  s=String(s||'').trim().replace(/^(?:chords?|tabs?|acordes?|acords?|cifra|lyrics?)\s+(?:for|de|of)\s+/i,'');
-  let p;
-  do{
-    p=s;
-    s=s.replace(/\s*[\(\[]?\s*\b(?:ver(?:si[oó]n)?\.?\s*\d+|official|chords?(?:\s*&\s*lyrics)?|tabs?|lyrics?|letra|cifra|acordes|acords)\s*[\)\]]?\s*$/i,'').trim();
-  }while(s!==p);
-  return s.replace(/^["“”'‘’]+|["“”'‘’]+$/g,'').replace(/[\s:,;-]+$/,'').trim();
-}
-function extractMeta(lines){
-  const meta={},drop=new Set();
-  const isDir=l=>/^\s*\{.*\}\s*$/.test(l);
-  const cs=lines.findIndex(l=>l.trim()&&!isJunk(l)&&!isDir(l)&&noteText(l)===null&&isContentLine(l));
-  const zoneEnd=cs>=0?cs:Math.min(lines.length,25);
-  const idx=[];
-  for(let i=0;i<zoneEnd;i++) if(lines[i].trim()&&!isDir(lines[i])) idx.push(i);
-  const dropZone=cs>=0&&idx.length<=10;
-  const cand=[];
-  for(const i of idx){
-    const l=lines[i].trim(); let m;
-    if((m=l.match(LABEL_T))){if(!meta.title)meta.title=cleanTitle(m[1]);drop.add(i);continue}
-    if((m=l.match(LABEL_A))){if(!meta.artist)meta.artist=cleanTitle(m[1]);drop.add(i);continue}
-    if((m=l.match(CHORDS_BY))){
-      if(!meta.title)meta.title=cleanTitle(m[1]);
-      if(!meta.artist)meta.artist=cleanTitle(m[2]);
-      drop.add(i);continue;
-    }
-    if(isJunk(lines[i])||noteText(lines[i])!==null){drop.add(i);continue}
-    if(dropZone){
-      if((m=l.match(/^[Bb]y\s+([A-ZÀ-Þ][^,.;!?]{1,40})$/))){if(!meta.artist)meta.artist=cleanTitle(m[1]);drop.add(i);continue}
-      drop.add(i);
-      if(l.length<=80) cand.push(l);
-    }
-  }
-  if(dropZone&&cand.length){
-    if(!meta.title){
-      const c0=cand.shift();
-      const m=c0.match(/^(.{1,70}?)\s+[-–—]\s+(.{1,50})$/);
-      if(m){meta.title=cleanTitle(m[1]);if(!meta.artist)meta.artist=cleanTitle(m[2]);}
-      else meta.title=cleanTitle(c0);
-    }
-    if(!meta.artist&&cand.length&&cand[0].length<=45) meta.artist=cleanTitle(cand[0]);
-  }
-  if(!meta.title)delete meta.title;
-  if(!meta.artist)delete meta.artist;
-  return {meta,drop};
-}
-
-function fixText(t){
-  const meta={}; let n=0,removed=0,notes=0;
-  t=t.replace(/\r\n?/g,'\n').replace(/\u00a0/g,' ').replace(/\t/g,'    ').replace(/\[\/?(?:ch|tab)\]/gi,'');
-  let lines=t.split('\n').map(l=>l.replace(/\s+$/,''));
-  // 1) títol i autor de la capçalera
-  const ex=extractMeta(lines);
-  Object.assign(meta,ex.meta);
-  // 2) fora la capçalera i les línies que no són lletra ni acords
-  const kept=[];
-  lines.forEach((l,i)=>{
-    if(ex.drop.has(i)||isJunk(l)){if(l.trim())removed++;return}
-    kept.push(/^[\s\-_=*~.•·|]{3,}$/.test(l)?'':l);
-  });
-  lines=kept;
-  // 3) acords a sobre de la lletra
-  const plain=l=>!isChordLine(l)&&!SKIP.test(l)&&!/\[[^\]]+\]/.test(l)&&!GARBLE.test(l)&&noteText(l)===null;
-  const lenient=lines.filter(l=>plain(l)&&parseMixed(l,false)).length>=2;
-  const out=[]; let lastChord=false;
-  for(const line of lines){
-    const d=line.match(/^\s*\{\s*([a-z_]+)\s*:?\s*(.*?)\s*\}\s*$/i);   // directives ChordPro
-    if(d){
-      const k=d[1].toLowerCase(),v=d[2];
-      if(k==='title'||k==='t') meta.title=v;
-      else if(k==='artist'||k==='subtitle'||k==='st') meta.artist=v;
-      else if(['comment','c','ci','comment_italic'].includes(k)){out.push('# '+v);notes++}
-      lastChord=false;
-      continue;
-    }
-    if(isChordLine(line)||SKIP.test(line)){out.push(line);lastChord=isChordLine(line);continue}
-    const nt=noteText(line);
-    if(nt!==null){if(nt!==''){out.push('# '+nt);notes++}lastChord=false;continue}
-    if(/\[[^\]]+\]/.test(line)){
-      const r=inlineToAbove(line);
-      if(r){out.push(...r);n++;lastChord=false;continue}
-    }
-    const lab=line.match(/^\s*([^\s:]{1,15}:)\s+(\S.*)$/);               // "Intro: C G Am F"
-    if(lab&&isChordLine(lab[2])){out.push(lab[1],lab[2]);n++;lastChord=false;continue}
-    if(GARBLE.test(line)){                                                // còpia malmesa
-      const P=lastChord?out[out.length-1]:null;
-      const r=fuseLine(line,P);
-      if(r){
-        if(P) out.pop();
-        if(r.chord.trim()) out.push(r.chord);
-        if(r.lyric.trim()) out.push(r.lyric);
-        n++; lastChord=!r.lyric.trim()&&!!r.chord.trim(); continue;
-      }
-    }
-    const r=parseMixed(line,lenient);
-    if(r){out.push(...r);n++;lastChord=false;continue}
-    out.push(line); lastChord=false;
-  }
-  const text=out.join('\n').replace(/\n{3,}/g,'\n\n').replace(/^\n+|\n+$/g,'');
-  return {text,meta,n,removed,notes};
-}
-/* hi ha res a netejar o convertir en aquest text? */
-function needsFix(t){
-  return String(t||'').split('\n').some(l=>/\[[A-G][^\]]*\]/.test(l)||(!isChordLine(l)&&GARBLE.test(l))||(!/^\s*#/.test(l)&&noteText(l)!==null));
-}
-
-/* ---------- dibuix de la cançó: acords a sobre de la lletra ---------- */
-function segHTML(c,tx){
-  return '<span class="sg"><span class="ch">'+(c?esc(c):'&nbsp;')+'</span><span class="tx">'+(tx?esc(tx):'&nbsp;')+'</span></span>';
-}
-function pairHTML(cl,ll,n,useFlat){
-  const ch=[]; const re=/\S+/g; let m;
-  while((m=re.exec(cl))) ch.push({i:m.index,t:chordTok(m[0],n,useFlat)});
-  ll=ll.replace(/\s+$/,'');
-  let h='';
-  const first=Math.min(ch[0].i,ll.length);
-  if(first>0) h+=segHTML('',ll.slice(0,first));
-  for(let k=0;k<ch.length;k++){
-    const a=Math.min(ch[k].i,ll.length);
-    const b=k+1<ch.length?Math.min(ch[k+1].i,ll.length):ll.length;
-    h+=segHTML(ch[k].t,ll.slice(a,b));
-  }
-  return '<div class="ln"><span class="lw">'+h+'</span></div>';
-}
-function chordOnlyHTML(cl,n,useFlat){
-  const h=cl.trim().split(/\s+/).map(t=>'<span class="ch inl">'+esc(chordTok(t,n,useFlat))+'</span>').join('');
-  return '<div class="ln co"><span class="lw">'+h+'</span></div>';
-}
-function sheetHTML(text,n,useFlat){
-  const L=String(text||'').replace(/\r/g,'').replace(/\t/g,'    ').split('\n').map(x=>x.replace(/\s+$/,''));
-  let out='',i=0,blank=true;
-  while(i<L.length){
-    const l=L[i];
-    if(!l.trim()){ if(!blank) out+='<div class="sp"></div>'; blank=true; i++; continue; }
-    blank=false;
-    if(isChordLine(l)){
-      const nx=L[i+1];
-      if(nx!==undefined&&nx.trim()&&!isChordLine(nx)&&!isSection(nx)&&noteText(nx)===null){
-        out+=pairHTML(l,nx,n,useFlat); i+=2; continue;
-      }
-      out+=chordOnlyHTML(l,n,useFlat); i++; continue;
-    }
-    if(isSection(l)){
-      out+='<div class="sec">'+esc(l.trim().replace(/^[\[(]\s*/,'').replace(/\s*[\])]$/,'').replace(/:$/,''))+'</div>'; i++; continue;
-    }
-    const nt=noteText(l);
-    if(nt!==null){
-      if(nt!=='') out+='<div class="note">'+esc(nt)+'</div>';
-      i++; continue;
-    }
-    out+='<div class="ln pl">'+esc(l)+'</div>'; i++;
-  }
-  return out;
-}
-
-/* ajusta les columnes perquè càpiga tota la cançó a la pantalla */
-function fitSong(){
-  const sh=$('#sheet'); if(!sh)return;
-  const cs=getComputedStyle(sh);
-  sh.classList.remove('wrap');
-  sh.style.columnCount=1;
-  const W=sh.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);
-  const gap=parseFloat(cs.columnGap)||32;
-  let mx=parseFloat(cs.fontSize)*14;
-  sh.querySelectorAll('.lw').forEach(e=>{mx=Math.max(mx,e.getBoundingClientRect().width)});
-  if(mx>W) sh.classList.add('wrap');
-  const maxCols=Math.max(1,Math.min(3,Math.floor((W+gap)/(mx+gap))));
-  let n;
-  if(prefs.cols>0){
-    n=Math.min(prefs.cols,maxCols);
-  }else{
-    const avail=Math.max(260,window.innerHeight-(sh.getBoundingClientRect().top+window.scrollY)-18);
-    n=maxCols;
-    for(let k=1;k<=maxCols;k++){
-      sh.style.columnCount=k;
-      if(sh.scrollHeight<=avail){n=k;break}
-    }
-  }
-  sh.style.columnCount=n;
-}
-let rzT;
-window.addEventListener('resize',()=>{clearTimeout(rzT);rzT=setTimeout(()=>{if(view.name==='song')fitSong()},150)});
-
-/* ---------- navegació ---------- */
-function go(v){view=v;if(v.name==='song')shift=0;render()}
-function render(){
-  $('#n-songs').className=['songs','song','edit'].includes(view.name)?'on':'';
-  $('#n-lists').className=['lists','list'].includes(view.name)?'on':'';
-  $('#app').style.maxWidth=view.name==='song'?'1500px':'900px';
-  ({songs:songsView,song:songView,edit:editView,lists:listsView,list:listView})[view.name]();
-  window.scrollTo(0,0);
-}
-
-/* ---------- cançons ---------- */
-function songsView(){
-  $('#app').innerHTML=`
-   <div class="row"><input type="text" id="q" placeholder="Cerca per títol o autor..." oninput="drawSongs()" style="flex:1">
-   <button class="btn" onclick="go({name:'edit',id:null})">+ Nova cançó</button>
-   <button class="btn alt" onclick="document.getElementById('txts').click()">Importa .txt / .cho</button>
-   <input type="file" id="txts" accept=".txt,.cho,.crd,.chopro,.chordpro,.pro" multiple hidden onchange="importTxt(this)"></div>
-   <div id="res"></div>`;
-  drawSongs();
-}
-function drawSongs(){
-  const q=($('#q')?.value||'').toLowerCase();
-  const arr=db.songs.filter(s=>(s.title+' '+s.artist).toLowerCase().includes(q))
-    .sort((a,b)=>a.title.localeCompare(b.title,'ca'));
-  $('#res').innerHTML=arr.length?arr.map(s=>`<div class="item">
-    <a onclick="go({name:'song',id:'${s.id}'})"><b>${esc(s.title)}</b> <small>${esc(s.artist)}</small></a>
-    <button class="btn alt" onclick="go({name:'edit',id:'${s.id}'})">Edita</button></div>`).join('')
-    :'<p>Encara no hi ha cap cançó. Prem "Nova cançó".</p>';
-}
-function importTxt(inp){
-  [...inp.files].forEach(f=>{
-    const r=new FileReader();
-    r.onload=()=>{
-      const f2=fixText(r.result);
-      db.songs.push({id:uid(),title:f2.meta.title||f.name.replace(/\.[^.]+$/,''),artist:f2.meta.artist||'',text:f2.text});
-      save();drawSongs();
-    };
-    r.readAsText(f);
-  });
-}
-
-function songView(){
-  const s=db.songs.find(x=>x.id===view.id); if(!s){go({name:'songs'});return}
-  if(needsFix(s.text)){                                   // cançons desades abans: es posen al dia soles
-    const f=fixText(s.text);
-    if(f.text.trim()&&f.text!==s.text){
-      s.text=f.text;
-      if(f.meta.title&&(!s.title||s.title==='Sense títol')) s.title=f.meta.title;
-      if(f.meta.artist&&!s.artist) s.artist=f.meta.artist;
-      save();
-    }
-  }
-  const lst=view.list&&db.lists.find(l=>l.id===view.list);
-  let nav='';
-  if(lst){
-    const i=lst.songs.indexOf(s.id);
-    const prev=lst.songs[i-1], next=lst.songs[i+1];
-    nav=`<div class="row noprint"><button class="btn alt" ${prev?`onclick="go({name:'song',id:'${prev}',list:'${lst.id}'})"`:'disabled'}>◀</button>
-     <span>${esc(lst.name)} · ${i+1}/${lst.songs.length}</span>
-     <button class="btn alt" ${next?`onclick="go({name:'song',id:'${next}',list:'${lst.id}'})"`:'disabled'}>▶</button>
-     <button class="btn alt" onclick="go({name:'list',id:'${lst.id}'})">Torna a la llista</button></div>`;
-  }
-  const a=Math.abs(shift);
-  const tl=shift===0?'Original':(shift>0?'+':'−')+a+' '+(a===1?'semitò':'semitons');
-  const sizeBtn=(i,lab,px)=>`<button class="btn alt sz ${prefs.size===i?'on':''}" style="font-size:${px}px" title="${lab}" onclick="setSize(${i})">A</button>`;
-  const colSel='<select title="Columnes" onchange="setCols(this.value)">'+
-    [['0','Columnes: auto'],['1','1 columna'],['2','2 columnes'],['3','3 columnes']]
-    .map(([v,t])=>`<option value="${v}" ${String(prefs.cols)===v?'selected':''}>${t}</option>`).join('')+'</select>';
-  $('#app').innerHTML=`${nav}
-   <div class="bar noprint">
-    <div class="ttl"><b>${esc(s.title)}</b><span>${esc(s.artist)}</span></div>
-    <div class="row">
-     <button class="btn tb" onclick="tr(-1)">Transposa ▼</button>
-     <button class="btn tb" onclick="tr(1)">Transposa ▲</button>
-     <span class="trind ${shift?'act':''}">${tl}</span>
-     ${shift?`<button class="btn alt" onclick="shift=0;render()">Original</button>`:''}
-     <span class="sep"></span>
-     ${sizeBtn(0,'Lletra petita',12)}${sizeBtn(1,'Lletra mitjana',16)}${sizeBtn(2,'Lletra gran',20)}
-     ${colSel}
-     <label><input type="checkbox" ${prefs.flat?'checked':''} onchange="prefs.flat=this.checked;savePrefs();render()"> bemolls (♭)</label>
-     <button class="btn alt" onclick="window.print()">Imprimeix</button>
-     <button class="btn alt" onclick="go({name:'edit',id:'${s.id}'})">Edita</button>
-    </div>
-   </div>
-   <h2 class="onlyprint" style="margin:0 0 8px">${esc(s.title)} <small style="font-weight:400">${esc(s.artist)}</small></h2>
-   <div id="sheet" class="sheet" style="--fs:${SIZES[prefs.size]}px">${sheetHTML(s.text,shift,prefs.flat)}</div>
-   <div class="row noprint"><select id="addl" style="max-width:260px"><option value="">Afegeix a una llista...</option>
-     ${db.lists.map(l=>`<option value="${l.id}">${esc(l.name)}</option>`).join('')}</select>
-     <button class="btn" onclick="addToList('${s.id}')">Afegeix</button></div>`;
-  fitSong();
-}
-function tr(n){shift+=n;if(Math.abs(shift)>=12)shift=0;render()}
-function setSize(i){prefs.size=i;savePrefs();render()}
-function setCols(v){prefs.cols=+v;savePrefs();fitSong()}
-function addToList(sid){
-  const l=db.lists.find(x=>x.id===$('#addl').value); if(!l)return;
-  if(!l.songs.includes(sid)){l.songs.push(sid);save()}
-  alert('Afegida a "'+l.name+'"');
-}
-
-function editView(){
-  const s=view.id?db.songs.find(x=>x.id===view.id):{title:'',artist:'',text:''};
-  const isNew=!view.id;
-  prevTxt=null;prevTA=null;
-  $('#app').innerHTML=`
-   <h2>${isNew?'Nova cançó':'Edita cançó'}</h2>
-   <label>Títol</label><input type="text" id="t" value="${esc(s.title)}" oninput="updLinks()">
-   <label>Autor</label><input type="text" id="a" value="${esc(s.artist)}" oninput="updLinks()">
-   ${isNew?`<div class="box"><b>Busca la cançó:</b> (s'obre en una pestanya nova; copia el text i enganxa'l a sota)
-     <div class="row" id="links"></div></div>`:''}
-   <label>Lletra amb els acords a sobre (text pla)</label>
-   <div id="note" class="nt noprint" style="display:none"></div>
-   <textarea id="x" onpaste="onPaste(event)" placeholder="   Am        F
-Aquí va la lletra...">${esc(s.text)}</textarea>
-   <div class="row">
-    <button class="btn" onclick="saveSong('${view.id||''}')">Desa</button>
-    <button class="btn alt" onclick="${view.id?`go({name:'song',id:'${view.id}'})`:`go({name:'songs'})`}">Cancel·la</button>
-    ${view.id?`<button class="btn red" onclick="delSong('${view.id}')">Esborra</button>`:''}
-   </div>
-   <p><small>En enganxar el text d'una web, el programa deixa la lletra i els acords (acords a sobre de la lletra, també si venien trencats o enganxats a les paraules), treu capo, tonalitat, enllaços i botons, i omple el títol i l'autor si estan buits. Les indicacions (intro, solo, 2x…) es guarden amb un <code>#</code> al davant i es veuen en cursiva; si en vols afegir una, escriu <code># el text</code> en una línia. Els acords han d'estar en notació anglesa (C, D, E, F, G, A, B).</small></p>`;
-  if(isNew)updLinks();
-}
-function onPaste(e){
-  const cd=e.clipboardData||window.clipboardData; if(!cd)return;
-  const txt=cd.getData('text/plain'); if(!txt)return;
-  const r=fixText(txt);
-  if(r.text===txt&&!Object.keys(r.meta).length) return;          // res a netejar: enganxat normal
-  e.preventDefault();
-  const ta=e.target;
-  prevTxt=ta.value;
-  prevTA={t:$('#t').value,a:$('#a').value};
-  ta.focus();
-  let done=false;
-  try{done=document.execCommand('insertText',false,r.text)}catch(err){}
-  if(!done){
-    const s=ta.selectionStart,en=ta.selectionEnd;
-    ta.value=ta.value.slice(0,s)+r.text+ta.value.slice(en);
-    ta.selectionStart=ta.selectionEnd=s+r.text.length;
-  }
-  if(r.meta.title&&!$('#t').value.trim()) $('#t').value=r.meta.title;
-  if(r.meta.artist&&!$('#a').value.trim()) $('#a').value=r.meta.artist;
-  updLinks();
-  showNote(r);
-}
-function showNote(r){
-  const parts=[];
-  if(r.n) parts.push('✔ '+r.n+' línies amb els acords posats a sobre de la lletra.');
-  if(r.notes) parts.push('✔ '+r.notes+' indicacions (intro, solo…) posades en cursiva.');
-  if(r.removed) parts.push('✔ '+r.removed+' línies que no eren lletra ni acords eliminades.');
-  if(r.meta.title||r.meta.artist){
-    const T=$('#t').value.trim(),A=$('#a').value.trim();
-    parts.push('✔ Títol: <b>'+esc(T||'—')+'</b> · Autor: <b>'+esc(A||'—')+'</b> <a onclick="swapTA()">Intercanvia</a>');
-  }
-  const note=$('#note');
-  if(!parts.length){note.style.display='none';return}
-  note.innerHTML=parts.join('<br>')+' <a onclick="undoFix()">Desfés tot</a>';
-  note.style.display='block';
-}
-function swapTA(){
-  const t=$('#t'),a=$('#a'),v=t.value;
-  t.value=a.value;a.value=v;updLinks();
-  const note=$('#note');
-  if(note) note.innerHTML=note.innerHTML.replace(/Títol: <b>.*?<\/b> · Autor: <b>.*?<\/b>/,'Títol: <b>'+esc(t.value||'—')+'</b> · Autor: <b>'+esc(a.value||'—')+'</b>');
-}
-function undoFix(){
-  if(prevTxt!==null) $('#x').value=prevTxt;
-  if(prevTA){$('#t').value=prevTA.t;$('#a').value=prevTA.a;updLinks()}
-  prevTxt=null;prevTA=null;
-  $('#note').style.display='none';
-}
-function updLinks(){
-  const el=$('#links'); if(!el)return;
-  const q=encodeURIComponent(($('#t').value+' '+$('#a').value).trim());
-  const g=(extra)=>`https://www.google.com/search?q=${q}+${encodeURIComponent(extra)}`;
-  el.innerHTML=[
-   ['Ultimate Guitar',g('chords site:ultimate-guitar.com')],
-   ['Cifraclub',g('site:cifraclub.com')],
-   ['Chordie',g('site:chordie.com')],
-   ['Google (lletra i acords)',g('lletra acords')]
-  ].map(([n,u])=>`<a class="btn alt" style="text-decoration:none" target="_blank" rel="noopener" href="${u}">${n}</a>`).join('');
-}
-function saveSong(id){
-  let text=$('#x').value.replace(/\r/g,'');
-  if(needsFix(text)){const f=fixText(text);if(f.text.trim())text=f.text}
-  const o={title:$('#t').value.trim()||'Sense títol',artist:$('#a').value.trim(),text};
-  if(id){Object.assign(db.songs.find(s=>s.id===id),o)}else{id=uid();db.songs.push({id,...o})}
-  save();go({name:'song',id});
-}
-function delSong(id){
-  if(!confirm('Segur que vols esborrar aquesta cançó?'))return;
-  db.songs=db.songs.filter(s=>s.id!==id);
-  db.lists.forEach(l=>l.songs=l.songs.filter(x=>x!==id));
-  save();go({name:'songs'});
-}
-
-/* ---------- llistes ---------- */
-function listsView(){
-  $('#app').innerHTML=`
-   <div class="row"><input type="text" id="nl" placeholder="Nom de la nova llista (ex.: Concert Nadal)" style="flex:1">
-   <button class="btn" onclick="newList()">+ Crea llista</button></div>
-   ${db.lists.map(l=>`<div class="item"><a onclick="go({name:'list',id:'${l.id}'})"><b>${esc(l.name)}</b> <small>${l.songs.length} cançons</small></a></div>`).join('')||'<p>Encara no tens cap llista.</p>'}`;
-}
-function newList(){
-  const n=$('#nl').value.trim(); if(!n)return;
-  const l={id:uid(),name:n,songs:[]};db.lists.push(l);save();go({name:'list',id:l.id});
-}
-function listView(){
-  const l=db.lists.find(x=>x.id===view.id); if(!l){go({name:'lists'});return}
-  const avail=db.songs.filter(s=>!l.songs.includes(s.id)).sort((a,b)=>a.title.localeCompare(b.title,'ca'));
-  $('#app').innerHTML=`
-   <h2 style="margin:6px 0">${esc(l.name)}</h2>
-   <div class="row">
-    <button class="btn" ${l.songs.length?`onclick="go({name:'song',id:'${l.songs[0]}',list:'${l.id}'})"`:'disabled'}>▶ Mode concert</button>
-    <button class="btn alt" onclick="renList('${l.id}')">Reanomena</button>
-    <button class="btn red" onclick="delList('${l.id}')">Esborra llista</button>
-    <button class="btn alt" onclick="go({name:'lists'})">Totes les llistes</button>
-   </div>
-   ${l.songs.map((sid,i)=>{const s=db.songs.find(x=>x.id===sid);if(!s)return'';
-     return `<div class="item"><a onclick="go({name:'song',id:'${sid}',list:'${l.id}'})">${i+1}. <b>${esc(s.title)}</b> <small>${esc(s.artist)}</small></a>
-      <span><button class="btn alt" onclick="mv('${l.id}',${i},-1)">↑</button>
-      <button class="btn alt" onclick="mv('${l.id}',${i},1)">↓</button>
-      <button class="btn red" onclick="rm('${l.id}',${i})">✕</button></span></div>`}).join('')}
-   <div class="row"><select id="as"><option value="">Afegeix una cançó de la biblioteca...</option>
-    ${avail.map(s=>`<option value="${s.id}">${esc(s.title)} — ${esc(s.artist)}</option>`).join('')}</select>
-    <button class="btn" onclick="addSong('${l.id}')">Afegeix</button></div>`;
-}
-const getL=id=>db.lists.find(x=>x.id===id);
-function mv(id,i,d){const a=getL(id).songs,j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];save();render()}
-function rm(id,i){getL(id).songs.splice(i,1);save();render()}
-function addSong(id){const v=$('#as').value;if(!v)return;getL(id).songs.push(v);save();render()}
-function renList(id){const l=getL(id),n=prompt('Nou nom:',l.name);if(n){l.name=n;save();render()}}
-function delList(id){if(confirm('Esborrar la llista? (les cançons es conserven)')){db.lists=db.lists.filter(l=>l.id!==id);save();go({name:'lists'})}}
-
-/* ---------- còpia de seguretat de les cançons ---------- */
-function exportDb(){
-  const b=new Blob([JSON.stringify(db)],{type:'application/json'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(b);
-  a.download='cansoner-'+new Date().toISOString().slice(0,10)+'.json';a.click();
-}
-function importDb(inp){
-  const f=inp.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=()=>{try{const d=JSON.parse(r.result);
-    if(!d.songs||!d.lists)throw 0;
-    if(confirm('Això substituirà el contingut actual. Continuar?')){db=d;save();go({name:'songs'})}
-  }catch(e){alert('Fitxer no vàlid')}};
-  r.readAsText(f);
-}
-
-/* ---------- descarrega el programa (HTML net, sense les teves cançons) ---------- */
-function downloadApp(){
-  const c=document.documentElement.cloneNode(true);
-  const app=c.querySelector('#app'); app.innerHTML=''; app.removeAttribute('style');
-  c.querySelectorAll('header button').forEach(b=>b.classList.remove('on'));
-  const html='<!DOCTYPE html>\n'+c.outerHTML;
-  const b=new Blob([html],{type:'text/html'});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(b);a.download='cansoner.html';
-  document.body.appendChild(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-}
-render();
-</script>
+<h1 style="margin: 0.0px 16.0px 0.0px 0.0px; font: 18.0px 'Helvetica Neue'; color: #ffffff; -webkit-text-stroke: #ffffff"><span class="s1">🎸</span><span class="s2"><b> Cançoner</b><b></b></span></h1>
+<p class="p2"><span class="s3">Cançons</span></p>
+<p class="p2"><span class="s3">Llistes</span></p>
+<p class="p2"><span class="s3">Exporta cançons</span></p>
+<p class="p2"><span class="s3">Importa cançons</span></p>
+<p class="p2"><span class="s4">⬇</span><span class="s3"> Descarrega</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">&lt;!DOCTYPE html&gt;</span></p>
+<p class="p4"><span class="s3">&lt;html lang="ca"&gt;</span></p>
+<p class="p4"><span class="s3">&lt;head&gt;</span></p>
+<p class="p4"><span class="s3">&lt;meta charset="utf-8"&gt;</span></p>
+<p class="p4"><span class="s3">&lt;meta name="viewport" content="width=device-width,initial-scale=1"&gt;</span></p>
+<p class="p4"><span class="s3">&lt;title&gt;Cançoner&lt;/title&gt;</span></p>
+<p class="p4"><span class="s3">&lt;style&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>*{box-sizing:border-box}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;margin:0;background:#f6f4ef;color:#222}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>header{background:#2b3a42;color:#fff;padding:10px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>header h1{font-size:18px;margin:0 16px 0 0}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>header button{background:#3d5360;color:#fff;border:0;padding:8px 14px;border-radius:6px;cursor:pointer}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>header button.on{background:#e0a030;color:#222}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>main{margin:0 auto;padding:12px 16px}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>button,select,input,textarea{font:inherit}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>button{cursor:pointer}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.btn{background:#2b3a42;color:#fff;border:0;padding:7px 12px;border-radius:6px}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.btn.alt{background:#ddd;color:#222}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.btn.red{background:#b33}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.btn:disabled{opacity:.4}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>input[type=text],textarea,select{width:100%;padding:8px;border:1px solid #bbb;border-radius:6px;background:#fff}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>textarea{font-family:ui-monospace,Menlo,Consolas,monospace;min-height:380px;white-space:pre;overflow:auto}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.item{background:#fff;border:1px solid #ddd;border-radius:8px;padding:10px 12px;margin:6px 0;display:flex;justify-content:space-between;align-items:center;gap:8px}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.item a{cursor:pointer;flex:1}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.item small{color:#777}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.box{background:#fff;border:1px dashed #999;border-radius:8px;padding:10px;margin:10px 0}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.nt{background:#e7f3e7;border:1px solid #9c9;border-radius:6px;padding:6px 10px;margin:8px 0;font-size:14px;line-height:1.5}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.nt a{color:#225;text-decoration:underline;cursor:pointer;margin-left:8px}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>label{display:block;margin:10px 0 3px;font-weight:600}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>/* ---- vista de la cançó ---- */</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.bar{margin:0 0 8px}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.bar .row{margin:4px 0}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.ttl{font-size:19px;margin:2px 0}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.ttl span{color:#666;font-size:15px;margin-left:8px}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.tb{background:#1f6f5c;font-weight:700;padding:9px 14px}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.trind{font-weight:700;min-width:105px;text-align:center}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.trind.act{color:#d9480f}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.sep{width:10px}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.btn.sz{min-width:36px;padding:4px 8px;line-height:1.2;font-weight:700}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.btn.sz.on{background:#2b3a42;color:#fff}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.bar select{width:auto;padding:6px}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.bar label{display:inline;margin:0;font-weight:400}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.onlyprint{display:none}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.sheet{</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>--chord:#d9480f; <span class="Apple-converted-space">                                  </span>/* color dels acords */</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>--lyric:Georgia,"Times New Roman",Times,serif; <span class="Apple-converted-space">    </span>/* tipus de lletra de la cançó (només la lletra) */</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>font-size:var(--fs,19px);line-height:1.3;color:#1b1b1b;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>background:#fff;border:1px solid #ddd;border-radius:10px;padding:14px 18px;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>column-gap:2.4em;column-rule:1px solid #e6e1d6;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.ln{break-inside:avoid;page-break-inside:avoid;-webkit-column-break-inside:avoid;margin:0 0 .6em}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.lw{white-space:nowrap}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.sheet.wrap .lw{white-space:normal}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.sg{display:inline-block}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.ch{display:block;white-space:pre;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>font-family:ui-monospace,"SF Mono",Menlo,Consolas,"Courier New",monospace;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>font-weight:800;font-size:calc(var(--fs,19px)*1.2);line-height:1.15;color:var(--chord);padding-right:.5em}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.tx{display:block;white-space:pre;font-family:var(--lyric);font-size:var(--fs,19px);line-height:1.25}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.ln.co .ch.inl{display:inline-block;padding-right:0;margin-right:1.1em}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.ln.pl{white-space:pre-wrap;font-family:var(--lyric);font-size:var(--fs,19px)}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.sec{font-weight:700;text-transform:uppercase;font-size:.78em;letter-spacing:.08em;color:#5b6b73;margin:1em 0 .4em;break-after:avoid;-webkit-column-break-after:avoid}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.note{font-style:italic;font-size:.82em;color:#6b6f76;margin:1em 0 1em .2em;padding-left:.7em;border-left:3px solid #d8d2c4;break-inside:avoid;-webkit-column-break-inside:avoid}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>.sp{height:.5em}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>@media print{</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>header,.noprint{display:none}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>.onlyprint{display:block}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>.sheet{border:0;padding:0}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>}</span></p>
+<p class="p4"><span class="s3">&lt;/style&gt;</span></p>
+<p class="p4"><span class="s3">&lt;/head&gt;</span></p>
+<p class="p4"><span class="s3">&lt;body&gt;</span></p>
+<p class="p4"><span class="s3">&lt;header&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>&lt;h1&gt;🎸 Cançoner&lt;/h1&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>&lt;button id="n-songs" onclick="go({name:'songs'})"&gt;Cançons&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>&lt;button id="n-lists" onclick="go({name:'lists'})"&gt;Llistes&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>&lt;button onclick="exportDb()"&gt;Exporta cançons&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>&lt;button onclick="document.getElementById('imp').click()"&gt;Importa cançons&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>&lt;button onclick="downloadApp()"&gt;⬇ Descarrega&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>&lt;input type="file" id="imp" accept=".json" hidden onchange="importDb(this)"&gt;</span></p>
+<p class="p4"><span class="s3">&lt;/header&gt;</span></p>
+<p class="p4"><span class="s3">&lt;main id="app"&gt;&lt;/main&gt;</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">&lt;script&gt;</span></p>
+<p class="p4"><span class="s3">const NS=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];</span></p>
+<p class="p4"><span class="s3">const NF=['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];</span></p>
+<p class="p4"><span class="s3">const IDX={C:0,'C#':1,Db:1,D:2,'D#':3,Eb:3,E:4,F:5,'F#':6,Gb:6,G:7,'G#':8,Ab:8,A:9,'A#':10,Bb:10,B:11};</span></p>
+<p class="p4"><span class="s3">/* acord sol (token sencer) */</span></p>
+<p class="p4"><span class="s3">const CH=/^[A-G][#b]?(?:maj|min|m|M|dim|aug|sus|add|\+|°|ø|-)?(?:[0-9]+|(?:sus|add|maj|dim|aug|alt|b|#|-|\+)[0-9]*)*(?:\/[A-G][#b]?)?$/;</span></p>
+<p class="p4"><span class="s3">const NEUTRAL=/^(\||\|\||x\d+|\(?x\d+\)?|-|N\.C\.?)$/;</span></p>
+<p class="p4"><span class="s3">const SIZES=[15,19,24]; <span class="Apple-converted-space">  </span>// mides de la lletra (px): petita, mitjana, gran</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">let db={songs:[],lists:[]};</span></p>
+<p class="p4"><span class="s3">try{db=JSON.parse(localStorage.getItem('cansoner'))||db}catch(e){}</span></p>
+<p class="p4"><span class="s3">const save=()=&gt;{try{localStorage.setItem('cansoner',JSON.stringify(db))}catch(e){alert('No es pot desar al navegador')}};</span></p>
+<p class="p4"><span class="s3">let prefs={size:1,cols:0,flat:false};</span></p>
+<p class="p4"><span class="s3">try{Object.assign(prefs,JSON.parse(localStorage.getItem('cansoner_prefs'))||{})}catch(e){}</span></p>
+<p class="p4"><span class="s3">const savePrefs=()=&gt;{try{localStorage.setItem('cansoner_prefs',JSON.stringify(prefs))}catch(e){}};</span></p>
+<p class="p4"><span class="s3">const uid=()=&gt;Date.now().toString(36)+Math.random().toString(36).slice(2,6);</span></p>
+<p class="p4"><span class="s3">const esc=s=&gt;String(s??'').replace(/[&amp;&lt;&gt;"]/g,c=&gt;({'&amp;':'&amp;amp;','&lt;':'&amp;lt;','&gt;':'&amp;gt;','"':'&amp;quot;'}[c]));</span></p>
+<p class="p4"><span class="s3">const $=s=&gt;document.querySelector(s);</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">let view={name:'songs'}, shift=0, prevTxt=null, prevTA=null;</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">/* ---------- acords: transport ---------- */</span></p>
+<p class="p4"><span class="s3">function isChordLine(l){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const t=l.trim(); if(!t) return false;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const toks=t.split(/\s+/);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return toks.every(x=&gt;CH.test(x)||NEUTRAL.test(x)) &amp;&amp; toks.some(x=&gt;CH.test(x));</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function tChord(tok,n,useFlat){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const m=tok.match(/^([A-G][#b]?)([^\/]*)(?:\/([A-G][#b]?))?$/);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!m) return tok;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const arr=useFlat?NF:NS;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const tr=r=&gt;arr[((IDX[r]+n)%12+12)%12];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return tr(m[1])+m[2]+(m[3]?'/'+tr(m[3]):'');</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">const chordTok=(t,n,useFlat)=&gt;((CH.test(t)&amp;&amp;n)?tChord(t,n,useFlat):t);</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">/* ---------- acords dins la línia -&gt; acords a sobre ---------- */</span></p>
+<p class="p4"><span class="s3">const AMB=new Set(['A','Am','Em']); <span class="Apple-converted-space">                      </span>// també poden ser paraules</span></p>
+<p class="p4"><span class="s3">const VOWEL=/[aeiouyáéíóúàèìòùïüöäëâêîôû]/i;</span></p>
+<p class="p4"><span class="s3">const ONSET={B:'lr',C:'hlr',D:'rw',F:'lr',G:'hlnrw'};<span class="Apple-converted-space">      </span>// 2a lletra consonant possible en una paraula normal</span></p>
+<p class="p4"><span class="s3">const STOP=new Set('del dels cel cat bat cup bit fit din gin con don bin fin eat gas bus gun fun bun ben den bel gel bon for cor dor can ban dan fan'.split(' '));</span></p>
+<p class="p4"><span class="s3">const LEAD=new Set("and all as at an are is in it if into on of out over up under us ask after again always another around away any am also almost alone about above en el un una es al amb i'm i'll i've i'd".split(' '));</span></p>
+<p class="p4"><span class="s3">const LEAD2=new Set([...LEAD,...'even ever every only one too you your we he she him his the to for but or so not no now then when how who what where here there just still can got get go from with that this they them our'.split(' ')]);</span></p>
+<p class="p4"><span class="s3">const SKIP=/^\s*(?:key|capo|tuning|tono|tonalidad|tonalitat|afinaci[oó]|bpm|tempo|artist|autor|title|t[ií]tol|album|[àa]lbum)\b/i;</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">/* acord + paraula enganxats: "Csitting", "Gmorning", "Cmaj7sun", "C#and", "Asushello" */</span></p>
+<p class="p4"><span class="s3">const GLUE=new RegExp(</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>'^([A-G](?:#|b(?=[\\dm/]))?'+</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>'(?:(?:maj|min|dim|aug|sus|add)(?=\\d)|sus(?=[a-zà-ÿ]{2}))?'+</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>'(?:m(?![aeiouyáéíóúàèìòùïüöä]))?'+</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>'\\d{0,2}'+</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>'(?:(?:[#b+-]|sus|add|alt)\\d{1,2})*'+</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>'(?:/[A-G]#?)?)'+</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>'([A-Za-zÀ-ÿ][A-Za-zÀ-ÿ\'’-]*[^\\sA-Za-zÀ-ÿ]*)$');</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">function glueKind(tok){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const m=tok.match(GLUE); if(!m) return null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const pre=m[1], rem=m[2];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const word=rem.replace(/[^A-Za-zÀ-ÿ'’-]+$/,'');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const low=word.replace(/[^a-zà-öø-ÿ]/g,'');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(low.length&lt;2||!VOWEL.test(low)) return null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if((pre==='Am'||pre==='Em')&amp;&amp;/^[bpmn]/i.test(rem)) return null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const key=tok.toLowerCase().replace(/’/g,"'").replace(/[^a-zà-öø-ÿ']+$/,'');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const stop=STOP.has(key);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let dec=pre.length&gt;1;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!dec){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const c=rem[0];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(/[A-ZÀ-Þ]/.test(c)) dec=/[a-zà-öø-ÿ]/.test(rem.slice(1));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>else if(pre!=='A'&amp;&amp;pre!=='E'&amp;&amp;!VOWEL.test(c)) dec=!(ONSET[pre]||'').includes(c.toLowerCase());</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const w=word.toLowerCase().replace(/’/g,"'");</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return {chord:pre,rest:rem,dec,stop,word:w,lead:LEAD.has(w)};</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">const core=t=&gt;t.replace(/^[(\[]+/,'').replace(/[)\],.;:]+$/,'');</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">function parseMixed(line,lenient){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const cls=line.trim().split(/\s+/).map(t=&gt;{</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const c=core(t);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(CH.test(c)) return {t,k:AMB.has(c)?'Samb':'S',chord:c};</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const g=glueKind(t);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(g&amp;&amp;!g.stop) return {t,k:g.dec?'Gdec':(g.lead?'Glead':'W'),chord:g.chord,rest:g.rest};</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>return {t,k:'W'};</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const ev=cls.filter(x=&gt;x.k==='S'||x.k==='Gdec').length;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const total=ev+cls.filter(x=&gt;x.k==='Samb').length;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const strong=(total&gt;=2&amp;&amp;ev&gt;=1)||cls.some(x=&gt;x.k==='Gdec')||cls.some(x=&gt;x.k==='S'&amp;&amp;x.chord.length&gt;1);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!ev||(!strong&amp;&amp;!lenient)) return null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const ok=x=&gt;x.k==='S'||x.k==='Gdec'||x.k==='Samb'||x.k==='Glead';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(cls.every(ok)&amp;&amp;cls.every(x=&gt;!x.rest)) return null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let lyr='',ch='';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>for(const x of cls){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(lyr&amp;&amp;!lyr.endsWith(' ')) lyr+=' ';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(ok(x)){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>const pos=Math.max(lyr.length,ch?ch.length+1:0);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>ch=ch.padEnd(pos,' ')+x.chord;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(x.rest) lyr+=x.rest;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}else lyr+=x.t;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return lyr.trim()?[ch.trimEnd(),lyr.trimEnd()]:[ch.trimEnd()];</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">/* "[Am]Hola [F]món" */</span></p>
+<p class="p4"><span class="s3">function inlineToAbove(line){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const re=/\[([^\]]+)\]/g;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let lyr='',ch='',last=0,m,found=false;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>while((m=re.exec(line))){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const c=m[1].trim();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(!(CH.test(c)||/^N\.?C\.?$/i.test(c))) continue;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>found=true;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>lyr+=line.slice(last,m.index); last=re.lastIndex;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const pos=Math.max(lyr.length,ch?ch.length+1:0);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>ch=ch.padEnd(pos,' ')+c;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!found) return null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>lyr+=line.slice(last);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return lyr.trim()?[ch,lyr.replace(/\s+$/,'')]:[ch];</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">/* ---------- còpies malmeses: acords partits, dins de les paraules, amb guionets i "sus" solts ---------- */</span></p>
+<p class="p4"><span class="s3">const EMB=/^[A-G](?:#|b(?=[0-9m\/\-]|$))?(?:maj[79]?|min7?|m(?![aeiouyáéíóúàèìòùïüöäëâêîôû])[679]?|dim7?|aug|sus[24]?|add[29]|[0-9]{1,2})?(?:\/[A-G](?:#|b)?)?/;</span></p>
+<p class="p4"><span class="s3">/* paraules habituals: serveixen per saber que el que queda després d'una lletra d'acord és una paraula de debò */</span></p>
+<p class="p4"><span class="s3">const COMMON=new Set(`and all are but can did does for from get got had has have her him his how its just let not now off one our out over say she that the their them then there they this too was were what when who why will with you your</span></p>
+<p class="p4"><span class="s3">even ever only still away again around always another any about above after also alone almost among along been before being below between both came come could day down each else end every first found give going good great here home into keep kind know last left life like little long look made make many may more most much must never new next night old once other own right same seem should since some such take tell than these thing think those through time under until upon want way well where which while whole without would yes yet</span></p>
+<p class="p4"><span class="s3">baby girl boy love heart face eyes hand hands head mind soul sun sky rain wind fire water road town city street house door floor wall window light dark black white red blue green gold silver dream dreams song songs sing sang voice words word name names world people friend friends mother father mama papa man woman men women child children king queen god lord devil angel heaven hell wild free fall falling flying crying dying lying running walking talking living loving looking waiting wanting feeling coming getting making taking giving leaving breaking changing burning turning learning dancing singing playing saying thinking knowing doing being having seeing hearing standing sitting</span></p>
+<p class="p4"><span class="s3">cold gold bold gone feel dear bear beat boat coat bite dare care card cart eat ago bit bat cat fit fat gin fin bin cup</span></p>
+<p class="p4"><span class="s3">amb com per que més molt sense sobre entre fins cap fer ser estar vull tinc quan també però cada tots totes meva teu seu nostre amor cor vida ara aquí allà sempre mai tot res algú ningú casa mar cel terra nit dia sol lluna vent foc aigua gent llum camí temps</span></p>
+<p class="p4"><span class="s3">mundo cielo tierra noche corazón siempre nunca todo nada tiempo`.split(/\s+/));</span></p>
+<p class="p4"><span class="s3">const TWO=new Set('in on of to up us my me no so as at is it if or we he be do go an am'.split(' '));</span></p>
+<p class="p4"><span class="s3">const STOPSUS=['sustain','sustanc','sustant','suspect','suspen','suspic','suspir','sushi','susan','susie','sussex','suscept'];</span></p>
+<p class="p4"><span class="s3">/* línia amb senyals de còpia malmesa */</span></p>
+<p class="p4"><span class="s3">const GARBLE=/[a-zà-öø-ÿ][A-G]|\b[A-G](?:#|b)?sus|(?:^|[\s-])sus(?=[A-Za-zÀ-ÿ'’]|[\s-]|$)|\b[A-G](?:#|b)?-[A-G]/;</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">/* després d'un guionet: continua una cadena d'acords? */</span></p>
+<p class="p4"><span class="s3">function chainOK(r){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(/^sus(?=$|-|[A-Za-z])/.test(r)) return true;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const m=r.match(EMB); if(!m) return false;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const ch=m[0], aft=r[ch.length];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!/^[A-G][#b]?$/.test(ch)) return true;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return aft===undefined||aft==='-';</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">/* hi ha un acord al principi de s? (o: s es l'inici d'una part de paraula) → retorna l'acord o null */</span></p>
+<p class="p4"><span class="s3">function bChord(s,o){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const m=s.match(EMB); if(!m) return null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const ch=m[0], se=s.indexOf('-'), seg=se&lt;0?s:s.slice(0,se);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(ch.length&gt;seg.length) return null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const rest=seg.slice(ch.length), bare=/^[A-G][#b]?$/.test(ch);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!bare&amp;&amp;/(?:maj|min|dim|aug|add)$/.test(ch)&amp;&amp;rest) return null; <span class="Apple-converted-space">    </span>// Dim, Added...</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(/m$/.test(ch)&amp;&amp;/^[bpmn]/i.test(rest)) return null; <span class="Apple-converted-space">                  </span>// Embrace, Empty...</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(o.mid){<span class="Apple-converted-space">                                                              </span>// majúscula enmig d'una paraula</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>return (rest===''||/^[a-zà-öø-ÿ'’.,;:!?)"]/.test(rest))?ch:null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(rest===''){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(se&gt;=0) return chainOK(s.slice(se+1))?ch:null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>return (!bare||o.chain)?ch:null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(/^[a-zà-öø-ÿ]/.test(rest)){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const low=rest.replace(/[^a-zà-öø-ÿ]/g,'');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(!bare) return (low.length&gt;=2&amp;&amp;VOWEL.test(low))?ch:null; <span class="Apple-converted-space">          </span>// Asusmama, Dsusfree</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const w=rest.toLowerCase().replace(/[^a-zà-öø-ÿ']/g,'');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const full=(ch+rest).toLowerCase().replace(/[^a-zà-öø-ÿ']/g,'');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const okLen=w.length&gt;=3||TWO.has(w);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>return (o.glue2&amp;&amp;!o.first&amp;&amp;okLen&amp;&amp;COMMON.has(w)&amp;&amp;!COMMON.has(full))?ch:null; <span class="Apple-converted-space">  </span>// Deven</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(/^['’.,;:!?)"]/.test(rest)) return (!bare||o.glue2||o.chain)?ch:null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return null;</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">/* talla una paraula en trossos: text, acords i "sus" solts */</span></p>
+<p class="p4"><span class="s3">function scanTok(t,o){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const ops=[];let i=0,ts=0,chain=false,ws=-1;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const flush=to=&gt;{if(to&gt;ts)ops.push({k:'t',s:t.slice(ts,to),from:ts,to})};</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>while(i&lt;t.length){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const c=t[i],prev=i?t[i-1]:'';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const boundary=(i===0||prev==='-'||i===ws);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>/* "sus" solt davant d'una paraula */</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(boundary&amp;&amp;t.startsWith('sus',i)){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>const rest=t.slice(i+3);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>const run=(t.slice(i).match(/^[A-Za-zÀ-ÿ'’]+/)||[''])[0].toLowerCase().replace(/’/g,"'");</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(!STOPSUS.some(p=&gt;run.startsWith(p))){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>const letters=rest.replace(/[^A-Za-zÀ-ÿ].*$/,'');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>const wordAfter=letters.length&gt;=2&amp;&amp;(/^[A-Z]/.test(letters)||VOWEL.test(letters));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>const chainAfter=rest[0]==='-'&amp;&amp;chainOK(rest.slice(1));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>if(wordAfter||chainAfter||(rest===''&amp;&amp;chain)){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">          </span>flush(i);ops.push({k:'s',from:i,to:i+3,free:(!wordAfter)});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">          </span>i+=3;ts=i;chain=true;ws=i;continue;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>/* acord */</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(/[A-G]/.test(c)){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>let o2=null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(boundary) o2={glue2:o.glue2,first:o.first&amp;&amp;i===0,chain,mid:false};</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>else if(/[a-zà-öø-ÿ]/.test(prev)&amp;&amp;!/^(?:Mc|Mac)$/.test(t.slice(0,i))) o2={glue2:o.glue2,first:false,chain:false,mid:true};</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(o2){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>const ch=bChord(t.slice(i),o2);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>if(ch){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">          </span>flush(i);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">          </span>ops.push({k:'c',tok:ch,from:i,to:i+ch.length,def:(!/^[A-G][#b]?$/.test(ch))||o2.mid});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">          </span>i+=ch.length;ts=i;chain=true;continue;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>/* guionets que només serveixen per enganxar acords */</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(c==='-'){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>const nx=t.slice(i+1);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(ts===i&amp;&amp;chain){ts=i+1;i++;continue}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(/^[A-G]/.test(nx)&amp;&amp;bChord(nx,{glue2:o.glue2,first:false,chain:false,mid:false})){flush(i);ts=i+1;i++;continue}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(/^sus(?=$|-|[A-Z])/.test(nx)){flush(i);ts=i+1;i++;continue}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>chain=false;i++;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>flush(t.length);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return ops;</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">/* acord (sense qualitat) de la línia de sobre, proper a la posició r d'un "sus" solt */</span></p>
+<p class="p4"><span class="s3">function nearIdx(pc,r){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let best=-1,bd=99;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>pc.forEach((c,i)=&gt;{</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(!/^[A-G][#b]?$/.test(c.tok)) return;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const d=c.col-r;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(d&gt;=-2&amp;&amp;d&lt;=4){const sc=Math.abs(d-1);if(sc&lt;bd){bd=sc;best=i}}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return best;</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">/* raw = línia de lletra amb trossos d'acords; P = línia d'acords de sobre (o null) */</span></p>
+<p class="p4"><span class="s3">function fuseLine(raw,P){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const toks=[];{const re=/\S+/g;let m;while((m=re.exec(raw)))toks.push({s:m[0],r:m.index});}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const pc=[];if(P){const re=/\S+/g;let m;while((m=re.exec(P)))pc.push({col:m.index,tok:m[0]});}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let scans=toks.map((tk,ix)=&gt;scanTok(tk.s,{glue2:false,first:ix===0}));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const defs=scans.reduce((n,ops)=&gt;n+ops.filter(o=&gt;(o.k==='c'&amp;&amp;o.def)||o.k==='s').length,0);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(defs&gt;=2||(defs&gt;=1&amp;&amp;pc.length)) scans=toks.map((tk,ix)=&gt;scanTok(tk.s,{glue2:true,first:ix===0}));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let clean='',changed=false;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const emb=[],maps=[];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>toks.forEach((tk,ti)=&gt;{</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const ops=scans[ti];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>ops.forEach(o=&gt;{</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(o.k==='s'){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>if(!o.free){const ix=nearIdx(pc,tk.r+o.from);if(ix&gt;=0)pc[ix].tok+='sus'}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>changed=true;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>}else if(o.k==='c') changed=true;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const hasT=ops.some(o=&gt;o.k==='t');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(hasT&amp;&amp;clean&amp;&amp;!clean.endsWith(' ')) clean+=' ';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const c0=clean.length,cm=[];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const at=new Array(tk.s.length).fill(null);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>ops.forEach(o=&gt;{for(let q=o.from;q&lt;o.to;q++)at[q]=o});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const trail=[];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>for(let q=0;q&lt;tk.s.length;q++){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>cm[q]=clean.length-c0;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>const o=at[q];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(!o) continue;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(o.k==='t') clean+=tk.s[q];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>else if(o.k==='c'&amp;&amp;q===o.from){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>const after=ops.some(x=&gt;x.k==='t'&amp;&amp;x.from&gt;=o.to);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>if(after) emb.push({pos:clean.length,tok:o.tok});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>else trail.push(o.tok);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>cm[tk.s.length]=clean.length-c0;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(trail.length){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>const p=clean.length+((clean&amp;&amp;!clean.endsWith(' '))?1:0); <span class="Apple-converted-space">      </span>// principi de la paraula següent</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>trail.forEach(t=&gt;emb.push({pos:p,tok:t}));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>maps.push({r:tk.r,len:tk.s.length,c0,cm});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>clean=clean.replace(/\s+$/,'');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!changed&amp;&amp;!emb.length) return null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const toClean=r=&gt;{</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>for(const m of maps){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(r&lt;m.r) return m.c0;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(r&lt;=m.r+m.len) return m.c0+m.cm[Math.min(r-m.r,m.len)];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>return clean.length;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>};</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const Q=pc.map(c=&gt;({pos:toClean(c.col),tok:c.tok}));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const E=emb.map(e=&gt;({pos:e.pos,tok:e.tok,used:false})),keep=[];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>Q.forEach(q=&gt;{ <span class="Apple-converted-space">                                  </span>// acords de la línia de sobre i de dins la lletra: sense duplicats</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const j=E.findIndex(e=&gt;!e.used&amp;&amp;Math.abs(e.pos-q.pos)&lt;=4&amp;&amp;e.tok[0]===q.tok[0]&amp;&amp;(e.tok.startsWith(q.tok)||q.tok.startsWith(e.tok)));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(j&lt;0){keep.push(q);return}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>E[j].used=true;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(q.tok.length&gt;E[j].tok.length)E[j].tok=q.tok;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const all=keep.concat(E).sort((a,b)=&gt;a.pos-b.pos);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let ch='';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>for(const c of all){const p=Math.max(c.pos,ch?ch.length+1:0);ch=ch.padEnd(p,' ')+c.tok}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return {chord:ch,lyric:clean};</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">/* ---------- indicacions (intro, solo, 2x...): en cursiva, no són lletra ---------- */</span></p>
+<p class="p4"><span class="s3">const N_STRONG=/\b(?:intro|outro|solo|riffs?|interlude|instrumental|capo|fret|bar\s*chords?|chord\s*breaks?|tacet|arpeggios?|tremolo|ad[\s-]?lib|fade[\s-]?out|ritardando|repeat|second\s+guitar|lead\s+guitar|x\s?\d+|\d+\s?x)\b/i;</span></p>
+<p class="p4"><span class="s3">const N_START=/^(?:intro|outro|solo|riffs?|interlude|instrumental|capo|repeat|play|tacet|fade|bar\s*chords?|chord\s*break|second\s+guitar|lead\s+guitar|guitar\s+(?:solo|riff)|x\s?\d|\d+\s?x)\b/i;</span></p>
+<p class="p4"><span class="s3">const SECW=/^\s*[\[(]?\s*(?:verse|chorus|pre-?chorus|bridge|intro|outro|interlude|instrumental|solo|refrain|coda|estrofa|tornada|estribillo|introducci[oó])(?:\s*(?:\d+|x\d+|[ivx]{1,3}))*\s*[\])]?\s*:?\s*$/i;</span></p>
+<p class="p4"><span class="s3">function isSection(l){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(SECW.test(l)) return true;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const m=l.match(/^\s*\[([^\]]{1,30})\]\s*$/);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return !!m&amp;&amp;!CH.test(m[1].trim());</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">/* retorna el text de la indicació si la línia ho és, o null */</span></p>
+<p class="p4"><span class="s3">function noteText(l){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const t=String(l||'').trim();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!t) return null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(/^#/.test(t)) return t.replace(/^#+\s*/,'');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(SECW.test(t)||isChordLine(t)) return null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const lab=t.match(/^[^\s:]{1,15}:\s+(\S.*)$/);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(lab&amp;&amp;isChordLine(lab[1])) return null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!N_STRONG.test(t)) return null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const inner=t.replace(/^[(\[]\s*/,'').replace(/\s*[)\]]$/,'').trim();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const wrapped=/^[(\[]/.test(t)||/[)\]]$/.test(t);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const caps=t===t.toUpperCase()&amp;&amp;/[A-Z]{3}/.test(t);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return (wrapped||caps||N_START.test(inner))?inner:null;</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">/* ---------- neteja: elimina el que no és lletra ni acords + detecta títol i autor ---------- */</span></p>
+<p class="p4"><span class="s3">const LABEL_T=/^\s*(?:t[ií]tol|title|song|can[cç]ó|canci[oó]n|nom)\s*[:：]\s*(.+?)\s*$/i;</span></p>
+<p class="p4"><span class="s3">const LABEL_A=/^\s*(?:autor(?:a)?|artista?|author|by|int[èe]rpret|cantant|band|grup|group|composer|compositor|written\s+by|lletra\s+i\s+m[uú]sica)\s*[:：]\s*(.+?)\s*$/i;</span></p>
+<p class="p4"><span class="s3">const CHORDS_BY=/^(.{1,80}?)\s+(?:chords?(?:\s*&amp;\s*lyrics)?|tabs?|acordes|acords|cifra|lyrics?)\s+(?:by|de|per)\s+(.{1,60})$/i;</span></p>
+<p class="p4"><span class="s3">const LABEL_J=/^\s*(?:key|tom|tonalitat|tonalidad|tono|capo|tuning|afinaci[oó]n?|tempo|bpm|difficulty|dificultat|dificultad|rating|votes?|views?|hits|album|[àa]lbum|year|any|a[ñn]o|genre|g[eè]nere|g[eé]nero|submitted\s+by|updated|last\s+update(?:d)?|last\s+edit(?:ed)?|transcribed\s+by|chords?\s+by|tabs?\s+by|strumming|chords?\s+used|acordes|acords|date|data|fecha|time\s+signature|comp[aà]s)\s*[:：]\s*.*$/i;</span></p>
+<p class="p4"><span class="s3">const J_WORD=/^\s*(?:chords?|tabs?|lyrics?|letra|acordes|acords|cifra|share|print|download|edit|favou?rites?|autoscroll|auto-?scroll|transpose|simplify|tuner|metronome|capo|report|reportar|compartir|imprimir|baixar|descargar|advertisement|ads?|sponsored|related|comments?|comentaris|rate|pro|premium|official|show\s+chords|hide\s+chords|chord\s+diagrams?|chord\s+chart|more|less|show\s+all|play|ver\s+v[ií]deo|aprender|tablature|ultimate[\s-]*guitar|cifra\s*club|chordie|songsterr|e-?chords)\s*$/i;</span></p>
+<p class="p4"><span class="s3">const J_MISC=[</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>/^\s*[A-Ga-g]?[#b]?\s*\|[-\dhpbrxs\/\\~()^|*.\s]{4,}$/,</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>/^\s*[xX\d]{6}\s*$/,</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>/^\s*capo\s*(?:on\s*)?(?:the\s*)?\d+\w*\s*(?:fret)?\s*$/i,</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>/^\s*key\s+of\s+\S+\s*$/i,</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>/^\s*(?:bpm|tempo)\s*[=:]?\s*\d+\s*(?:bpm)?\s*$/i,</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>/^\s*(?:standard|drop\s*[a-g]#?|half[\s-]*step\s+down)\s+tuning\s*$/i,</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>/^\s*(?:submit|send|report)\s+(?:a\s+)?(?:correction|corrections|problem|error)\b.*$/i,</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>/^\s*(?:chords?|acordes|acords)\s+(?:for|de|of)\s+.{1,80}$/i,</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>/(?:https?:\/\/|www\.|@[\w-]+\.\w{2,}|\b[a-z0-9-]+\.(?:com|net|org|es|cat|br|io|fm)\b)/i,</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space"> </span>/(?:©|\(c\)\s*\d{4}|copyright|all\s+rights\s+reserved|todos\s+los\s+derechos|tots\s+els\s+drets)/i</span></p>
+<p class="p4"><span class="s3">];</span></p>
+<p class="p4"><span class="s3">function isJunk(l){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!l||!l.trim()) return false;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return LABEL_J.test(l)||J_WORD.test(l)||J_MISC.some(r=&gt;r.test(l));</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function isContentLine(l){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return isChordLine(l)||isSection(l)||/\[[A-G][^\]]*\]/.test(l)||GARBLE.test(l)||!!parseMixed(l,false);</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function cleanTitle(s){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>s=String(s||'').trim().replace(/^(?:chords?|tabs?|acordes?|acords?|cifra|lyrics?)\s+(?:for|de|of)\s+/i,'');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let p;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>do{</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>p=s;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>s=s.replace(/\s*[\(\[]?\s*\b(?:ver(?:si[oó]n)?\.?\s*\d+|official|chords?(?:\s*&amp;\s*lyrics)?|tabs?|lyrics?|letra|cifra|acordes|acords)\s*[\)\]]?\s*$/i,'').trim();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}while(s!==p);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return s.replace(/^["“”'‘’]+|["“”'‘’]+$/g,'').replace(/[\s:,;-]+$/,'').trim();</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function extractMeta(lines){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const meta={},drop=new Set();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const isDir=l=&gt;/^\s*\{.*\}\s*$/.test(l);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const cs=lines.findIndex(l=&gt;l.trim()&amp;&amp;!isJunk(l)&amp;&amp;!isDir(l)&amp;&amp;noteText(l)===null&amp;&amp;isContentLine(l));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const zoneEnd=cs&gt;=0?cs:Math.min(lines.length,25);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const idx=[];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>for(let i=0;i&lt;zoneEnd;i++) if(lines[i].trim()&amp;&amp;!isDir(lines[i])) idx.push(i);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const dropZone=cs&gt;=0&amp;&amp;idx.length&lt;=10;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const cand=[];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>for(const i of idx){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const l=lines[i].trim(); let m;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if((m=l.match(LABEL_T))){if(!meta.title)meta.title=cleanTitle(m[1]);drop.add(i);continue}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if((m=l.match(LABEL_A))){if(!meta.artist)meta.artist=cleanTitle(m[1]);drop.add(i);continue}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if((m=l.match(CHORDS_BY))){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(!meta.title)meta.title=cleanTitle(m[1]);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(!meta.artist)meta.artist=cleanTitle(m[2]);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>drop.add(i);continue;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(isJunk(lines[i])||noteText(lines[i])!==null){drop.add(i);continue}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(dropZone){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if((m=l.match(/^[Bb]y\s+([A-ZÀ-Þ][^,.;!?]{1,40})$/))){if(!meta.artist)meta.artist=cleanTitle(m[1]);drop.add(i);continue}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>drop.add(i);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(l.length&lt;=80) cand.push(l);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(dropZone&amp;&amp;cand.length){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(!meta.title){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>const c0=cand.shift();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>const m=c0.match(/^(.{1,70}?)\s+[-–—]\s+(.{1,50})$/);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(m){meta.title=cleanTitle(m[1]);if(!meta.artist)meta.artist=cleanTitle(m[2]);}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>else meta.title=cleanTitle(c0);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(!meta.artist&amp;&amp;cand.length&amp;&amp;cand[0].length&lt;=45) meta.artist=cleanTitle(cand[0]);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!meta.title)delete meta.title;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!meta.artist)delete meta.artist;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return {meta,drop};</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">function fixText(t){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const meta={}; let n=0,removed=0,notes=0;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>t=t.replace(/\r\n?/g,'\n').replace(/\u00a0/g,' ').replace(/\t/g,'<span class="Apple-converted-space">    </span>').replace(/\[\/?(?:ch|tab)\]/gi,'');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let lines=t.split('\n').map(l=&gt;l.replace(/\s+$/,''));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>// 1) títol i autor de la capçalera</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const ex=extractMeta(lines);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>Object.assign(meta,ex.meta);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>// 2) fora la capçalera i les línies que no són lletra ni acords</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const kept=[];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>lines.forEach((l,i)=&gt;{</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(ex.drop.has(i)||isJunk(l)){if(l.trim())removed++;return}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>kept.push(/^[\s\-_=*~.•·|]{3,}$/.test(l)?'':l);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>lines=kept;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>// 3) acords a sobre de la lletra</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const plain=l=&gt;!isChordLine(l)&amp;&amp;!SKIP.test(l)&amp;&amp;!/\[[^\]]+\]/.test(l)&amp;&amp;!GARBLE.test(l)&amp;&amp;noteText(l)===null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const lenient=lines.filter(l=&gt;plain(l)&amp;&amp;parseMixed(l,false)).length&gt;=2;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const out=[]; let lastChord=false;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>for(const line of lines){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const d=line.match(/^\s*\{\s*([a-z_]+)\s*:?\s*(.*?)\s*\}\s*$/i); <span class="Apple-converted-space">  </span>// directives ChordPro</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(d){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>const k=d[1].toLowerCase(),v=d[2];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(k==='title'||k==='t') meta.title=v;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>else if(k==='artist'||k==='subtitle'||k==='st') meta.artist=v;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>else if(['comment','c','ci','comment_italic'].includes(k)){out.push('# '+v);notes++}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>lastChord=false;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>continue;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(isChordLine(line)||SKIP.test(line)){out.push(line);lastChord=isChordLine(line);continue}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const nt=noteText(line);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(nt!==null){if(nt!==''){out.push('# '+nt);notes++}lastChord=false;continue}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(/\[[^\]]+\]/.test(line)){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>const r=inlineToAbove(line);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(r){out.push(...r);n++;lastChord=false;continue}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const lab=line.match(/^\s*([^\s:]{1,15}:)\s+(\S.*)$/); <span class="Apple-converted-space">              </span>// "Intro: C G Am F"</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(lab&amp;&amp;isChordLine(lab[2])){out.push(lab[1],lab[2]);n++;lastChord=false;continue}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(GARBLE.test(line)){<span class="Apple-converted-space">                                                </span>// còpia malmesa</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>const P=lastChord?out[out.length-1]:null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>const r=fuseLine(line,P);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(r){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>if(P) out.pop();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>if(r.chord.trim()) out.push(r.chord);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>if(r.lyric.trim()) out.push(r.lyric);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>n++; lastChord=!r.lyric.trim()&amp;&amp;!!r.chord.trim(); continue;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const r=parseMixed(line,lenient);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(r){out.push(...r);n++;lastChord=false;continue}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>out.push(line); lastChord=false;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const text=out.join('\n').replace(/\n{3,}/g,'\n\n').replace(/^\n+|\n+$/g,'');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return {text,meta,n,removed,notes};</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">/* hi ha res a netejar o convertir en aquest text? */</span></p>
+<p class="p4"><span class="s3">function needsFix(t){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return String(t||'').split('\n').some(l=&gt;/\[[A-G][^\]]*\]/.test(l)||(!isChordLine(l)&amp;&amp;GARBLE.test(l))||(!/^\s*#/.test(l)&amp;&amp;noteText(l)!==null));</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">/* ---------- dibuix de la cançó: acords a sobre de la lletra ---------- */</span></p>
+<p class="p4"><span class="s3">function segHTML(c,tx){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return '&lt;span class="sg"&gt;&lt;span class="ch"&gt;'+(c?esc(c):'&amp;nbsp;')+'&lt;/span&gt;&lt;span class="tx"&gt;'+(tx?esc(tx):'&amp;nbsp;')+'&lt;/span&gt;&lt;/span&gt;';</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function pairHTML(cl,ll,n,useFlat){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const ch=[]; const re=/\S+/g; let m;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>while((m=re.exec(cl))) ch.push({i:m.index,t:chordTok(m[0],n,useFlat)});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>ll=ll.replace(/\s+$/,'');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let h='';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const first=Math.min(ch[0].i,ll.length);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(first&gt;0) h+=segHTML('',ll.slice(0,first));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>for(let k=0;k&lt;ch.length;k++){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const a=Math.min(ch[k].i,ll.length);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const b=k+1&lt;ch.length?Math.min(ch[k+1].i,ll.length):ll.length;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>h+=segHTML(ch[k].t,ll.slice(a,b));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return '&lt;div class="ln"&gt;&lt;span class="lw"&gt;'+h+'&lt;/span&gt;&lt;/div&gt;';</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function chordOnlyHTML(cl,n,useFlat){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const h=cl.trim().split(/\s+/).map(t=&gt;'&lt;span class="ch inl"&gt;'+esc(chordTok(t,n,useFlat))+'&lt;/span&gt;').join('');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return '&lt;div class="ln co"&gt;&lt;span class="lw"&gt;'+h+'&lt;/span&gt;&lt;/div&gt;';</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function sheetHTML(text,n,useFlat){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const L=String(text||'').replace(/\r/g,'').replace(/\t/g,'<span class="Apple-converted-space">    </span>').split('\n').map(x=&gt;x.replace(/\s+$/,''));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let out='',i=0,blank=true;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>while(i&lt;L.length){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const l=L[i];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(!l.trim()){ if(!blank) out+='&lt;div class="sp"&gt;&lt;/div&gt;'; blank=true; i++; continue; }</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>blank=false;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(isChordLine(l)){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>const nx=L[i+1];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(nx!==undefined&amp;&amp;nx.trim()&amp;&amp;!isChordLine(nx)&amp;&amp;!isSection(nx)&amp;&amp;noteText(nx)===null){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">        </span>out+=pairHTML(l,nx,n,useFlat); i+=2; continue;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>out+=chordOnlyHTML(l,n,useFlat); i++; continue;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(isSection(l)){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>out+='&lt;div class="sec"&gt;'+esc(l.trim().replace(/^[\[(]\s*/,'').replace(/\s*[\])]$/,'').replace(/:$/,''))+'&lt;/div&gt;'; i++; continue;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const nt=noteText(l);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(nt!==null){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(nt!=='') out+='&lt;div class="note"&gt;'+esc(nt)+'&lt;/div&gt;';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>i++; continue;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>out+='&lt;div class="ln pl"&gt;'+esc(l)+'&lt;/div&gt;'; i++;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>return out;</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">/* ajusta les columnes perquè càpiga tota la cançó a la pantalla */</span></p>
+<p class="p4"><span class="s3">function fitSong(){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const sh=$('#sheet'); if(!sh)return;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const cs=getComputedStyle(sh);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>sh.classList.remove('wrap');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>sh.style.columnCount=1;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const W=sh.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const gap=parseFloat(cs.columnGap)||32;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let mx=parseFloat(cs.fontSize)*14;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>sh.querySelectorAll('.lw').forEach(e=&gt;{mx=Math.max(mx,e.getBoundingClientRect().width)});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(mx&gt;W) sh.classList.add('wrap');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const maxCols=Math.max(1,Math.min(3,Math.floor((W+gap)/(mx+gap))));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let n;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(prefs.cols&gt;0){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>n=Math.min(prefs.cols,maxCols);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}else{</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const avail=Math.max(260,window.innerHeight-(sh.getBoundingClientRect().top+window.scrollY)-18);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>n=maxCols;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>for(let k=1;k&lt;=maxCols;k++){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>sh.style.columnCount=k;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(sh.scrollHeight&lt;=avail){n=k;break}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>sh.style.columnCount=n;</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">let rzT;</span></p>
+<p class="p4"><span class="s3">window.addEventListener('resize',()=&gt;{clearTimeout(rzT);rzT=setTimeout(()=&gt;{if(view.name==='song')fitSong()},150)});</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">/* ---------- navegació ---------- */</span></p>
+<p class="p4"><span class="s3">function go(v){view=v;if(v.name==='song')shift=0;render()}</span></p>
+<p class="p4"><span class="s3">function render(){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>$('#n-songs').className=['songs','song','edit'].includes(view.name)?'on':'';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>$('#n-lists').className=['lists','list'].includes(view.name)?'on':'';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>$('#app').style.maxWidth=view.name==='song'?'1500px':'900px';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>({songs:songsView,song:songView,edit:editView,lists:listsView,list:listView})[view.name]();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>window.scrollTo(0,0);</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">/* ---------- cançons ---------- */</span></p>
+<p class="p4"><span class="s3">function songsView(){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>$('#app').innerHTML=`</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;div class="row"&gt;&lt;input type="text" id="q" placeholder="Cerca per títol o autor..." oninput="drawSongs()" style="flex:1"&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;button class="btn" onclick="go({name:'edit',id:null})"&gt;+ Nova cançó&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;button class="btn alt" onclick="document.getElementById('txts').click()"&gt;Importa .txt / .cho&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;input type="file" id="txts" accept=".txt,.cho,.crd,.chopro,.chordpro,.pro" multiple hidden onchange="importTxt(this)"&gt;&lt;/div&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;div id="res"&gt;&lt;/div&gt;`;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>drawSongs();</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function drawSongs(){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const q=($('#q')?.value||'').toLowerCase();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const arr=db.songs.filter(s=&gt;(s.title+' '+s.artist).toLowerCase().includes(q))</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>.sort((a,b)=&gt;a.title.localeCompare(b.title,'ca'));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>$('#res').innerHTML=arr.length?arr.map(s=&gt;`&lt;div class="item"&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>&lt;a onclick="go({name:'song',id:'${s.id}'})"&gt;&lt;b&gt;${esc(s.title)}&lt;/b&gt; &lt;small&gt;${esc(s.artist)}&lt;/small&gt;&lt;/a&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>&lt;button class="btn alt" onclick="go({name:'edit',id:'${s.id}'})"&gt;Edita&lt;/button&gt;&lt;/div&gt;`).join('')</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>:'&lt;p&gt;Encara no hi ha cap cançó. Prem "Nova cançó".&lt;/p&gt;';</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function importTxt(inp){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>[...inp.files].forEach(f=&gt;{</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const r=new FileReader();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>r.onload=()=&gt;{</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>const f2=fixText(r.result);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>db.songs.push({id:uid(),title:f2.meta.title||f.name.replace(/\.[^.]+$/,''),artist:f2.meta.artist||'',text:f2.text});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>save();drawSongs();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>};</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>r.readAsText(f);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>});</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">function songView(){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const s=db.songs.find(x=&gt;x.id===view.id); if(!s){go({name:'songs'});return}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(needsFix(s.text)){ <span class="Apple-converted-space">                                  </span>// cançons desades abans: es posen al dia soles</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const f=fixText(s.text);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(f.text.trim()&amp;&amp;f.text!==s.text){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>s.text=f.text;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(f.meta.title&amp;&amp;(!s.title||s.title==='Sense títol')) s.title=f.meta.title;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>if(f.meta.artist&amp;&amp;!s.artist) s.artist=f.meta.artist;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>save();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const lst=view.list&amp;&amp;db.lists.find(l=&gt;l.id===view.list);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let nav='';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(lst){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const i=lst.songs.indexOf(s.id);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const prev=lst.songs[i-1], next=lst.songs[i+1];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>nav=`&lt;div class="row noprint"&gt;&lt;button class="btn alt" ${prev?`onclick="go({name:'song',id:'${prev}',list:'${lst.id}'})"`:'disabled'}&gt;◀&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>&lt;span&gt;${esc(lst.name)} · ${i+1}/${lst.songs.length}&lt;/span&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>&lt;button class="btn alt" ${next?`onclick="go({name:'song',id:'${next}',list:'${lst.id}'})"`:'disabled'}&gt;▶&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>&lt;button class="btn alt" onclick="go({name:'list',id:'${lst.id}'})"&gt;Torna a la llista&lt;/button&gt;&lt;/div&gt;`;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const a=Math.abs(shift);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const tl=shift===0?'Original':(shift&gt;0?'+':'−')+a+' '+(a===1?'semitò':'semitons');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const sizeBtn=(i,lab,px)=&gt;`&lt;button class="btn alt sz ${prefs.size===i?'on':''}" style="font-size:${px}px" title="${lab}" onclick="setSize(${i})"&gt;A&lt;/button&gt;`;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const colSel='&lt;select title="Columnes" onchange="setCols(this.value)"&gt;'+</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>[['0','Columnes: auto'],['1','1 columna'],['2','2 columnes'],['3','3 columnes']]</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>.map(([v,t])=&gt;`&lt;option value="${v}" ${String(prefs.cols)===v?'selected':''}&gt;${t}&lt;/option&gt;`).join('')+'&lt;/select&gt;';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>$('#app').innerHTML=`${nav}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;div class="bar noprint"&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>&lt;div class="ttl"&gt;&lt;b&gt;${esc(s.title)}&lt;/b&gt;&lt;span&gt;${esc(s.artist)}&lt;/span&gt;&lt;/div&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>&lt;div class="row"&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>&lt;button class="btn tb" onclick="tr(-1)"&gt;Transposa ▼&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>&lt;button class="btn tb" onclick="tr(1)"&gt;Transposa ▲&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>&lt;span class="trind ${shift?'act':''}"&gt;${tl}&lt;/span&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>${shift?`&lt;button class="btn alt" onclick="shift=0;render()"&gt;Original&lt;/button&gt;`:''}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>&lt;span class="sep"&gt;&lt;/span&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>${sizeBtn(0,'Lletra petita',12)}${sizeBtn(1,'Lletra mitjana',16)}${sizeBtn(2,'Lletra gran',20)}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>${colSel}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>&lt;label&gt;&lt;input type="checkbox" ${prefs.flat?'checked':''} onchange="prefs.flat=this.checked;savePrefs();render()"&gt; bemolls (♭)&lt;/label&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>&lt;button class="btn alt" onclick="window.print()"&gt;Imprimeix&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>&lt;button class="btn alt" onclick="go({name:'edit',id:'${s.id}'})"&gt;Edita&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>&lt;/div&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;/div&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;h2 class="onlyprint" style="margin:0 0 8px"&gt;${esc(s.title)} &lt;small style="font-weight:400"&gt;${esc(s.artist)}&lt;/small&gt;&lt;/h2&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;div id="sheet" class="sheet" style="--fs:${SIZES[prefs.size]}px"&gt;${sheetHTML(s.text,shift,prefs.flat)}&lt;/div&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;div class="row noprint"&gt;&lt;select id="addl" style="max-width:260px"&gt;&lt;option value=""&gt;Afegeix a una llista...&lt;/option&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>${db.lists.map(l=&gt;`&lt;option value="${l.id}"&gt;${esc(l.name)}&lt;/option&gt;`).join('')}&lt;/select&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>&lt;button class="btn" onclick="addToList('${s.id}')"&gt;Afegeix&lt;/button&gt;&lt;/div&gt;`;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>fitSong();</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function tr(n){shift+=n;if(Math.abs(shift)&gt;=12)shift=0;render()}</span></p>
+<p class="p4"><span class="s3">function setSize(i){prefs.size=i;savePrefs();render()}</span></p>
+<p class="p4"><span class="s3">function setCols(v){prefs.cols=+v;savePrefs();fitSong()}</span></p>
+<p class="p4"><span class="s3">function addToList(sid){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const l=db.lists.find(x=&gt;x.id===$('#addl').value); if(!l)return;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!l.songs.includes(sid)){l.songs.push(sid);save()}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>alert('Afegida a "'+l.name+'"');</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">function editView(){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const s=view.id?db.songs.find(x=&gt;x.id===view.id):{title:'',artist:'',text:''};</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const isNew=!view.id;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>prevTxt=null;prevTA=null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>$('#app').innerHTML=`</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;h2&gt;${isNew?'Nova cançó':'Edita cançó'}&lt;/h2&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;label&gt;Títol&lt;/label&gt;&lt;input type="text" id="t" value="${esc(s.title)}" oninput="updLinks()"&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;label&gt;Autor&lt;/label&gt;&lt;input type="text" id="a" value="${esc(s.artist)}" oninput="updLinks()"&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>${isNew?`&lt;div class="box"&gt;&lt;b&gt;Busca la cançó:&lt;/b&gt; (s'obre en una pestanya nova; copia el text i enganxa'l a sota)</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>&lt;div class="row" id="links"&gt;&lt;/div&gt;&lt;/div&gt;`:''}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;label&gt;Lletra amb els acords a sobre (text pla)&lt;/label&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;div id="note" class="nt noprint" style="display:none"&gt;&lt;/div&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;textarea id="x" onpaste="onPaste(event)" placeholder=" <span class="Apple-converted-space">  </span>Am<span class="Apple-converted-space">        </span>F</span></p>
+<p class="p4"><span class="s3">Aquí va la lletra..."&gt;${esc(s.text)}&lt;/textarea&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;div class="row"&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>&lt;button class="btn" onclick="saveSong('${view.id||''}')"&gt;Desa&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>&lt;button class="btn alt" onclick="${view.id?`go({name:'song',id:'${view.id}'})`:`go({name:'songs'})`}"&gt;Cancel·la&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>${view.id?`&lt;button class="btn red" onclick="delSong('${view.id}')"&gt;Esborra&lt;/button&gt;`:''}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;/div&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;p&gt;&lt;small&gt;En enganxar el text d'una web, el programa deixa la lletra i els acords (acords a sobre de la lletra, també si venien trencats o enganxats a les paraules), treu capo, tonalitat, enllaços i botons, i omple el títol i l'autor si estan buits. Les indicacions (intro, solo, 2x…) es guarden amb un &lt;code&gt;#&lt;/code&gt; al davant i es veuen en cursiva; si en vols afegir una, escriu &lt;code&gt;# el text&lt;/code&gt; en una línia. Els acords han d'estar en notació anglesa (C, D, E, F, G, A, B).&lt;/small&gt;&lt;/p&gt;`;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(isNew)updLinks();</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function onPaste(e){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const cd=e.clipboardData||window.clipboardData; if(!cd)return;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const txt=cd.getData('text/plain'); if(!txt)return;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const r=fixText(txt);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(r.text===txt&amp;&amp;!Object.keys(r.meta).length) return;<span class="Apple-converted-space">          </span>// res a netejar: enganxat normal</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>e.preventDefault();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const ta=e.target;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>prevTxt=ta.value;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>prevTA={t:$('#t').value,a:$('#a').value};</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>ta.focus();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let done=false;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>try{done=document.execCommand('insertText',false,r.text)}catch(err){}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!done){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const s=ta.selectionStart,en=ta.selectionEnd;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>ta.value=ta.value.slice(0,s)+r.text+ta.value.slice(en);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>ta.selectionStart=ta.selectionEnd=s+r.text.length;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(r.meta.title&amp;&amp;!$('#t').value.trim()) $('#t').value=r.meta.title;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(r.meta.artist&amp;&amp;!$('#a').value.trim()) $('#a').value=r.meta.artist;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>updLinks();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>showNote(r);</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function showNote(r){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const parts=[];</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(r.n) parts.push('✔ '+r.n+' línies amb els acords posats a sobre de la lletra.');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(r.notes) parts.push('✔ '+r.notes+' indicacions (intro, solo…) posades en cursiva.');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(r.removed) parts.push('✔ '+r.removed+' línies que no eren lletra ni acords eliminades.');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(r.meta.title||r.meta.artist){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>const T=$('#t').value.trim(),A=$('#a').value.trim();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>parts.push('✔ Títol: &lt;b&gt;'+esc(T||'—')+'&lt;/b&gt; · Autor: &lt;b&gt;'+esc(A||'—')+'&lt;/b&gt; &lt;a onclick="swapTA()"&gt;Intercanvia&lt;/a&gt;');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const note=$('#note');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!parts.length){note.style.display='none';return}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>note.innerHTML=parts.join('&lt;br&gt;')+' &lt;a onclick="undoFix()"&gt;Desfés tot&lt;/a&gt;';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>note.style.display='block';</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function swapTA(){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const t=$('#t'),a=$('#a'),v=t.value;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>t.value=a.value;a.value=v;updLinks();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const note=$('#note');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(note) note.innerHTML=note.innerHTML.replace(/Títol: &lt;b&gt;.*?&lt;\/b&gt; · Autor: &lt;b&gt;.*?&lt;\/b&gt;/,'Títol: &lt;b&gt;'+esc(t.value||'—')+'&lt;/b&gt; · Autor: &lt;b&gt;'+esc(a.value||'—')+'&lt;/b&gt;');</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function undoFix(){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(prevTxt!==null) $('#x').value=prevTxt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(prevTA){$('#t').value=prevTA.t;$('#a').value=prevTA.a;updLinks()}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>prevTxt=null;prevTA=null;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>$('#note').style.display='none';</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function updLinks(){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const el=$('#links'); if(!el)return;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const q=encodeURIComponent(($('#t').value+' '+$('#a').value).trim());</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const g=(extra)=&gt;`https://www.google.com/search?q=${q}+${encodeURIComponent(extra)}`;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>el.innerHTML=[</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>['Ultimate Guitar',g('chords site:ultimate-guitar.com')],</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>['Cifraclub',g('site:cifraclub.com')],</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>['Chordie',g('site:chordie.com')],</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>['Google (lletra i acords)',g('lletra acords')]</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>].map(([n,u])=&gt;`&lt;a class="btn alt" style="text-decoration:none" target="_blank" rel="noopener" href="${u}"&gt;${n}&lt;/a&gt;`).join('');</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function saveSong(id){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>let text=$('#x').value.replace(/\r/g,'');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(needsFix(text)){const f=fixText(text);if(f.text.trim())text=f.text}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const o={title:$('#t').value.trim()||'Sense títol',artist:$('#a').value.trim(),text};</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(id){Object.assign(db.songs.find(s=&gt;s.id===id),o)}else{id=uid();db.songs.push({id,...o})}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>save();go({name:'song',id});</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function delSong(id){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>if(!confirm('Segur que vols esborrar aquesta cançó?'))return;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>db.songs=db.songs.filter(s=&gt;s.id!==id);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>db.lists.forEach(l=&gt;l.songs=l.songs.filter(x=&gt;x!==id));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>save();go({name:'songs'});</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">/* ---------- llistes ---------- */</span></p>
+<p class="p4"><span class="s3">function listsView(){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>$('#app').innerHTML=`</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;div class="row"&gt;&lt;input type="text" id="nl" placeholder="Nom de la nova llista (ex.: Concert Nadal)" style="flex:1"&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;button class="btn" onclick="newList()"&gt;+ Crea llista&lt;/button&gt;&lt;/div&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>${db.lists.map(l=&gt;`&lt;div class="item"&gt;&lt;a onclick="go({name:'list',id:'${l.id}'})"&gt;&lt;b&gt;${esc(l.name)}&lt;/b&gt; &lt;small&gt;${l.songs.length} cançons&lt;/small&gt;&lt;/a&gt;&lt;/div&gt;`).join('')||'&lt;p&gt;Encara no tens cap llista.&lt;/p&gt;'}`;</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function newList(){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const n=$('#nl').value.trim(); if(!n)return;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const l={id:uid(),name:n,songs:[]};db.lists.push(l);save();go({name:'list',id:l.id});</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function listView(){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const l=db.lists.find(x=&gt;x.id===view.id); if(!l){go({name:'lists'});return}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const avail=db.songs.filter(s=&gt;!l.songs.includes(s.id)).sort((a,b)=&gt;a.title.localeCompare(b.title,'ca'));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>$('#app').innerHTML=`</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;h2 style="margin:6px 0"&gt;${esc(l.name)}&lt;/h2&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;div class="row"&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>&lt;button class="btn" ${l.songs.length?`onclick="go({name:'song',id:'${l.songs[0]}',list:'${l.id}'})"`:'disabled'}&gt;▶ Mode concert&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>&lt;button class="btn alt" onclick="renList('${l.id}')"&gt;Reanomena&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>&lt;button class="btn red" onclick="delList('${l.id}')"&gt;Esborra llista&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>&lt;button class="btn alt" onclick="go({name:'lists'})"&gt;Totes les llistes&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;/div&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>${l.songs.map((sid,i)=&gt;{const s=db.songs.find(x=&gt;x.id===sid);if(!s)return'';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">     </span>return `&lt;div class="item"&gt;&lt;a onclick="go({name:'song',id:'${sid}',list:'${l.id}'})"&gt;${i+1}. &lt;b&gt;${esc(s.title)}&lt;/b&gt; &lt;small&gt;${esc(s.artist)}&lt;/small&gt;&lt;/a&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>&lt;span&gt;&lt;button class="btn alt" onclick="mv('${l.id}',${i},-1)"&gt;↑&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>&lt;button class="btn alt" onclick="mv('${l.id}',${i},1)"&gt;↓&lt;/button&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">      </span>&lt;button class="btn red" onclick="rm('${l.id}',${i})"&gt;✕&lt;/button&gt;&lt;/span&gt;&lt;/div&gt;`}).join('')}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">   </span>&lt;div class="row"&gt;&lt;select id="as"&gt;&lt;option value=""&gt;Afegeix una cançó de la biblioteca...&lt;/option&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>${avail.map(s=&gt;`&lt;option value="${s.id}"&gt;${esc(s.title)} — ${esc(s.artist)}&lt;/option&gt;`).join('')}&lt;/select&gt;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>&lt;button class="btn" onclick="addSong('${l.id}')"&gt;Afegeix&lt;/button&gt;&lt;/div&gt;`;</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">const getL=id=&gt;db.lists.find(x=&gt;x.id===id);</span></p>
+<p class="p4"><span class="s3">function mv(id,i,d){const a=getL(id).songs,j=i+d;if(j&lt;0||j&gt;=a.length)return;[a[i],a[j]]=[a[j],a[i]];save();render()}</span></p>
+<p class="p4"><span class="s3">function rm(id,i){getL(id).songs.splice(i,1);save();render()}</span></p>
+<p class="p4"><span class="s3">function addSong(id){const v=$('#as').value;if(!v)return;getL(id).songs.push(v);save();render()}</span></p>
+<p class="p4"><span class="s3">function renList(id){const l=getL(id),n=prompt('Nou nom:',l.name);if(n){l.name=n;save();render()}}</span></p>
+<p class="p4"><span class="s3">function delList(id){if(confirm('Esborrar la llista? (les cançons es conserven)')){db.lists=db.lists.filter(l=&gt;l.id!==id);save();go({name:'lists'})}}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">/* ---------- còpia de seguretat de les cançons ---------- */</span></p>
+<p class="p4"><span class="s3">function exportDb(){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const b=new Blob([JSON.stringify(db)],{type:'application/json'});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const a=document.createElement('a');a.href=URL.createObjectURL(b);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>a.download='cansoner-'+new Date().toISOString().slice(0,10)+'.json';a.click();</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">function importDb(inp){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const f=inp.files[0];if(!f)return;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const r=new FileReader();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>r.onload=()=&gt;{try{const d=JSON.parse(r.result);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(!d.songs||!d.lists)throw 0;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">    </span>if(confirm('Això substituirà el contingut actual. Continuar?')){db=d;save();go({name:'songs'})}</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>}catch(e){alert('Fitxer no vàlid')}};</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>r.readAsText(f);</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p3"><span class="s3"></span><br></p>
+<p class="p4"><span class="s3">/* ---------- descarrega el programa (HTML net, sense les teves cançons) ---------- */</span></p>
+<p class="p4"><span class="s3">function downloadApp(){</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const c=document.documentElement.cloneNode(true);</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const app=c.querySelector('#app'); app.innerHTML=''; app.removeAttribute('style');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>c.querySelectorAll('header button').forEach(b=&gt;b.classList.remove('on'));</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const html='&lt;!DOCTYPE html&gt;\n'+c.outerHTML;</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const b=new Blob([html],{type:'text/html'});</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>const a=document.createElement('a');</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>a.href=URL.createObjectURL(b);a.download='cansoner.html';</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>document.body.appendChild(a);a.click();a.remove();</span></p>
+<p class="p4"><span class="s3"><span class="Apple-converted-space">  </span>setTimeout(()=&gt;URL.revokeObjectURL(a.href),1000);</span></p>
+<p class="p4"><span class="s3">}</span></p>
+<p class="p4"><span class="s3">render();</span></p>
+<p class="p4"><span class="s3">&lt;/script&gt;</span></p>
+<p class="p4"><span class="s3">&lt;/body&gt;</span></p>
+<p class="p4"><span class="s3">&lt;/html&gt;</span></p>
 </body>
 </html>
