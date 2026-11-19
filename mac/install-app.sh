@@ -1,8 +1,8 @@
 #!/bin/bash
 # Crea "Taller musical.app" (per posar al Dock).
-# Els fitxers del programa es desen a ~/Documents/AI/fitxers_claude.
+# Els fitxers del programa es desen a ~/Documents/AI/fitxers_claude/practice_player.
 set -e
-DIR="$HOME/Documents/AI/fitxers_claude"
+DIR="$HOME/Documents/AI/fitxers_claude/practice_player"
 REPO="https://raw.githubusercontent.com/Gabrieltrial/Trial/main"
 if [ -w /Applications ]; then APPS="/Applications"; else APPS="$HOME/Applications"; fi
 APP="$APPS/Taller musical.app"
@@ -30,7 +30,7 @@ on reopen
 end reopen
 
 on startTaller()
-	set folderPath to (POSIX path of (path to documents folder)) & "AI/fitxers_claude/"
+	set folderPath to (POSIX path of (path to documents folder)) & "AI/fitxers_claude/practice_player/"
 	try
 		do shell script "/bin/bash " & quoted form of (folderPath & "start-taller.sh")
 	on error errMsg
@@ -46,7 +46,7 @@ end idle
 
 on quit
 	try
-		do shell script "/bin/bash " & quoted form of ((POSIX path of (path to documents folder)) & "AI/fitxers_claude/stop-taller.sh")
+		do shell script "/bin/bash " & quoted form of ((POSIX path of (path to documents folder)) & "AI/fitxers_claude/practice_player/stop-taller.sh")
 	end try
 	continue quit
 end quit
