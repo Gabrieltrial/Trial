@@ -1200,12 +1200,14 @@ const $ = (s, r = document) => r.querySelector(s);
 const LOOP_COUNT = 10;
 const MAX_TRACKS = 8;
 const LOCAL_HOSTS = /^(127\.0\.0\.1|localhost)$/;
-const isWeb = /^https?:$/.test(location.protocol);
-const isHosted = isWeb && !LOCAL_HOSTS.test(location.hostname);
+// self.origin also works when the page runs inside the Taller musical app (srcdoc iframe).
+const pageOrigin = self.origin;
+const isWeb = /^https?:\/\//.test(pageOrigin);
+const isHosted = isWeb && !LOCAL_HOSTS.test(new URL(pageOrigin).hostname);
 const helperPort = new URLSearchParams(location.search).get('helper') || '8765';
 function helperHint() {
   return 'To search YouTube and play full songs, run practice-player-server.py on this computer' +
-    (isHosted ? ' with --allow-origin ' + location.origin : ' and use the page it opens') + '.';
+    (isHosted ? ' with --allow-origin ' + pageOrigin : ' and use the page it opens') + '.';
 }
 
 let ctx = null, node = null, master = null, engine = null, proc = null;

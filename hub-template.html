@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Taller musical</title>
+<!-- Aquest fitxer el genera build-hub.py a partir de hub-template.html i dels programes. No l'editis a mà. -->
+<style>
+  :root {
+    --bg: #12161b; --panel: #1b2128; --panel-2: #232a33; --line: #2f3843;
+    --text: #e8ecf1; --muted: #93a0ae; --accent: #4fd1a5; --accent-ink: #0d2a20;
+    --tuner: #f2b35b; --tuner-ink: #2b1d05;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #eef1f4; --panel: #ffffff; --panel-2: #f3f5f8; --line: #d5dbe2;
+      --text: #1b232c; --muted: #5d6b79; --accent: #13976d; --accent-ink: #ffffff;
+      --tuner: #c97a06; --tuner-ink: #ffffff;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #eef1f4; --panel: #ffffff; --panel-2: #f3f5f8; --line: #d5dbe2;
+    --text: #1b232c; --muted: #5d6b79; --accent: #13976d; --accent-ink: #ffffff;
+    --tuner: #c97a06; --tuner-ink: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 14px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  /* ---------- pestanyes ---------- */
+  header {
+    display: flex; align-items: stretch; gap: 8px; padding: 6px 8px 0;
+    background: var(--panel); border-bottom: 1px solid var(--line); flex: none;
+  }
+  .home {
+    border: 0; background: transparent; font-weight: 700; padding: 6px 10px 8px; white-space: nowrap;
+  }
+  .tabs { display: flex; gap: 2px; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: thin; }
+  .tab {
+    position: relative; display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 12px 8px; border: 1px solid transparent; border-bottom: 0;
+    border-radius: 9px 9px 0 0; background: transparent; color: var(--muted); white-space: nowrap;
+  }
+  .tab:hover { color: var(--text); background: var(--panel-2); }
+  .tab[aria-selected="true"] {
+    color: var(--text); background: var(--bg); border-color: var(--line);
+    margin-bottom: -1px; padding-bottom: 9px;
+  }
+  .tab .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: none; flex: none; }
+  .tab.running .dot { display: inline-block; }
+  .tab .x {
+    display: none; width: 18px; height: 18px; line-height: 16px; text-align: center;
+    border-radius: 5px; font-size: 12px; color: var(--muted); margin-right: -4px;
+  }
+  .tab.running .x { display: inline-block; }
+  .tab .x:hover { background: var(--line); color: var(--text); }
+  .tuner-btn {
+    align-self: center; margin-bottom: 6px; display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--tuner); background: transparent; color: var(--tuner);
+    border-radius: 999px; padding: 5px 12px; font-weight: 600; white-space: nowrap;
+  }
+  .tuner-btn[aria-pressed="true"] { background: var(--tuner); color: var(--tuner-ink); }
+
+  /* ---------- contingut ---------- */
+  main { flex: 1; min-height: 0; display: flex; }
+  #stage { flex: 1; min-width: 0; position: relative; }
+  #stage iframe, #tunerPane iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #fff; }
+  #stage iframe { visibility: hidden; }
+  #stage iframe.shown { visibility: visible; }
+  #tunerWrap { display: none; flex: none; }
+  body.tuner #tunerWrap { display: flex; }
+  #gutter { flex: 0 0 7px; cursor: col-resize; background: var(--line); touch-action: none; }
+  #gutter:hover, #gutter.drag { background: var(--tuner); }
+  #tunerPane { position: relative; width: var(--tw, 420px); min-width: 260px; max-width: 75vw; }
+  body.dragging iframe { pointer-events: none; }
+
+  /* ---------- inici ---------- */
+  #welcome { position: absolute; inset: 0; overflow: auto; padding: 28px 16px; }
+  #welcome .in { max-width: 820px; margin: 0 auto; }
+  #welcome h1 { font-size: 22px; margin: 0 0 4px; }
+  #welcome p { color: var(--muted); margin: 0 0 20px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .card {
+    text-align: left; border: 1px solid var(--line); background: var(--panel);
+    border-radius: 10px; padding: 14px;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card b { display: block; margin-bottom: 4px; font-size: 15px; }
+  .card span { color: var(--muted); font-size: 13px; }
+  .card.tuner-card { border-color: var(--tuner); }
+
+  @media (max-width: 720px) {
+    header { flex-wrap: wrap; padding: 6px 6px 0; gap: 4px; }
+    .home { padding: 6px 4px; }
+    .tabs { order: 3; flex-basis: 100%; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tuner-btn { margin-left: auto; }
+    main { flex-direction: column; }
+    #gutter { flex-basis: 7px; cursor: row-resize; }
+    #tunerPane { width: auto; max-width: none; min-width: 0; height: var(--th, 42vh); min-height: 180px; }
+    body.tuner #tunerWrap { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <button class="home" id="homeBtn" title="Inici">🎵 Taller musical</button>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Programes"></nav>
+  <button class="tuner-btn" id="tunerBtn" aria-pressed="false" title="Mostra l'afinador al costat del programa">🎚 Afinador</button>
+</header>
+<main>
+  <div id="stage">
+    <section id="welcome">
+      <div class="in">
+        <h1>Tria un programa</h1>
+        <p>Canvia de programa amb les pestanyes de dalt. Els programes que ja has obert continuen funcionant quan canvies de pestanya (per exemple, la música del Practice Player). Per aturar-ne un, prem la ✕ de la seva pestanya. L'afinador s'obre al costat de qualsevol programa amb el botó 🎚 Afinador.</p>
+        <div class="cards" id="cards"></div>
+      </div>
+    </section>
+  </div>
+  <div id="tunerWrap">
+    <div id="gutter" title="Arrossega per canviar la mida"></div>
+    <div id="tunerPane"></div>
+  </div>
+</main>
+
+<!--APPS-->
+
+<script>
+'use strict';
+const APPS = JSON.parse(document.getElementById('apps-meta').textContent);
+const TUNER = APPS.find(a => a.tuner);
+const MAIN = APPS.filter(a => !a.tuner);
+const BY_ID = Object.fromEntries(APPS.map(a => [a.id, a]));
+const $ = s => document.querySelector(s);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+const ALLOW = 'microphone; camera; autoplay; fullscreen; clipboard-read; clipboard-write; encrypted-media; picture-in-picture';
+
+function makeFrame(app) {
+  const f = document.createElement('iframe');
+  f.title = app.name;
+  f.setAttribute('allow', ALLOW);
+  f.allowFullscreen = true;
+  f.srcdoc = JSON.parse(document.getElementById('src-' + app.id).textContent);
+  return f;
+}
+
+/* ---------- programes principals ---------- */
+const frames = new Map();   // id -> iframe (programes en marxa)
+let current = null;
+
+for (const app of MAIN) {
+  const t = document.createElement('button');
+  t.className = 'tab'; t.dataset.id = app.id; t.setAttribute('role', 'tab');
+  t.setAttribute('aria-selected', 'false');
+  t.innerHTML = '<span class="dot"></span><span class="nm"></span><span class="x" title="Atura aquest programa">✕</span>';
+  t.querySelector('.nm').textContent = app.name;
+  t.title = app.desc;
+  t.addEventListener('click', e => {
+    if (e.target.classList.contains('x')) { e.stopPropagation(); stop(app.id); }
+    else show(app.id);
+  });
+  t.addEventListener('auxclick', e => { if (e.button === 1) stop(app.id); });
+  $('#tabs').appendChild(t);
+
+  const c = document.createElement('button');
+  c.className = 'card';
+  c.innerHTML = '<b></b><span></span>';
+  c.firstChild.textContent = app.name; c.lastChild.textContent = app.desc;
+  c.addEventListener('click', () => show(app.id));
+  $('#cards').appendChild(c);
+}
+{
+  const c = document.createElement('button');
+  c.className = 'card tuner-card';
+  c.innerHTML = '<b>🎚 Afinador</b><span>S\'obre al costat de qualsevol altre programa.</span>';
+  c.addEventListener('click', () => setTuner(true));
+  $('#cards').appendChild(c);
+}
+
+function show(id) {
+  if (id && !BY_ID[id]) id = null;
+  current = id;
+  if (id && !frames.has(id)) {
+    const f = makeFrame(BY_ID[id]);
+    frames.set(id, f);
+    $('#stage').appendChild(f);
+  }
+  for (const [fid, f] of frames) f.classList.toggle('shown', fid === id);
+  $('#welcome').style.display = id ? 'none' : '';
+  for (const t of $('#tabs').children) {
+    t.setAttribute('aria-selected', String(t.dataset.id === id));
+    t.classList.toggle('running', frames.has(t.dataset.id));
+  }
+  if (id) {
+    const tab = $('#tabs').querySelector(`[data-id="${id}"]`);
+    tab.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    frames.get(id).focus();
+  }
+  store.set('hub-current', id);
+  syncHash();
+}
+
+function stop(id) {
+  const f = frames.get(id);
+  if (!f) return;
+  f.remove();             // treure l'iframe atura el so i el micròfon d'aquell programa
+  frames.delete(id);
+  if (current === id) {
+    const others = [...frames.keys()];
+    show(others.length ? others[others.length - 1] : null);
+  } else show(current);
+}
+
+/* ---------- afinador al costat ---------- */
+let tunerFrame = null;
+function setTuner(on) {
+  document.body.classList.toggle('tuner', on);
+  $('#tunerBtn').setAttribute('aria-pressed', String(on));
+  if (on && !tunerFrame) { tunerFrame = makeFrame(TUNER); $('#tunerPane').appendChild(tunerFrame); }
+  if (!on && tunerFrame) { tunerFrame.remove(); tunerFrame = null; }
+  store.set('hub-tuner', on);
+  syncHash();
+}
+$('#tunerBtn').addEventListener('click', () => setTuner(!tunerFrame));
+$('#homeBtn').addEventListener('click', () => show(null));
+
+const pane = $('#tunerPane'), gutter = $('#gutter');
+const sizes = store.get('hub-tuner-size', {});
+if (sizes.w) pane.style.setProperty('--tw', sizes.w + 'px');
+if (sizes.h) pane.style.setProperty('--th', sizes.h + 'px');
+gutter.addEventListener('pointerdown', e => {
+  const vertical = matchMedia('(max-width: 720px)').matches;
+  const r = pane.getBoundingClientRect();
+  const start = vertical ? e.clientY : e.clientX, size0 = vertical ? r.height : r.width;
+  gutter.setPointerCapture(e.pointerId);
+  gutter.classList.add('drag'); document.body.classList.add('dragging');
+  const move = ev => {
+    const d = (vertical ? ev.clientY : ev.clientX) - start;
+    const v = Math.round(Math.max(180, size0 - d));
+    if (vertical) { sizes.h = v; pane.style.setProperty('--th', v + 'px'); }
+    else { sizes.w = v; pane.style.setProperty('--tw', v + 'px'); }
+  };
+  const up = () => {
+    gutter.removeEventListener('pointermove', move);
+    gutter.classList.remove('drag'); document.body.classList.remove('dragging');
+    store.set('hub-tuner-size', sizes);
+  };
+  gutter.addEventListener('pointermove', move);
+  gutter.addEventListener('pointerup', up, { once: true });
+  gutter.addEventListener('pointercancel', up, { once: true });
+});
+
+/* ---------- adreça: #chord-practice o #chord-practice+afinador ---------- */
+function syncHash() {
+  const parts = [current, tunerFrame ? TUNER.id : null].filter(Boolean);
+  const h = parts.length ? '#' + parts.join('+') : '';
+  if (location.hash !== h) history.replaceState(null, '', h || location.pathname + location.search);
+}
+function fromHash() {
+  const parts = decodeURIComponent(location.hash.slice(1)).split('+').filter(Boolean);
+  if (!parts.length) return false;
+  setTuner(parts.includes(TUNER.id));
+  show(parts.find(p => BY_ID[p] && !BY_ID[p].tuner) || null);
+  return true;
+}
+addEventListener('hashchange', fromHash);
+if (!fromHash()) {
+  if (store.get('hub-tuner', false)) setTuner(true);
+  show(store.get('hub-current', null));
+}
+</script>
+</body>
+</html>
