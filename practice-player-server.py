@@ -18,10 +18,21 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 PAGE = HERE / "practice-player.html"
+HUB = HERE / "index.html"
 CACHE = Path(tempfile.gettempdir()) / "practice-player-cache"
 DOWNLOAD_LOCK = threading.Lock()
 
 CONFIG = {"port": 8765, "max_minutes": 45, "cookies_from_browser": None, "origins": set()}
+
+STATIC_TYPES = {
+    ".html": "text/html; charset=utf-8",
+    ".css": "text/css; charset=utf-8",
+    ".js": "text/javascript; charset=utf-8",
+    ".json": "application/json; charset=utf-8",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".ico": "image/x-icon",
+}
 
 CONTENT_TYPES = {
     ".flac": "audio/flac",
@@ -201,6 +212,16 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def static_file(self, route):
+        """The hub (index.html) and the other pages that sit next to this script."""
+        name = urllib.parse.unquote(route).lstrip("/") or ("index.html" if HUB.exists() else PAGE.name)
+        if "/" in name or "\\" in name or name.startswith("."):
+            return None
+        path = HERE / name
+        if path.suffix.lower() in STATIC_TYPES and path.is_file():
+            return path
+        return None
+
     def do_GET(self):
         allowed, origin = self.origin_state()
         if not self.host_ok() or not allowed:
@@ -211,10 +232,11 @@ class Handler(BaseHTTPRequestHandler):
         query = urllib.parse.parse_qs(parsed.query)
         route = parsed.path
         try:
-            if route in ("/", "/practice-player.html"):
-                if PAGE.exists():
-                    data = PAGE.read_bytes()
-                    content_type = "text/html; charset=utf-8"
+            static = self.static_file(route)
+            if static is not None or route == "/":
+                if static is not None:
+                    data = static.read_bytes()
+                    content_type = STATIC_TYPES[static.suffix.lower()]
                 else:
                     data = b"Practice Player helper is running. Open your Practice Player page in the browser."
                     content_type = "text/plain; charset=utf-8"
@@ -287,6 +309,8 @@ def main(argv=None):
     parser.add_argument("--cookies-from-browser", default=None, metavar="BROWSER")
     parser.add_argument("--allow-origin", action="append", default=[], metavar="URL")
     parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument("--open", default=None, metavar="PAGE",
+                        help="page or programs to open, e.g. practice-player.html or afinador+chord-practice")
     parser.add_argument("--no-install-prompt", action="store_true")
     args = parser.parse_args(argv)
     raw_origins = args.allow_origin + [o for o in os.environ.get("PRACTICE_PLAYER_ORIGINS", "").split(",") if o.strip()]
@@ -308,12 +332,15 @@ def main(argv=None):
     print(f"Practice Player helper is running on port {args.port}  (Ctrl+C to stop)")
     if origins:
         print("Pages allowed to use it: " + ", ".join(sorted(origins)))
-    if PAGE.exists():
-        print(f"Local copy of the page: {url}")
+    if HUB.exists() or PAGE.exists():
+        target = url
+        if args.open:
+            target = url + args.open if args.open.endswith(".html") else url + "#" + args.open
+        print(f"Open in the browser: {target}")
         if not args.no_browser and not origins:
-            webbrowser.open(url)
+            webbrowser.open(target)
     else:
-        print("practice-player.html was not found next to this script, so only your hosted page can use the helper.")
+        print("index.html / practice-player.html were not found next to this script, so only your hosted page can use the helper.")
         if not origins:
             print("Start it with: --allow-origin https://YOUR-USER.github.io")
     try:

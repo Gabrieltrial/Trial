@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Taller musical</title>
+<style>
+  :root {
+    --bg: #12161b;
+    --panel: #1b2128;
+    --panel-2: #232a33;
+    --line: #2f3843;
+    --text: #e8ecf1;
+    --muted: #93a0ae;
+    --accent: #4fd1a5;
+    --accent-ink: #0d2a20;
+    --mic: #f2b35b;
+    --warn-bg: #3a2c16;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --bg: #eef1f4; --panel: #ffffff; --panel-2: #f3f5f8; --line: #d5dbe2;
+      --text: #1b232c; --muted: #5d6b79; --accent: #13976d; --accent-ink: #ffffff;
+      --mic: #b86e00; --warn-bg: #fff1d9;
+    }
+  }
+  :root[data-theme="light"] {
+    --bg: #eef1f4; --panel: #ffffff; --panel-2: #f3f5f8; --line: #d5dbe2;
+    --text: #1b232c; --muted: #5d6b79; --accent: #13976d; --accent-ink: #ffffff;
+    --mic: #b86e00; --warn-bg: #fff1d9;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 14px/1.35 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  button { font: inherit; color: inherit; cursor: pointer; }
+
+  /* ---------- barra superior ---------- */
+  header {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 8px 12px; background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  .brand { font-weight: 700; font-size: 15px; margin-right: 4px; white-space: nowrap; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; min-width: 0; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 10px; border-radius: 999px; border: 1px solid var(--line);
+    background: var(--panel-2); white-space: nowrap; transition: background .12s, border-color .12s;
+  }
+  .chip:hover { border-color: var(--accent); }
+  .chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .chip .mic { width: 7px; height: 7px; border-radius: 50%; background: var(--mic); flex: none; }
+  .chip[aria-pressed="true"] .mic { background: var(--accent-ink); }
+  .tools { display: flex; gap: 6px; }
+  .tool {
+    border: 1px solid var(--line); background: var(--panel-2); border-radius: 8px;
+    padding: 5px 9px; min-width: 34px;
+  }
+  .tool:hover { border-color: var(--accent); }
+  .tool:disabled { opacity: .4; cursor: default; }
+
+  /* ---------- avís ---------- */
+  #toast {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%) translateY(20px);
+    max-width: min(560px, calc(100% - 32px)); padding: 10px 14px; border-radius: var(--radius);
+    background: var(--warn-bg); color: var(--text); border: 1px solid var(--mic);
+    box-shadow: 0 8px 24px rgba(0,0,0,.3); opacity: 0; pointer-events: none;
+    transition: opacity .2s, transform .2s; z-index: 10;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ---------- espai de treball ---------- */
+  main { flex: 1; min-height: 0; display: flex; padding: 8px; gap: 0; }
+  main.rows { flex-direction: column; }
+  .pane {
+    display: flex; flex-direction: column; min-width: 0; min-height: 0;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden;
+    flex: 1 1 0;
+  }
+  .pane-head {
+    display: flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px;
+    background: var(--panel-2); border-bottom: 1px solid var(--line); flex: none;
+  }
+  .pane-title { font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pane-head button {
+    border: 0; background: transparent; border-radius: 6px; padding: 2px 7px; color: var(--muted);
+  }
+  .pane-head button:hover { background: var(--line); color: var(--text); }
+  .pane iframe { flex: 1; width: 100%; border: 0; background: #fff; display: block; }
+  .gutter { flex: 0 0 8px; cursor: col-resize; position: relative; touch-action: none; }
+  main.rows .gutter { cursor: row-resize; }
+  .gutter::after {
+    content: ""; position: absolute; inset: 30% 3px; border-radius: 2px; background: var(--line);
+  }
+  main.rows .gutter::after { inset: 3px 30%; }
+  .gutter:hover::after, .gutter.drag::after { background: var(--accent); }
+  main.dragging iframe { pointer-events: none; }
+  main.solo .pane:not(.max), main.solo .gutter { display: none; }
+
+  /* ---------- benvinguda ---------- */
+  #welcome { margin: auto; max-width: 640px; padding: 24px 16px; text-align: center; }
+  #welcome h1 { font-size: 22px; margin: 0 0 6px; }
+  #welcome p { color: var(--muted); margin: 0 0 18px; }
+  .presets { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; text-align: left; }
+  .preset {
+    border: 1px solid var(--line); background: var(--panel); border-radius: var(--radius);
+    padding: 12px 14px;
+  }
+  .preset:hover { border-color: var(--accent); }
+  .preset b { display: block; margin-bottom: 3px; }
+  .preset span { color: var(--muted); font-size: 13px; }
+  .legend { margin-top: 18px; font-size: 13px; color: var(--muted); }
+  .legend .mic { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--mic); margin-right: 4px; }
+
+  @media (max-width: 720px) {
+    header { padding: 8px; }
+    .brand { display: none; }
+    .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+    .chips::-webkit-scrollbar { display: none; }
+    main { padding: 6px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">🎵 Taller musical</div>
+  <nav class="chips" id="chips" aria-label="Programes"></nav>
+  <div class="tools">
+    <button class="tool" id="layoutBtn" title="Canvia entre columnes i files">⇆</button>
+    <button class="tool" id="resetBtn" title="Mides iguals">⊟</button>
+    <button class="tool" id="clearBtn" title="Tanca-ho tot">✕</button>
+  </div>
+</header>
+<main id="work">
+  <section id="welcome">
+    <h1>Tria un o més programes</h1>
+    <p>Fes clic als botons de dalt per obrir-los. Pots tenir-ne fins a 3 alhora, un al costat de l'altre.</p>
+    <div class="presets" id="presets"></div>
+    <div class="legend"><span class="mic"></span>fa servir el micròfon (només se'n pot obrir un alhora)</div>
+  </section>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+const APPS = [
+  { id: 'practice-player',      file: 'practice-player.html',      name: 'Practice Player' },
+  { id: 'afinador',             file: 'afinador.html',             name: 'Afinador',               mic: true },
+  { id: 'chord-practice',       file: 'chord-practice.html',       name: 'Chord Practice' },
+  { id: 'metronom-notes',       file: 'metronom-notes.html',       name: "Pràctica d'acords" },
+  { id: 'neo-soul-generator',   file: 'neo-soul-generator.html',   name: 'Neo Soul Generator' },
+  { id: 'scale-recognizer',     file: 'scale-recognizer.html',     name: 'Scale Recognizer',       mic: true },
+  { id: 'analitzador',          file: 'analitzador_espectral.html', name: 'Analitzador espectral', mic: true },
+  { id: 'guitar-rodeo',         file: 'guitar-rodeo.html',         name: 'Chord Rodeo',            mic: true },
+  { id: 'bass-rodeo',           file: 'bass-rodeo.html',           name: 'Bass Rodeo',             mic: true },
+];
+const PRESETS = [
+  { ids: ['afinador', 'chord-practice'],         title: 'Afinador + Chord Practice',     text: 'Afina i després practica els canvis d\'acords.' },
+  { ids: ['practice-player', 'chord-practice'],  title: 'Practice Player + Chord Practice', text: 'Escolta la cançó i practica els acords alhora.' },
+  { ids: ['practice-player', 'afinador'],        title: 'Practice Player + Afinador',    text: 'Comprova l\'afinació abans de tocar sobre una gravació.' },
+  { ids: ['neo-soul-generator', 'chord-practice'], title: 'Neo Soul + Chord Practice',   text: 'Genera progressions i practica-les.' },
+];
+const MAX_PANES = 3;
+const BY_ID = Object.fromEntries(APPS.map(a => [a.id, a]));
+
+const $ = s => document.querySelector(s);
+const work = $('#work'), welcome = $('#welcome'), chips = $('#chips');
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} },
+};
+
+// Si la pàgina s'obre amb ?helper=PORT es passa al Practice Player.
+const pageParams = new URLSearchParams(location.search);
+function srcFor(app) {
+  if (app.id === 'practice-player' && pageParams.get('helper')) {
+    return app.file + '?helper=' + encodeURIComponent(pageParams.get('helper'));
+  }
+  return app.file;
+}
+
+let open = [];                 // ids, en ordre
+const panes = new Map();       // id -> { el, gutter }
+let sizes = store.get('hub-sizes', {});
+let layout = store.get('hub-layout', null) || (innerWidth > 900 ? 'cols' : 'rows');
+let maxId = null;
+
+/* ---------- avís ---------- */
+let toastTimer = 0;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 4200);
+}
+
+/* ---------- botons ---------- */
+for (const app of APPS) {
+  const b = document.createElement('button');
+  b.className = 'chip'; b.dataset.id = app.id; b.setAttribute('aria-pressed', 'false');
+  b.innerHTML = (app.mic ? '<span class="mic" title="Micròfon"></span>' : '') + '<span></span>';
+  b.lastChild.textContent = app.name;
+  b.title = app.mic ? app.name + ' — fa servir el micròfon' : app.name;
+  b.addEventListener('click', () => toggle(app.id));
+  chips.appendChild(b);
+}
+for (const p of PRESETS) {
+  const b = document.createElement('button');
+  b.className = 'preset';
+  b.innerHTML = '<b></b><span></span>';
+  b.firstChild.textContent = p.title; b.lastChild.textContent = p.text;
+  b.addEventListener('click', () => setOpen(p.ids));
+  $('#presets').appendChild(b);
+}
+
+/* ---------- obrir / tancar ---------- */
+function toggle(id) {
+  if (open.includes(id)) { setOpen(open.filter(x => x !== id)); return; }
+  const app = BY_ID[id];
+  let next = open.slice();
+  if (app.mic) {
+    const other = next.find(x => BY_ID[x].mic);
+    if (other) {
+      next = next.filter(x => x !== other);
+      toast(`${BY_ID[other].name} i ${app.name} fan servir el micròfon: he tancat ${BY_ID[other].name}.`);
+    }
+  }
+  if (next.length >= MAX_PANES) {
+    toast(`Com a màxim ${MAX_PANES} programes alhora. Tanca'n un abans d'obrir ${app.name}.`);
+    return;
+  }
+  next.push(id);
+  setOpen(next);
+}
+
+function setOpen(ids) {
+  ids = ids.filter((id, i) => BY_ID[id] && ids.indexOf(id) === i).slice(0, MAX_PANES);
+  for (const [id, p] of panes) {
+    if (!ids.includes(id)) { p.el.remove(); p.gutter.remove(); panes.delete(id); }
+  }
+  for (const id of ids) if (!panes.has(id)) createPane(id);
+  open = ids;
+  if (maxId && !open.includes(maxId)) maxId = null;
+  render();
+  const hash = open.length ? '#' + open.join('+') : ' ';
+  if (location.hash !== hash.trim()) history.replaceState(null, '', hash === ' ' ? location.pathname + location.search : hash);
+}
+
+function createPane(id) {
+  const app = BY_ID[id];
+  const el = document.createElement('section');
+  el.className = 'pane'; el.dataset.id = id;
+  el.innerHTML = `
+    <div class="pane-head">
+      <span class="pane-title"></span>
+      <button data-act="max" title="Maximitza / restaura">⤢</button>
+      <button data-act="reload" title="Torna a carregar">↻</button>
+      <button data-act="tab" title="Obre en una pestanya nova">↗</button>
+      <button data-act="close" title="Tanca">✕</button>
+    </div>
+    <iframe allow="microphone; camera; autoplay; fullscreen; clipboard-read; clipboard-write; encrypted-media; picture-in-picture" allowfullscreen></iframe>`;
+  el.querySelector('.pane-title').textContent = app.name;
+  const frame = el.querySelector('iframe');
+  frame.title = app.name;
+  frame.src = srcFor(app);
+  el.querySelector('.pane-head').addEventListener('click', e => {
+    const act = e.target.dataset && e.target.dataset.act;
+    if (act === 'close') toggle(id);
+    else if (act === 'reload') frame.src = srcFor(app);
+    else if (act === 'tab') window.open(srcFor(app), '_blank', 'noopener');
+    else if (act === 'max') { maxId = maxId === id ? null : id; render(); }
+  });
+  el.querySelector('.pane-head').addEventListener('dblclick', e => {
+    if (e.target.tagName !== 'BUTTON') { maxId = maxId === id ? null : id; render(); }
+  });
+  const gutter = document.createElement('div');
+  gutter.className = 'gutter';
+  gutter.addEventListener('pointerdown', e => startDrag(e, gutter));
+  // Els elements no es mouen mai dins el DOM (moure un iframe el torna a carregar);
+  // l'ordre visual es fa amb la propietat CSS "order".
+  work.appendChild(gutter);
+  work.appendChild(el);
+  panes.set(id, { el, gutter });
+}
+
+function render() {
+  welcome.style.display = open.length ? 'none' : '';
+  work.classList.toggle('rows', layout === 'rows');
+  work.classList.toggle('solo', !!maxId && open.length > 1);
+  open.forEach((id, i) => {
+    const p = panes.get(id);
+    p.el.style.order = String(i * 2 + 1);
+    p.gutter.style.order = String(i * 2);
+    p.gutter.style.display = i === 0 ? 'none' : '';
+    p.el.classList.toggle('max', id === maxId);
+    p.el.style.flexGrow = String(sizes[id] || 1);
+  });
+  for (const b of chips.children) b.setAttribute('aria-pressed', String(open.includes(b.dataset.id)));
+  $('#layoutBtn').textContent = layout === 'rows' ? '⇅' : '⇆';
+  $('#layoutBtn').disabled = $('#resetBtn').disabled = open.length < 2;
+  $('#clearBtn').disabled = !open.length;
+  const mixed = open.some(id => BY_ID[id].mic) && open.some(id => !BY_ID[id].mic);
+  if (mixed && !render.warned) {
+    render.warned = true;
+    toast('Consell: amb un programa que escolta el micròfon i un altre que sona, fes servir auriculars.');
+  }
+}
+
+/* ---------- redimensionar ---------- */
+function startDrag(e, gutter) {
+  const idx = open.findIndex(id => panes.get(id).gutter === gutter);
+  if (idx < 1) return;
+  const a = open[idx - 1], b = open[idx];
+  const ea = panes.get(a).el, eb = panes.get(b).el;
+  const rows = layout === 'rows';
+  const ra = ea.getBoundingClientRect(), rb = eb.getBoundingClientRect();
+  const total = rows ? ra.height + rb.height : ra.width + rb.width;
+  const start = rows ? e.clientY : e.clientX;
+  const sa = rows ? ra.height : ra.width;
+  const grow = (sizes[a] || 1) + (sizes[b] || 1);
+  gutter.setPointerCapture(e.pointerId);
+  gutter.classList.add('drag'); work.classList.add('dragging');
+  const move = ev => {
+    const pos = rows ? ev.clientY : ev.clientX;
+    const na = Math.min(total - 160, Math.max(160, sa + pos - start));
+    sizes[a] = grow * na / total; sizes[b] = grow - sizes[a];
+    ea.style.flexGrow = sizes[a]; eb.style.flexGrow = sizes[b];
+  };
+  const up = () => {
+    gutter.removeEventListener('pointermove', move);
+    gutter.classList.remove('drag'); work.classList.remove('dragging');
+    store.set('hub-sizes', sizes);
+  };
+  gutter.addEventListener('pointermove', move);
+  gutter.addEventListener('pointerup', up, { once: true });
+  gutter.addEventListener('pointercancel', up, { once: true });
+}
+
+$('#layoutBtn').addEventListener('click', () => {
+  layout = layout === 'rows' ? 'cols' : 'rows'; store.set('hub-layout', layout); render();
+});
+$('#resetBtn').addEventListener('click', () => { sizes = {}; store.set('hub-sizes', sizes); render(); });
+$('#clearBtn').addEventListener('click', () => setOpen([]));
+
+/* ---------- estat inicial (#afinador+chord-practice) ---------- */
+function fromHash() {
+  const ids = decodeURIComponent(location.hash.slice(1)).split('+').filter(Boolean);
+  const micIds = ids.filter(id => BY_ID[id] && BY_ID[id].mic);
+  setOpen(ids.filter(id => !BY_ID[id] || !BY_ID[id].mic || id === micIds[0]));
+}
+addEventListener('hashchange', fromHash);
+fromHash();
+</script>
+</body>
+</html>
