@@ -13,7 +13,6 @@ HERE = Path(__file__).resolve().parent
 APPS = [
     ("practice-player", "practice-player.html", "Practice Player", "Reprodueix cançons (també de YouTube) a la velocitat que vulguis, amb bucles."),
     ("chord-practice", "chord-practice.html", "Chord Practice", "Practica canvis d'acords."),
-    ("metronom-notes", "metronom-notes.html", "Pràctica d'acords", "Metrònom amb acords."),
     ("neo-soul-generator", "neo-soul-generator.html", "Neo Soul Generator", "Genera progressions neo soul."),
     ("scale-recognizer", "scale-recognizer.html", "Scale Recognizer", "Toca una escala i et diu quina és."),
     ("analitzador", "analitzador_espectral.html", "Analitzador espectral", "Espectre del so del micròfon."),
