@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -327,6 +328,8 @@ def main(argv=None):
     if not any(shutil.which(x) for x in ("deno", "node", "bun")):
         print("Note: YouTube extraction may need a JavaScript runtime (Deno or Node.js) to be installed.")
     atexit.register(lambda: shutil.rmtree(CACHE, ignore_errors=True))
+    # Taller musical.app stops the helper with SIGTERM: exit cleanly so the cache is removed.
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     url = f"http://127.0.0.1:{args.port}/"
     print(f"Practice Player helper is running on port {args.port}  (Ctrl+C to stop)")
