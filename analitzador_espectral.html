@@ -18,6 +18,7 @@
   #spec { height:340px; }
   #prof { height:200px; }
   #diff { height:150px; }
+  #harm { height:150px; }
   .row { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
   button { font:inherit; color:var(--text); background:#242b33; border:1px solid #333c47;
            border-radius:8px; padding:8px 14px; cursor:pointer; }
@@ -49,11 +50,23 @@
           <option value="0.92">alt</option>
         </select>
       </label>
+      <label>Vista
+        <select id="view">
+          <option value="both" selected>espectre + harmònics</option>
+          <option value="line">només espectre</option>
+          <option value="bars">només barres d'harmònics</option>
+        </select>
+      </label>
       <label><input type="checkbox" id="peak"> mostra pics màxims</label>
       <span class="spacer"></span>
       <span class="muted" id="info"></span>
     </div>
     <canvas id="spec"></canvas>
+    <div class="row" style="margin:12px 0 6px">
+      <strong>Harmònics</strong>
+      <span class="muted" id="f0info">Toca o canta una nota llarga</span>
+    </div>
+    <canvas id="harm"></canvas>
   </div>
 
   <div class="panel">
@@ -101,9 +114,15 @@
   const NB = centers.length;
 
   let ctx, analyser, data, peaks, running = false, samples = [];
+  let pitchAn = null, tbuf = null, yinBuf = null, lastPitch = 0;
+  let f0 = null;            // { freq, note, cents, harm: [{k, f, db}] } o null
+  let f0Smooth = 0, f0Miss = 0;
+  const NOTE = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+  const NOTE_CA = ['Do', 'Do♯', 'Re', 'Re♯', 'Mi', 'Fa', 'Fa♯', 'Sol', 'Sol♯', 'La', 'La♯', 'Si'];
+  const MAX_H = 16;
 
   const $ = id => document.getElementById(id);
-  const specC = $('spec'), profC = $('prof'), diffC = $('diff');
+  const specC = $('spec'), profC = $('prof'), diffC = $('diff'), harmC = $('harm');
 
   // ---------- persistència ----------
   function load() {
@@ -151,6 +170,123 @@
     }
   }
 
+  // ---------- freqüència fonamental (YIN) i harmònics ----------
+  function yin(buf, sr) {
+    const W = 2048, maxLag = Math.min(Math.floor(sr / 40), buf.length - W - 1), minLag = Math.floor(sr / 2000);
+    let rms = 0;
+    for (let i = 0; i < W; i++) rms += buf[i] * buf[i];
+    rms = Math.sqrt(rms / W);
+    if (rms < 0.003) return null;
+    const d = yinBuf;
+    d[0] = 1;
+    let run = 0, best = -1;
+    for (let tau = 1; tau <= maxLag; tau++) {
+      let sum = 0;
+      for (let i = 0; i < W; i++) { const x = buf[i] - buf[i + tau]; sum += x * x; }
+      run += sum;
+      d[tau] = run ? sum * tau / run : 1;
+    }
+    for (let tau = minLag; tau <= maxLag; tau++) {
+      if (d[tau] < 0.15) {
+        while (tau + 1 <= maxLag && d[tau + 1] < d[tau]) tau++;
+        best = tau; break;
+      }
+    }
+    if (best < 0) return null;
+    const a = d[best - 1], b = d[best], c = d[best + 1] ?? b;
+    const den = a + c - 2 * b;
+    const t = best + (den ? (a - c) / (2 * den) : 0);
+    return { freq: sr / t, clarity: 1 - b };
+  }
+
+  // Busca el pic de l'espectre (gran resolució) prop de cada múltiple de f0.
+  function measureHarmonics(freq) {
+    const nyq = ctx.sampleRate / 2, n = data.length, binHz = nyq / n;
+    const harm = [];
+    for (let k = 1; k <= MAX_H; k++) {
+      const target = k * freq;
+      if (target > Math.min(FMAX, nyq * 0.95)) break;
+      const span = Math.max(2, Math.round(target * 0.025 / binHz));
+      const c = Math.round(target / binHz);
+      let bi = c, bv = -Infinity;
+      for (let i = Math.max(1, c - span); i <= Math.min(n - 2, c + span); i++) if (data[i] > bv) { bv = data[i]; bi = i; }
+      const a = data[bi - 1], b = data[bi], g = data[bi + 1];
+      const den = a + g - 2 * b;
+      const off = den ? Math.max(-0.5, Math.min(0.5, (a - g) / (2 * den))) : 0;
+      harm.push({ k, f: (bi + off) * binHz, db: b - (den ? (a - g) * off / 4 : 0) });
+    }
+    return harm;
+  }
+
+  function updatePitch(now) {
+    if (now - lastPitch < 45) return;
+    lastPitch = now;
+    pitchAn.getFloatTimeDomainData(tbuf);
+    const est = yin(tbuf, ctx.sampleRate);
+    if (!est || est.clarity < 0.82 || est.freq < FMIN) {
+      if (++f0Miss > 6) { f0 = null; f0Smooth = 0; }
+      return;
+    }
+    f0Miss = 0;
+    // Afina amb els harmònics de l'espectre de 32k punts (resolució ~1,5 Hz).
+    let harm = measureHarmonics(est.freq);
+    let num = 0, den = 0;
+    for (const h of harm.slice(0, 8)) {
+      if (h.db < -95) continue;
+      const w = Math.pow(10, h.db / 20);
+      num += w * h.f / h.k; den += w;
+    }
+    let freq = den ? num / den : est.freq;
+    if (Math.abs(freq / est.freq - 1) > 0.03) freq = est.freq;
+    f0Smooth = f0Smooth && Math.abs(freq / f0Smooth - 1) < 0.03 ? f0Smooth + (freq - f0Smooth) * 0.35 : freq;
+    harm = measureHarmonics(f0Smooth);
+    const m = 69 + 12 * Math.log2(f0Smooth / 440), r = Math.round(m);
+    f0 = { freq: f0Smooth, midi: r, cents: (m - r) * 100, harm };
+  }
+
+  function noteLabel(midi) {
+    const i = ((midi % 12) + 12) % 12, o = Math.floor(midi / 12) - 1;
+    return NOTE[i] + o + ' (' + NOTE_CA[i] + ')';
+  }
+
+  function drawHarm() {
+    const { g, w, h } = fit(harmC);
+    g.clearRect(0, 0, w, h);
+    g.font = '11px system-ui';
+    if (!f0) {
+      g.fillStyle = '#8a95a3'; g.textAlign = 'center';
+      g.fillText(running ? 'Cap fonamental clara (toca una sola nota)' : 'Activa el micròfon', w / 2, h / 2);
+      $('f0info').textContent = running ? 'Toca o canta una nota llarga' : '';
+      return;
+    }
+    const ref = f0.harm[0].db, lo = -60, hi = 24;
+    const L = 44, R = 10, T = 8, B = 22, cw = (w - L - R) / MAX_H;
+    g.strokeStyle = '#2a313a'; g.fillStyle = '#8a95a3'; g.textAlign = 'right';
+    for (let v = lo; v <= hi; v += 12) {
+      const y = Math.round(T + (1 - (v - lo) / (hi - lo)) * (h - T - B)) + .5;
+      g.beginPath(); g.moveTo(L, y); g.lineTo(w - R, y); g.stroke();
+      g.fillText((v > 0 ? '+' : '') + v, L - 5, y + 4);
+    }
+    const y0 = T + (1 - (0 - lo) / (hi - lo)) * (h - T - B);
+    g.textAlign = 'center';
+    let strongest = f0.harm[0];
+    for (const hm of f0.harm) {
+      if (hm.db > strongest.db) strongest = hm;
+      const rel = Math.max(lo, Math.min(hi, hm.db - ref));
+      const x = L + (hm.k - 0.5) * cw, bw = Math.max(4, cw * 0.62);
+      const y = T + (1 - (rel - lo) / (hi - lo)) * (h - T - B);
+      g.fillStyle = hm.k === 1 ? '#f2b35b' : '#4fc3f7';
+      g.fillRect(x - bw / 2, y, bw, h - B - y);
+      g.fillStyle = '#8a95a3';
+      g.fillText(hm.k === 1 ? 'F0' : 'H' + hm.k, x, h - 7);
+    }
+    g.strokeStyle = 'rgba(242,179,91,.6)'; g.setLineDash([4, 4]);
+    g.beginPath(); g.moveTo(L, y0); g.lineTo(w - R, y0); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#8a95a3'; g.textAlign = 'right'; g.fillText('dB respecte la fonamental', w - R - 4, T + 12);
+    const c = Math.round(f0.cents);
+    $('f0info').textContent = `Fonamental ${f0.freq.toFixed(1)} Hz · ${noteLabel(f0.midi)} ${c >= 0 ? '+' : ''}${c} cents · harmònic més fort: ${strongest.k === 1 ? 'la fonamental' : 'H' + strongest.k}`;
+  }
+
   // ---------- espectre en directe ----------
   function drawSpec() {
     const { g, w, h } = fit(specC);
@@ -171,22 +307,48 @@
         }
       };
 
-      if ($('peak').checked) {
+      updatePitch(performance.now());
+      const view = $('view').value;
+      if ($('peak').checked && view !== 'bars') {
         for (let i = 0; i < n; i++) peaks[i] = Math.max(data[i], peaks[i] - 0.15);
         g.strokeStyle = 'rgba(255,255,255,.35)'; g.lineWidth = 1; path(peaks); g.stroke();
       }
-      path(data);
-      g.strokeStyle = '#4fc3f7'; g.lineWidth = 1.5; g.stroke();
-      g.lineTo(xOf(FMAX, w), h - M.b); g.lineTo(xOf(FMIN, w), h - M.b); g.closePath();
-      const grad = g.createLinearGradient(0, M.t, 0, h - M.b);
-      grad.addColorStop(0, 'rgba(79,195,247,.35)'); grad.addColorStop(1, 'rgba(79,195,247,0)');
-      g.fillStyle = grad; g.fill();
+      if (view !== 'bars') {
+        path(data);
+        g.strokeStyle = view === 'both' && f0 ? 'rgba(79,195,247,.55)' : '#4fc3f7'; g.lineWidth = 1.5; g.stroke();
+        g.lineTo(xOf(FMAX, w), h - M.b); g.lineTo(xOf(FMIN, w), h - M.b); g.closePath();
+        const grad = g.createLinearGradient(0, M.t, 0, h - M.b);
+        grad.addColorStop(0, 'rgba(79,195,247,.25)'); grad.addColorStop(1, 'rgba(79,195,247,0)');
+        g.fillStyle = grad; g.fill();
+      }
+      if (f0 && view !== 'line') {
+        g.textAlign = 'center'; g.font = '10px system-ui';
+        for (const hm of f0.harm) {
+          const x = xOf(hm.f, w), y = yOf(Math.max(DB_MIN, Math.min(DB_MAX, hm.db)), h, DB_MIN, DB_MAX);
+          g.fillStyle = hm.k === 1 ? '#f2b35b' : 'rgba(120,214,255,.9)';
+          g.fillRect(x - 3, y, 6, h - M.b - y);
+          if (hm.k <= 10) { g.fillStyle = '#c9d3de'; g.fillText(hm.k, x, y - 4); }
+        }
+      }
+      if (f0) {
+        const x = Math.round(xOf(f0.freq, w)) + .5;
+        g.strokeStyle = '#f2b35b'; g.lineWidth = 1.5; g.setLineDash([5, 4]);
+        g.beginPath(); g.moveTo(x, M.t); g.lineTo(x, h - M.b); g.stroke(); g.setLineDash([]);
+        const c = Math.round(f0.cents);
+        const label = `F0 ${f0.freq.toFixed(1)} Hz · ${noteLabel(f0.midi)} ${c >= 0 ? '+' : ''}${c}c`;
+        g.font = 'bold 12px system-ui';
+        const tw = g.measureText(label).width + 12;
+        const bx = Math.min(w - M.r - tw, Math.max(M.l, x + 6));
+        g.fillStyle = 'rgba(242,179,91,.95)'; g.fillRect(bx, M.t + 4, tw, 20);
+        g.fillStyle = '#1b1406'; g.textAlign = 'left'; g.fillText(label, bx + 6, M.t + 18);
+      }
     } else {
       g.fillStyle = '#8a95a3'; g.textAlign = 'center'; g.font = '14px system-ui';
       g.fillText('Prem «Activa el micròfon» per començar', w / 2, h / 2);
     }
     g.fillStyle = '#8a95a3'; g.font = '11px system-ui'; g.textAlign = 'left';
     g.fillText('dBFS', 4, 12);
+    drawHarm();
     requestAnimationFrame(drawSpec);
   }
 
@@ -290,6 +452,11 @@
       analyser.minDecibels = -120; analyser.maxDecibels = 0;
       analyser.smoothingTimeConstant = parseFloat($('smooth').value);
       src.connect(analyser);
+      pitchAn = ctx.createAnalyser();
+      pitchAn.fftSize = 4096;
+      src.connect(pitchAn);
+      tbuf = new Float32Array(pitchAn.fftSize);
+      yinBuf = new Float32Array(Math.floor(ctx.sampleRate / 40) + 2);
       data = new Float32Array(analyser.frequencyBinCount);
       peaks = new Float32Array(analyser.frequencyBinCount).fill(-200);
       running = true;
