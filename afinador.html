@@ -42,21 +42,24 @@
   .tuner-face {
     background: radial-gradient(circle at 50% 25%, #f6efdc, #ddcfa8 85%);
     border-radius: 18px;
-    padding: 18px 12px 6px;
+    padding: 14px 10px 8px;
     box-shadow: inset 0 3px 14px rgba(0,0,0,.4), 0 3px 6px rgba(0,0,0,.35);
   }
   .tuner-svg { display: block; width: 100%; height: auto; }
-  .tuner-arc { fill: none; stroke: #2b2b2b; stroke-width: 3; }
-  .tuner-tick { stroke: #2b2b2b; stroke-width: 2.4; }
-  .tuner-tick.center { stroke: #2f7d4f; stroke-width: 3.6; }
-  .tuner-label { fill: #4a4a4a; font-size: 15px; font-weight: 700; font-family: inherit; }
-  .tuner-needle {
-    stroke: #c1272d; stroke-width: 3.6; stroke-linecap: round;
-    transform-origin: 160px 165px;
-    transition: transform .08s ease-out, opacity .25s;
-  }
+  .tuner-base { stroke: #2b2b2b; stroke-width: 2; }
+  .tuner-tick { stroke: #2b2b2b; stroke-width: 1.6; }
+  .tuner-tick.major { stroke-width: 2.4; }
+  .tuner-tick.center { stroke: #2f7d4f; stroke-width: 3.4; }
+  .tuner-zone { fill: rgba(47,125,79,.16); transition: fill .15s; }
+  .tuner-zone.on { fill: rgba(47,125,79,.38); }
+  .tuner-scale { fill: #4a4a4a; font-size: 12px; font-weight: 600; font-family: inherit; }
+  .tuner-label { fill: #4a4a4a; font-size: 20px; font-weight: 700; font-family: inherit; }
+  .tuner-needle { transition: transform .09s ease-out, opacity .25s; }
+  .tuner-needle line { stroke: #c1272d; stroke-width: 4; stroke-linecap: round; transition: stroke .15s; }
+  .tuner-needle path { fill: #c1272d; transition: fill .15s; }
+  .tuner-needle.good line { stroke: #23874f; }
+  .tuner-needle.good path { fill: #23874f; }
   .tuner-needle.idle { opacity: .35; }
-  .tuner-pivot { fill: #2b2b2b; }
   .tuner-note {
     margin-top: 14px; font-size: 3.1rem; font-weight: 800;
     font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -139,17 +142,17 @@
     <h1>Afinador</h1>
     <div class="tuner-panel">
       <div class="tuner-face">
-        <svg class="tuner-svg" viewBox="0 0 320 190" aria-hidden="true">
-          <path class="tuner-arc" d="M 68.1 73.1 A 130 130 0 0 1 251.9 73.1" />
-          <line class="tuner-tick" x1="68.1" y1="73.1" x2="79.4" y2="84.4" />
-          <line class="tuner-tick" x1="110.3" y1="44.9" x2="116.4" y2="59.7" />
-          <line class="tuner-tick center" x1="160" y1="35" x2="160" y2="51" />
-          <line class="tuner-tick" x1="209.7" y1="44.9" x2="203.6" y2="59.7" />
-          <line class="tuner-tick" x1="251.9" y1="73.1" x2="240.6" y2="84.4" />
-          <text class="tuner-label" x="46" y="100" text-anchor="middle">♭</text>
-          <text class="tuner-label" x="274" y="100" text-anchor="middle">♯</text>
-          <line id="needle" class="tuner-needle idle" x1="160" y1="165" x2="160" y2="48" />
-          <circle class="tuner-pivot" cx="160" cy="165" r="7" />
+        <svg class="tuner-svg" viewBox="0 0 400 145" aria-hidden="true">
+          <rect class="tuner-zone" x="165.1" y="12" width="69.8" height="102" rx="4" />
+          <line class="tuner-base" x1="25.0" y1="114" x2="375.0" y2="114" />
+          <line class="tuner-tick major" x1="25.0" y1="96" x2="25.0" y2="114" /><line class="tuner-tick" x1="50.3" y1="103" x2="50.3" y2="114" /><line class="tuner-tick major" x1="77.6" y1="96" x2="77.6" y2="114" /><line class="tuner-tick" x1="92.3" y1="103" x2="92.3" y2="114" /><line class="tuner-tick major" x1="107.9" y1="96" x2="107.9" y2="114" /><line class="tuner-tick" x1="124.7" y1="103" x2="124.7" y2="114" /><line class="tuner-tick major" x1="143.3" y1="96" x2="143.3" y2="114" /><line class="tuner-tick" x1="151.5" y1="103" x2="151.5" y2="114" /><line class="tuner-tick" x1="160.3" y1="103" x2="160.3" y2="114" /><line class="tuner-tick" x1="170.1" y1="103" x2="170.1" y2="114" /><line class="tuner-tick" x1="181.6" y1="103" x2="181.6" y2="114" /><line class="tuner-tick center" x1="200.0" y1="96" x2="200.0" y2="114" /><line class="tuner-tick" x1="218.4" y1="103" x2="218.4" y2="114" /><line class="tuner-tick" x1="229.9" y1="103" x2="229.9" y2="114" /><line class="tuner-tick" x1="239.7" y1="103" x2="239.7" y2="114" /><line class="tuner-tick" x1="248.5" y1="103" x2="248.5" y2="114" /><line class="tuner-tick major" x1="256.7" y1="96" x2="256.7" y2="114" /><line class="tuner-tick" x1="275.3" y1="103" x2="275.3" y2="114" /><line class="tuner-tick major" x1="292.1" y1="96" x2="292.1" y2="114" /><line class="tuner-tick" x1="307.7" y1="103" x2="307.7" y2="114" /><line class="tuner-tick major" x1="322.4" y1="96" x2="322.4" y2="114" /><line class="tuner-tick" x1="349.7" y1="103" x2="349.7" y2="114" /><line class="tuner-tick major" x1="375.0" y1="96" x2="375.0" y2="114" />
+          <text class="tuner-scale" x="25.0" y="132" text-anchor="middle">−50</text><text class="tuner-scale" x="107.9" y="132" text-anchor="middle">−20</text><text class="tuner-scale" x="143.3" y="132" text-anchor="middle">−10</text><text class="tuner-scale" x="200.0" y="132" text-anchor="middle">0</text><text class="tuner-scale" x="256.7" y="132" text-anchor="middle">+10</text><text class="tuner-scale" x="292.1" y="132" text-anchor="middle">+20</text><text class="tuner-scale" x="375.0" y="132" text-anchor="middle">+50</text>
+          <text class="tuner-label" x="14" y="30" text-anchor="start">♭</text>
+          <text class="tuner-label" x="386" y="30" text-anchor="end">♯</text>
+          <g id="needle" class="tuner-needle idle">
+            <line x1="200" y1="16" x2="200" y2="118" />
+            <path d="M 191 6 L 209 6 L 200 18 Z" />
+          </g>
         </svg>
       </div>
       <div class="tuner-note" id="note">—</div>
@@ -470,10 +473,18 @@ class MetronomeScheduler {
   const tracker = new NoteTracker();
   const ABSOLUTE_SILENCE = 0.002, SIGNAL_ABOVE_FLOOR_RATIO = 2.3, FLOOR_ADAPT_RATE = 0.08;
 
+  // Horizontal scale, wider near the centre: 1 cent ≈ 11 units, ±5 cents ≈ ±35, ±50 = the ends.
+  const zone = document.querySelector(".tuner-zone");
+  function centsToX(c) {
+    const v = Math.max(-50, Math.min(50, c)) / 50;
+    return 175 * Math.sign(v) * Math.pow(Math.abs(v), 0.7);
+  }
   function setNeedle(cents, idle) {
-    const clamped = Math.max(-50, Math.min(50, cents));
-    needle.style.transform = `rotate(${(clamped / 50) * 45}deg)`;
+    needle.style.transform = `translateX(${centsToX(cents).toFixed(2)}px)`;
+    const good = !idle && Math.abs(cents) <= 5;
     needle.classList.toggle("idle", !!idle);
+    needle.classList.toggle("good", good);
+    zone.classList.toggle("on", good);
   }
 
   function resetDisplay() {
