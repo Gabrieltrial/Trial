@@ -178,6 +178,7 @@
     color: var(--muted);
     opacity: .75;
   }
+  #resultValue .alt { font-size: .8em; opacity: .7; margin-top: 6px; font-weight: 500; }
 </style>
 </head>
 <body>
@@ -223,7 +224,7 @@
       const resultBox = document.querySelector("#result");
       const resultValue = document.querySelector("#resultValue");
 
-      const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+      const NOTE_NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 
       // Same transposing-instrument convention as Chord Practice: the
       // microphone always hears the actual (concert) pitch; what's shown is
@@ -282,7 +283,7 @@
       // with 9 or a few more notes still gets captured in full. Reaching it
       // analyzes immediately instead of waiting for silence; shorter scales
       // are still completed via the silence timeout below.
-      const MAX_SCALE_NOTES = 13;
+      const MAX_SCALE_NOTES = 24;
       // If nothing is heard for this long after at least 3 notes have been
       // captured, assume the scale is finished (used for shorter attempts
       // that never reach the 8-note cap).
@@ -295,6 +296,8 @@
       let lastOnsetAt = 0;
       let onsetIntervals = [];
       let lastSoundAt = 0;
+      let frameBuf = null;
+      const recent = [];
 
       function requiredStabilityFor(midi) {
         if (lastAppendedMidi === null) return STABLE_DURATION_MS;
@@ -315,57 +318,43 @@
         noiseFloor += (target - noiseFloor) * FLOOR_ADAPT_RATE;
       }
 
-      // Classic autocorrelation pitch detector (ACF2+), identical approach to
-      // the Afinador tuner.
-      function autoCorrelate(buffer, sampleRate) {
-        const size = buffer.length;
+      // YIN pitch detector (de Cheveigné & Kawahara): much less prone to
+      // octave errors than plain autocorrelation, and cheaper.
+      let yinBuf = null;
+      function detectPitch(buffer, sampleRate) {
+        const W = 1024;
         let rms = 0;
-        for (let i = 0; i < size; i += 1) rms += buffer[i] * buffer[i];
-        rms = Math.sqrt(rms / size);
-
+        for (let i = 0; i < buffer.length; i += 1) rms += buffer[i] * buffer[i];
+        rms = Math.sqrt(rms / buffer.length);
         if (rms < ABSOLUTE_SILENCE || rms < noiseFloor * SIGNAL_ABOVE_FLOOR_RATIO) {
           updateNoiseFloor(rms);
           return -1;
         }
-
-        const threshold = 0.2;
-        let start = 0;
-        let end = size - 1;
-        for (let i = 0; i < size / 2; i += 1) {
-          if (Math.abs(buffer[i]) < threshold) { start = i; break; }
+        const maxLag = Math.min(Math.floor(sampleRate / 50), buffer.length - W - 1);
+        const minLag = Math.floor(sampleRate / 1500);
+        if (!yinBuf || yinBuf.length < maxLag + 2) yinBuf = new Float32Array(maxLag + 2);
+        const d = yinBuf;
+        d[0] = 1;
+        let cumulative = 0;
+        for (let tau = 1; tau <= maxLag; tau += 1) {
+          let sum = 0;
+          for (let i = 0; i < W; i += 1) { const x = buffer[i] - buffer[i + tau]; sum += x * x; }
+          cumulative += sum;
+          d[tau] = cumulative ? sum * tau / cumulative : 1;
         }
-        for (let i = 1; i < size / 2; i += 1) {
-          if (Math.abs(buffer[size - i]) < threshold) { end = size - i; break; }
-        }
-        const trimmed = buffer.slice(start, end);
-        const n = trimmed.length;
-        if (n < 8) return -1;
-
-        const correlation = new Array(n).fill(0);
-        for (let lag = 0; lag < n; lag += 1) {
-          for (let i = 0; i < n - lag; i += 1) {
-            correlation[lag] += trimmed[i] * trimmed[i + lag];
+        let best = -1;
+        for (let tau = minLag; tau <= maxLag; tau += 1) {
+          if (d[tau] < 0.12) {
+            while (tau + 1 <= maxLag && d[tau + 1] < d[tau]) tau += 1;
+            best = tau;
+            break;
           }
         }
-
-        let d = 0;
-        while (d < n - 1 && correlation[d] > correlation[d + 1]) d += 1;
-
-        let bestLag = -1;
-        let bestValue = -Infinity;
-        for (let i = d; i < n; i += 1) {
-          if (correlation[i] > bestValue) { bestValue = correlation[i]; bestLag = i; }
-        }
-        if (bestLag <= 0) return -1;
-
-        const prev = correlation[bestLag - 1] ?? correlation[bestLag];
-        const curr = correlation[bestLag];
-        const next = correlation[bestLag + 1] ?? correlation[bestLag];
-        const a = (prev + next - 2 * curr) / 2;
-        const b = (next - prev) / 2;
-        const refinedLag = a ? bestLag - b / (2 * a) : bestLag;
-
-        const frequency = sampleRate / refinedLag;
+        if (best < 2) return -1;
+        const a = d[best - 1], b = d[best], c = d[best + 1] ?? b;
+        const den = a + c - 2 * b;
+        const lag = best + (den ? (a - c) / (2 * den) : 0);
+        const frequency = sampleRate / lag;
         if (!Number.isFinite(frequency) || frequency < 50 || frequency > 1500) return -1;
         return frequency;
       }
@@ -405,7 +394,7 @@
           resetCapture();
           statusDisplay.textContent = "Scale complete — ready for another";
         } else {
-          statusDisplay.textContent = `Listening… (${capturedMidiNotes.length}/${MAX_SCALE_NOTES} notes)`;
+          statusDisplay.textContent = `Listening… (${capturedMidiNotes.length} notes)`;
         }
       }
 
@@ -424,31 +413,55 @@
         resultBox.hidden = true;
       }
 
-      // Scores each candidate scale by how many of the notes actually played
-      // (as intervals from the root, ignoring octave and repeats) belong to
-      // it, penalizing missing/extra notes lightly so one imperfect or
-      // mis-heard note doesn't derail the match.
+      // Tries every root (0–11) with every scale. Each played note counts
+      // once per time it was played; notes outside the scale cost more than
+      // scale degrees that were not played. The first and last notes of a
+      // scale are normally the root, so a root that matches them gets a bonus
+      // (instead of blindly assuming the first note is the root).
       function identifyScale(midiNotes) {
-        const root = midiNotes[0];
-        const last = midiNotes[midiNotes.length - 1];
-        const ascending = last >= root;
-        const playedIntervals = new Set(midiNotes.map(m => (((m - root) % 12) + 12) % 12));
+        const pc = m => ((m % 12) + 12) % 12;
+        const counts = new Array(12).fill(0);
+        midiNotes.forEach(m => { counts[pc(m)] += 1; });
+        const first = pc(midiNotes[0]);
+        const last = pc(midiNotes[midiNotes.length - 1]);
+        const lowest = pc(Math.min(...midiNotes));
+        const distinct = counts.filter(c => c > 0).length;
 
-        let best = null;
-        SCALES.forEach(scale => {
-          const scaleSet = new Set(scale.intervals);
-          let matches = 0;
-          playedIntervals.forEach(iv => { if (scaleSet.has(iv)) matches += 1; });
-          const missing = scale.intervals.filter(iv => !playedIntervals.has(iv)).length;
-          const extra = [...playedIntervals].filter(iv => !scaleSet.has(iv)).length;
-          const score = matches - 0.5 * missing - 0.5 * extra;
-          if (!best || score > best.score) best = { scale, score };
-        });
-
+        const ranked = [];
+        for (let root = 0; root < 12; root += 1) {
+          SCALES.forEach(scale => {
+            const inScale = new Set(scale.intervals.map(iv => (root + iv) % 12));
+            let hits = 0, outside = 0, missing = 0;
+            for (let p = 0; p < 12; p += 1) {
+              if (inScale.has(p)) { hits += counts[p]; if (!counts[p]) missing += 1; }
+              else outside += counts[p];
+            }
+            let score = hits - 1.6 * outside - 0.45 * missing;
+            if (root === first) score += 1.6;
+            if (root === last) score += 1.0;
+            if (root === lowest) score += 0.6;
+            ranked.push({ root, scale, score, outside, missing });
+          });
+        }
+        ranked.sort((a, b) => b.score - a.score);
+        const best = ranked[0];
+        const runnerUps = ranked.slice(1).filter(r => best.score - r.score < 1.6).slice(0, 2);
+        const rootName = r => {
+          const written = (r + instruments[instrumentIndex].writtenOffset) % 12;
+          return NOTE_NAMES[written];
+        };
         return {
-          rootName: noteNameFor(root).replace(/\d+$/, ""),
+          rootName: rootName(best.root),
           scaleName: best.scale.name,
-          ascending
+          direction: (() => {
+            const hi = Math.max(...midiNotes), lo = Math.min(...midiNotes);
+            const a = midiNotes[0], z = midiNotes[midiNotes.length - 1];
+            if (hi - Math.max(a, z) >= 5) return "ascending and descending";
+            if (Math.min(a, z) - lo >= 5) return "descending and ascending";
+            return z >= a ? "ascending" : "descending";
+          })(),
+          uncertain: distinct < 5 || best.outside > 1 || runnerUps.length > 0,
+          alternatives: runnerUps.map(r => `${rootName(r.root)} ${r.scale.name}`)
         };
       }
 
@@ -458,21 +471,31 @@
           resultBox.hidden = false;
           return;
         }
-        const { rootName, scaleName, ascending } = identifyScale(capturedMidiNotes);
-        resultValue.textContent = `${rootName} ${scaleName} — ${ascending ? "ascending" : "descending"}`;
+        const { rootName, scaleName, direction, alternatives } = identifyScale(capturedMidiNotes);
+        resultValue.textContent = `${rootName} ${scaleName} — ${direction}`;
+        if (alternatives.length) {
+          const alt = document.createElement("div");
+          alt.className = "alt";
+          alt.textContent = "Could also be: " + alternatives.join(" · ");
+          resultValue.append(alt);
+        }
         resultBox.hidden = false;
       }
 
       function loop() {
         if (!running || !analyser) return;
-        const buffer = new Float32Array(analyser.fftSize);
+        if (!frameBuf || frameBuf.length !== analyser.fftSize) frameBuf = new Float32Array(analyser.fftSize);
+        const buffer = frameBuf;
         analyser.getFloatTimeDomainData(buffer);
-        const frequency = autoCorrelate(buffer, audioContext.sampleRate);
+        const frequency = detectPitch(buffer, audioContext.sampleRate);
         const now = Date.now();
 
         if (frequency !== -1) {
           lastSoundAt = now;
-          const midiFloat = 69 + 12 * Math.log2(frequency / 440);
+          // Median of the last 3 estimates removes single-frame glitches.
+          recent.push(69 + 12 * Math.log2(frequency / 440));
+          if (recent.length > 3) recent.shift();
+          const midiFloat = [...recent].sort((x, y) => x - y)[Math.floor(recent.length / 2)];
           const midi = Math.round(midiFloat);
           liveNoteDisplay.textContent = noteNameFor(midi);
 
@@ -491,11 +514,12 @@
             appendNote(midi, now);
           } else if (capturedMidiNotes.length < MAX_SCALE_NOTES) {
             statusDisplay.textContent = capturedMidiNotes.length > 0
-              ? `Listening… (${capturedMidiNotes.length}/${MAX_SCALE_NOTES} notes)`
+              ? `Listening… (${capturedMidiNotes.length} notes)`
               : "Listening…";
           }
         } else {
           liveNoteDisplay.textContent = "—";
+          recent.length = 0;
         }
 
         if (capturedMidiNotes.length >= 3 && capturedMidiNotes.length < MAX_SCALE_NOTES
