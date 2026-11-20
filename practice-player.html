@@ -51,7 +51,9 @@ canvas#wave{position:absolute;inset:0;width:100%;height:100%;cursor:pointer;touc
 .seg button{flex:1;padding:3px 0;min-width:28px}
 .seg button[aria-pressed=true]{background:var(--accent2);border-color:var(--accent2);color:#06201c;font-weight:650}
 #plBtns{flex:none}
-#plBtns button{flex:none;min-width:28px;padding:3px 8px}
+#plBtns{flex-wrap:wrap;max-width:420px}
+#plBtns button{flex:none;min-width:26px;padding:3px 6px}
+#plBtns .pladd{font-weight:700;color:var(--accent2)}
 #saxInfo{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
 #plPanel{position:absolute;right:0;top:36px;width:min(620px,94vw);max-height:60vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px;z-index:20;box-shadow:0 12px 40px rgba(0,0,0,.55);display:grid;gap:5px;align-content:start}
 #plPanel[hidden]{display:none}
@@ -1590,7 +1592,7 @@ async function loadItems(items) {
   else if (ok && lastErr) setStatus(ok + ' of ' + items.length + ' loaded. Last error: ' + lastErr, true);
 }
 
-const PL_COUNT = 5, PL_MAX = 40;
+const PL_COUNT = 10, PL_LISTS_MAX = 60, PL_MAX = 40;
 const idb = {
   p: null,
   open() {
@@ -1619,7 +1621,11 @@ const idb = {
 function readLists() {
   try {
     const s = JSON.parse(localStorage.getItem('pp-lists'));
-    if (Array.isArray(s) && s.length === PL_COUNT) return s;
+    // Keeps every saved list (older versions had 5) and fills up to PL_COUNT.
+    if (Array.isArray(s) && s.every(l => l && Array.isArray(l.items))) {
+      while (s.length < PL_COUNT) s.push({ name: 'List ' + (s.length + 1), items: [] });
+      return s;
+    }
   } catch (e) {}
   return Array.from({ length: PL_COUNT }, (_, i) => ({ name: 'List ' + (i + 1), items: [] }));
 }
@@ -1841,7 +1847,7 @@ async function plImport(file) {
 const TRASH = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:block"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
 function renderPl() {
   const p = $('#plPanel'), list = playlists[plIndex];
-  document.querySelectorAll('#plBtns button').forEach((b, i) => {
+  document.querySelectorAll('#plBtns button:not(.pladd)').forEach((b, i) => {
     b.setAttribute('aria-pressed', String(plOpen && i === plIndex));
     b.title = playlists[i].name + ' · ' + playlists[i].items.length + (playlists[i].items.length === 1 ? ' track' : ' tracks');
   });
@@ -1865,7 +1871,13 @@ function renderPl() {
   const cr = el('button', 'clr', Date.now() - clearArm < 3500 ? 'Click again to clear' : 'Clear list', 'Delete every track of this list'); cr.onclick = plClear;
   if (Date.now() - clearArm < 3500) cr.style.borderColor = 'var(--danger)';
   cr.disabled = !list.items.length;
-  tools.append(sv, wl, im, el('span', 'spacer'), cr); p.append(tools);
+  tools.append(sv, wl, im, el('span', 'spacer'), cr);
+  if (plIndex >= PL_COUNT) {
+    const dl = el('button', 'clr', 'Delete list', list.items.length ? 'Clear the list first to delete it' : 'Remove this extra list');
+    dl.disabled = !!list.items.length; dl.onclick = plDeleteList;
+    tools.append(dl);
+  }
+  p.append(tools);
   if (!list.items.length) p.append(el('div', 'muted', 'Empty. Load a track, set it up, then press "Add current track", or import a saved list.'));
   list.items.forEach((it, i) => {
     const cur = sameTrack(it, audio);
@@ -1880,12 +1892,32 @@ function renderPl() {
 }
 function buildPlBtns() {
   const box = $('#plBtns');
-  for (let i = 0; i < PL_COUNT; i++) {
+  box.innerHTML = '';
+  playlists.forEach((_, i) => {
     const b = document.createElement('button'); b.textContent = i + 1; b.setAttribute('aria-pressed', 'false');
     b.onclick = () => { if (plOpen && plIndex === i) plOpen = false; else { plIndex = i; plOpen = true; } renderPl(); };
     box.append(b);
-  }
+  });
+  const add = document.createElement('button');
+  add.className = 'pladd'; add.textContent = '+'; add.title = 'Add a new list';
+  add.disabled = playlists.length >= PL_LISTS_MAX;
+  add.onclick = () => {
+    if (playlists.length >= PL_LISTS_MAX) return;
+    playlists.push({ name: 'List ' + (playlists.length + 1), items: [] });
+    writeLists();
+    plIndex = playlists.length - 1; plOpen = true;
+    buildPlBtns();
+  };
+  box.append(add);
   renderPl();
+}
+function plDeleteList() {
+  if (plIndex < PL_COUNT || playlists[plIndex].items.length) return;
+  playlists.splice(plIndex, 1);
+  writeLists();
+  plIndex = Math.min(plIndex, playlists.length - 1); plOpen = false;
+  buildPlBtns();
+  setStatus('List deleted.');
 }
 
 async function isMp3(blob) {
