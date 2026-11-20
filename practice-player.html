@@ -132,6 +132,7 @@ output{font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
   <span id="time">0:00.000 / 0:00.000</span>
   <label class="muted" for="nudge" title="Step used by the loop start/end arrows">Nudge</label>
   <select id="nudge" title="Step used by the loop start/end arrows">
+    <option value="0.005">0.005 s</option>
     <option value="0.01">0.01 s</option>
     <option value="0.05" selected>0.05 s</option>
     <option value="0.1">0.10 s</option>
@@ -206,6 +207,7 @@ output{font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
         <option value="tenor" selected>Tenor</option>
         <option value="baritone">Baritone</option>
       </select>
+      <label id="aiWrap" class="muted" hidden title="AI separation with Demucs (a neural network, runs in the helper on this computer): much cleaner than the classic method. Untick to use the classic method."><input type="checkbox" id="aiSep" checked> AI</label>
     </div>
     <div class="sl">
       <span class="lbl">Backing</span>
@@ -1455,25 +1457,84 @@ function harmName(t) {
   if (harmPref !== 'auto') return harmPref === 'piano' ? 'Piano' : 'Guitar';
   return t && t.back && t.back.keys ? t.back.keys : 'Piano/Gtr';
 }
-function cancelSax() { if (saxRun) { saxRun.cancelled = true; if (saxRun.w) saxRun.w.terminate(); saxRun = null; } }
+function cancelSax() {
+  if (saxRun) {
+    saxRun.cancelled = true;
+    if (saxRun.w) saxRun.w.terminate();
+    if (saxRun.aiId && helperBase !== null) fetch(helperBase + '/api/sepcancel?id=' + saxRun.aiId).catch(() => {});
+    saxRun = null;
+  }
+}
+const useAI = () => !!(helper && helper.demucs && $('#aiSep').checked);
+// AI separation in the helper (Demucs). Fills both t.sax and t.back, so switching
+// between sax focus and backing is instant afterwards.
+async function startAiSep(t, kind) {
+  const type = saxType(), buf = t.buffer, sr = buf.sampleRate, ch = Math.min(2, buf.numberOfChannels), n = buf.length;
+  const job = { t, type, kind, cancelled: false, w: null, p: 0, ai: true, aiId: null };
+  saxRun = job;
+  saxInfo(0);
+  try {
+    const pcm = new Int16Array(n * ch);
+    for (let c = 0; c < ch; c++) {
+      const d = buf.getChannelData(c);
+      for (let i = 0; i < n; i++) { const v = d[i] < -1 ? -1 : d[i] > 1 ? 1 : d[i]; pcm[i * ch + c] = v < 0 ? v * 32768 : v * 32767; }
+    }
+    let r = await fetch(helperBase + '/api/separate', { method: 'POST', body: pcm.buffer, headers: { 'Content-Type': 'application/octet-stream', 'X-Sample-Rate': String(sr), 'X-Channels': String(ch) } });
+    let j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'separation failed');
+    job.aiId = j.id;
+    for (;;) {
+      if (job.cancelled) return;
+      r = await fetch(helperBase + '/api/sepstatus?id=' + job.aiId, { cache: 'no-store' });
+      j = await r.json();
+      if (!r.ok || j.error) throw new Error(j.error || 'separation failed');
+      job.p = j.progress; if (!job.cancelled) saxInfo(j.progress);
+      if (j.done) break;
+      await new Promise(res => setTimeout(res, 700));
+    }
+    const stem = async name => {
+      const rr = await fetch(helperBase + '/api/stem?id=' + job.aiId + '&name=' + name, { cache: 'no-store' });
+      if (!rr.ok) throw new Error('could not read the ' + name + ' stem');
+      const c = +rr.headers.get('X-Channels') || 1, all = new Float32Array(await rr.arrayBuffer()), len = all.length / c;
+      const L = all.slice(0, len), R = c > 1 ? all.slice(len) : L.slice();
+      return { L: L.length === n ? L : fitLen(L, n), R: R.length === n ? R : fitLen(R, n) };
+    };
+    const [S, B, D] = [await stem('sax'), await stem('bass'), await stem('drums')];
+    if (job.cancelled) return;
+    saxRun = null;
+    const stereo = buf.numberOfChannels > 1;
+    t.sax = { type, SL: S.L, SR: stereo ? S.R : null, voiced: 1, ai: true };
+    t.back = { type, BL: B.L, BR: stereo ? B.R : null, DL: D.L, DR: stereo ? D.R : null, keys: j.keys || 'Piano/Gtr', bassVoiced: 1 };
+    if (audio === t && (saxLevel > 0 || backLevel > 0)) applyMix();
+    saxInfo();
+  } catch (e) {
+    if (job.cancelled) return;
+    saxRun = null;
+    setStatus('AI separation failed (' + e.message + '); using the classic method.', true);
+    startDsp(t, kind, true);
+  }
+}
+function fitLen(a, n) { const o = new Float32Array(n); o.set(a.subarray(0, Math.min(n, a.length))); return o; }
 function keptList() { return ['drums', 'bass', 'harm'].filter(k => backSel[k]).map(k => k === 'harm' ? harmName(audio) : k === 'drums' ? 'drums' : 'bass').join(' + '); }
 function saxInfo(p) {
   const el = $('#saxInfo');
   let s;
   if (!audio) s = 'Load a track, then choose a level.';
-  else if (saxRun && saxRun.t === audio) s = (saxRun.kind === 'back' ? 'Separating the instruments… ' : 'Analysing the melody… ') + Math.round((p == null ? saxRun.p || 0 : p) * 100) + '%';
+  else if (saxRun && saxRun.t === audio) s = (saxRun.ai ? 'AI separation (Demucs)… ' : saxRun.kind === 'back' ? 'Separating the instruments… ' : 'Analysing the melody… ') + Math.round((p == null ? saxRun.p || 0 : p) * 100) + '%';
   else if (saxLevel === 0 && backLevel === 0) s = 'Sax focus keeps the sax. Backing removes it and keeps the ticked instruments.';
+  else if (saxLevel > 0 && saxValid(audio) && audio.sax.ai) s = 'Sax focus ' + saxLevel + ' · AI separation';
   else if (saxLevel > 0 && saxValid(audio)) {
     const v = audio.sax.voiced;
     s = 'Sax focus ' + saxLevel + ' · melody in ' + Math.round(v * 100) + '%' + (v < 0.2 ? ' · weak effect' : '');
   } else if (backLevel > 0 && backValid(audio)) {
-    s = 'Backing ' + backLevel + ' · keeping ' + keptList() + ' · sax ' + SAX_REMOVE_DB[backLevel] + ' dB · unticked ' + BACK_DB[backLevel] + ' dB' + (audio.back.keys && harmPref === 'auto' ? ' · harmonic instrument: guess' : '');
+    s = 'Backing ' + backLevel + ' · keeping ' + keptList() + ' · sax ' + SAX_REMOVE_DB[backLevel] + ' dB · unticked ' + BACK_DB[backLevel] + ' dB' + (audio.sax.ai ? ' · AI separation' : audio.back.keys && harmPref === 'auto' ? ' · harmonic instrument: guess' : '');
   } else s = '';
   el.textContent = s; el.title = s;
   const hb = $('#hBtn'); if (hb) hb.textContent = harmName(audio);
 }
-function startDsp(t, kind) {
+function startDsp(t, kind, noAI) {
   cancelSax();
+  if (!noAI && useAI()) { startAiSep(t, kind); return; }
   const type = saxType(), sr = t.buffer.sampleRate;
   const job = { t, type, kind, cancelled: false, w: null, p: 0 };
   saxRun = job;
@@ -1826,7 +1887,7 @@ function writeLists() {
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
 const sameTrack = (it, t) => !!t && ((it.blobId && it.blobId === t.blobId) || (it.name === t.name && Math.abs(it.duration - t.duration) < 0.5));
 function snapshot() {
-  return { speed: mainSpeed, semis, cents, win: winMs, sax: saxLevel, saxType: saxType(), back: { level: backLevel, drums: backSel.drums, bass: backSel.bass, harm: backSel.harm }, loops: loops.map(l => ({ start: l.start, end: l.end, speed: l.speed })) };
+  return { speed: mainSpeed, semis, cents, win: winMs, nudge: +$('#nudge').value, sax: saxLevel, saxType: saxType(), back: { level: backLevel, drums: backSel.drums, bass: backSel.bass, harm: backSel.harm }, loops: loops.map(l => ({ start: l.start, end: l.end, speed: l.speed })) };
 }
 function summary(st) {
   const n = st.loops.filter(l => l.start != null && l.end != null).length;
@@ -1841,6 +1902,7 @@ function applyState(st) {
   const set = (id, v) => { const el = $('#' + id); el.value = v; el.oninput({ target: el }); };
   set('speed', st.speed); set('semis', st.semis); set('cents', st.cents);
   $('#win').value = st.win; $('#win').onchange({ target: $('#win') });
+  if (st.nudge && [...$('#nudge').options].some(o => +o.value === st.nudge)) { $('#nudge').value = String(st.nudge); saveNudge(); }
   loops.forEach((l, i) => {
     const s = st.loops[i] || {};
     l.start = s.start == null ? null : s.start; l.end = s.end == null ? null : s.end; l.speed = s.speed || 1;
@@ -1988,6 +2050,7 @@ function cleanState(s) {
   return {
     speed: nclamp(s.speed, 1, 0.2, 2), semis: Math.round(nclamp(s.semis, 0, -12, 12)), cents: Math.round(nclamp(s.cents, 0, -100, 100)),
     win: [43, 85, 170].includes(+s.win) ? +s.win : 85,
+    nudge: [0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1].includes(+s.nudge) ? +s.nudge : undefined,
     sax: [0, 1, 2, 3].includes(+s.sax) ? +s.sax : 0,
     saxType: SAX_TYPES[s.saxType] ? s.saxType : 'tenor',
     back: s.back && [0, 1, 2, 3].includes(+s.back.level) ? { level: +s.back.level, drums: s.back.drums !== false, bass: s.back.bass !== false, harm: s.back.harm !== false } : null,
@@ -2278,6 +2341,7 @@ async function detectHelper() {
     const j = await pingHelper(base);
     if (j) {
       helper = j; helperBase = base;
+      $('#aiWrap').hidden = !j.demucs;
       $('#q').placeholder = 'Search a song or an artist (YouTube), or paste a link';
       return true;
     }
@@ -2454,6 +2518,10 @@ $('#semis').oninput = e => { semis = +e.target.value; $('#semisV').textContent =
 $('#cents').oninput = e => { cents = +e.target.value; $('#centsV').textContent = fmtS(cents) + ' ct'; applyParams(); };
 $('#semisR').onclick = () => { $('#semis').value = 0; $('#semis').oninput({ target: $('#semis') }); };
 $('#centsR').onclick = () => { $('#cents').value = 0; $('#cents').oninput({ target: $('#cents') }); };
+$('#aiSep').onchange = () => { if (audio) { if (audio.sax && !audio.sax.ai !== !$('#aiSep').checked) { audio.sax = null; audio.back = null; } syncSax(); } };
+function saveNudge() { try { localStorage.setItem('pp-nudge', $('#nudge').value); } catch (e) {} }
+try { const v = localStorage.getItem('pp-nudge'); if (v && [...$('#nudge').options].some(o => o.value === v)) $('#nudge').value = v; } catch (e) {}
+$('#nudge').addEventListener('change', saveNudge);
 $('#algo').value = algo;
 $('#algo').onchange = e => {
   algo = e.target.value;

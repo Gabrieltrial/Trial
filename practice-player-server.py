@@ -152,6 +152,121 @@ def watch_pages(server):
         return
 
 
+# ---------- AI instrument separation (optional: needs "pip install demucs") ----------
+# Demucs (Meta, open source) is a neural network trained to split a mix into stems,
+# the same family of technique that services like Suno use. htdemucs_6s gives
+# drums, bass, guitar, piano, vocals and "other"; for a sax recording the sax ends up
+# in vocals + other.
+SEP_MODEL = "htdemucs_6s"
+SEP_JOBS = {}            # id -> {"progress", "done", "error", "stems", "keys", "sr"}
+SEP_LOCK = threading.Lock()
+SEP_STATE = {"separator": None, "device": None, "force_cpu": False}
+
+
+def has_demucs():
+    try:
+        import importlib.util
+        return importlib.util.find_spec("demucs") is not None and importlib.util.find_spec("torch") is not None
+    except Exception:
+        return False
+
+
+def get_separator(callback):
+    os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+    import torch
+    from demucs.api import Separator
+    if SEP_STATE["separator"] is None:
+        if SEP_STATE["force_cpu"]:
+            device = "cpu"
+        elif torch.cuda.is_available():
+            device = "cuda"
+        elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
+            device = "mps"
+        else:
+            device = "cpu"
+        SEP_STATE["separator"] = Separator(model=SEP_MODEL, device=device, shifts=1, overlap=0.25, progress=False)
+        SEP_STATE["device"] = device
+    SEP_STATE["separator"].update_parameter(callback=callback)
+    return SEP_STATE["separator"]
+
+
+def run_separation(job_id, pcm, sr, channels):
+    job = SEP_JOBS[job_id]
+    try:
+        import numpy as np
+        import torch
+        from demucs.audio import convert_audio
+        wav = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768.0
+        wav = wav.reshape(-1, channels).T.copy()
+        if channels == 1:
+            wav = np.concatenate([wav, wav], axis=0)
+        length = wav.shape[1]
+        tensor = torch.from_numpy(wav)
+
+        def callback(info):
+            if job.get("cancel"):
+                raise KeyboardInterrupt
+            if info.get("state") != "end":
+                return
+            models = max(1, info.get("models", 1))
+            frac = (info.get("model_idx_in_bag", 0) + min(1.0, (info.get("segment_offset", 0) + 1) / max(1, info.get("audio_length", 1)))) / models
+            job["progress"] = max(job["progress"], min(0.97, 0.05 + 0.92 * frac))
+
+        with SEP_LOCK:
+            job["progress"] = 0.03
+            try:
+                separator = get_separator(callback)
+                _, stems = separator.separate_tensor(tensor, sr)
+            except KeyboardInterrupt:
+                raise
+            except Exception:
+                if SEP_STATE["device"] in ("mps", "cuda"):
+                    # Some GPU back-ends miss an operation: retry on the CPU.
+                    SEP_STATE["separator"] = None
+                    SEP_STATE["force_cpu"] = True
+                    separator = get_separator(callback)
+                    _, stems = separator.separate_tensor(tensor, sr)
+                else:
+                    raise
+            model_sr = separator.samplerate
+
+        def back(x):
+            y = convert_audio(x, model_sr, sr, 2).numpy().astype(np.float32)
+            if y.shape[1] < length:
+                y = np.pad(y, ((0, 0), (0, length - y.shape[1])))
+            return np.ascontiguousarray(y[:, :length])
+
+        sax = back(stems["vocals"] + stems["other"])
+        bass = back(stems["bass"])
+        drums = back(stems["drums"])
+        piano = float((stems["piano"] ** 2).mean()) if "piano" in stems else 0.0
+        guitar = float((stems["guitar"] ** 2).mean()) if "guitar" in stems else 0.0
+        if channels == 1:
+            sax, bass, drums = sax[:1], bass[:1], drums[:1]
+        job.update(stems={"sax": sax, "bass": bass, "drums": drums},
+                   keys="Piano" if piano >= guitar else "Guitar", progress=1.0, done=True)
+    except KeyboardInterrupt:
+        job.update(error="cancelled", done=True)
+    except Exception as exc:
+        job.update(error=(str(exc).splitlines() or [exc.__class__.__name__])[0][:300], done=True)
+    # keep the 3 most recent finished jobs in memory
+    finished = [k for k, v in SEP_JOBS.items() if v.get("done")]
+    for k in finished[:-3]:
+        SEP_JOBS.pop(k, None)
+
+
+def start_separation(body, sr, channels):
+    if not has_demucs():
+        raise RuntimeError('AI separation is not installed. Run: python3 -m pip install -U demucs')
+    job_id = hashlib.sha1(body + f"{sr}:{channels}".encode()).hexdigest()[:20]
+    job = SEP_JOBS.get(job_id)
+    if job and not job.get("error"):
+        return job_id
+    SEP_JOBS[job_id] = {"progress": 0.0, "done": False, "error": None, "sr": sr}
+    threading.Thread(target=run_separation, args=(job_id, body, sr, channels), daemon=True).start()
+    return job_id
+
+
 def find_cached(key):
     for path in glob.glob(str(CACHE / (key + ".*"))):
         if not path.endswith((".part", ".ytdl", ".json")):
@@ -237,7 +352,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         self.cors_origin = origin
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Methods", "GET, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "*")
         self.send_header("Access-Control-Max-Age", "600")
         self.send_header("Content-Length", "0")
@@ -261,6 +376,28 @@ class Handler(BaseHTTPRequestHandler):
         if path.suffix.lower() in STATIC_TYPES and path.is_file():
             return path
         return None
+
+    def do_POST(self):
+        allowed, origin = self.origin_state()
+        if not self.host_ok() or not allowed:
+            self.send_json(403, {"error": "Forbidden"})
+            return
+        self.cors_origin = origin
+        route = urllib.parse.urlparse(self.path).path
+        try:
+            if route != "/api/separate":
+                self.send_json(404, {"error": "Not found"})
+                return
+            size = int(self.headers.get("Content-Length") or 0)
+            sr = int(self.headers.get("X-Sample-Rate") or 0)
+            channels = int(self.headers.get("X-Channels") or 0)
+            if not (0 < size <= 600 * 1024 * 1024) or not (8000 <= sr <= 192000) or channels not in (1, 2):
+                self.send_json(400, {"error": "Bad audio"})
+                return
+            body = self.rfile.read(size)
+            self.send_json(200, {"id": start_separation(body, sr, channels)})
+        except Exception as exc:
+            self.send_json(500, {"error": str(exc).splitlines()[0][:400] if str(exc) else exc.__class__.__name__})
 
     def do_GET(self):
         allowed, origin = self.origin_state()
@@ -292,7 +429,32 @@ class Handler(BaseHTTPRequestHandler):
                     page_seen(page_id, route == "/api/heartbeat")
                 self.send_json(200, {"ok": True})
             elif route == "/api/ping":
-                self.send_json(200, {"ok": True, "ytdlp": load_ytdlp() is not None, "ffmpeg": has_ffmpeg()})
+                self.send_json(200, {"ok": True, "ytdlp": load_ytdlp() is not None, "ffmpeg": has_ffmpeg(), "demucs": has_demucs()})
+            elif route == "/api/sepstatus":
+                job = SEP_JOBS.get((query.get("id") or [""])[0])
+                if not job:
+                    self.send_json(404, {"error": "Unknown separation"})
+                else:
+                    self.send_json(200, {"progress": job["progress"], "done": job["done"], "error": job["error"], "keys": job.get("keys")})
+            elif route == "/api/sepcancel":
+                job = SEP_JOBS.get((query.get("id") or [""])[0])
+                if job and not job["done"]:
+                    job["cancel"] = True
+                self.send_json(200, {"ok": True})
+            elif route == "/api/stem":
+                job = SEP_JOBS.get((query.get("id") or [""])[0])
+                name = (query.get("name") or [""])[0]
+                if not job or not job.get("stems") or name not in job["stems"]:
+                    self.send_json(404, {"error": "Stem not ready"})
+                    return
+                data = job["stems"][name].tobytes()   # planar float32: channel 0, then channel 1
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("X-Channels", str(job["stems"][name].shape[0]))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
             elif route == "/api/search":
                 q = (query.get("q") or [""])[0].strip()
                 if not q:
@@ -371,6 +533,9 @@ def main(argv=None):
         ensure_ytdlp()
     if not has_ffmpeg():
         print("Note: ffmpeg was not found. Audio will be used as downloaded (usually m4a or webm) instead of FLAC.")
+    if not has_demucs():
+        print("Optional: for AI instrument separation (sax focus / backing), install Demucs:")
+        print(f"    {sys.executable} -m pip install -U demucs")
     if not any(shutil.which(x) for x in ("deno", "node", "bun")):
         print("Note: YouTube extraction may need a JavaScript runtime (Deno or Node.js) to be installed.")
     atexit.register(lambda: shutil.rmtree(CACHE, ignore_errors=True))
