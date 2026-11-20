@@ -2563,7 +2563,12 @@ document.addEventListener('drop', e => { const f = [...e.dataTransfer.files]; if
   setInterval(beat, 20000);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) beat(); });
   addEventListener('pageshow', e => { if (e.persisted) beat(); });
-  addEventListener('pagehide', () => { fetch('/api/bye?id=' + id, { keepalive: true, cache: 'no-store' }).catch(() => {}); });
+  addEventListener('pagehide', () => {
+    // sendBeacon is the browser's reliable way to send a last message while a page closes.
+    if (!(navigator.sendBeacon && navigator.sendBeacon('/api/bye?id=' + id, ''))) {
+      fetch('/api/bye?id=' + id, { keepalive: true, cache: 'no-store' }).catch(() => {});
+    }
+  });
 })();
 buildPlBtns(); saxInfo(); buildLoops(); refreshUI(); computePeaks(); if (isWeb && !isHosted) detectHelper(); requestAnimationFrame(draw);
 </script>

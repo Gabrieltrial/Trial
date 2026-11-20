@@ -30,7 +30,7 @@ PAGES = {}                 # page id -> time of its last heartbeat
 PAGES_LOCK = threading.Lock()
 PAGE_STATE = {"armed": False, "empty_since": None}
 BYE_GRACE = 8              # seconds to wait after the last page closes (a reload comes back sooner)
-HEARTBEAT_TIMEOUT = 600    # a page silent this long is forgotten (closed without saying bye)
+HEARTBEAT_TIMEOUT = 180    # a page silent this long is forgotten (closed without saying bye; background tabs still beat once a minute)
 
 CONFIG = {"port": 8765, "max_minutes": 45, "cookies_from_browser": None, "origins": set()}
 
@@ -385,6 +385,16 @@ class Handler(BaseHTTPRequestHandler):
         self.cors_origin = origin
         route = urllib.parse.urlparse(self.path).path
         try:
+            if route in ("/api/heartbeat", "/api/bye"):
+                # navigator.sendBeacon sends a POST when the page closes
+                length = int(self.headers.get("Content-Length") or 0)
+                if 0 < length <= 4096:
+                    self.rfile.read(length)
+                page_id = (urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query).get("id") or [""])[0][:64]
+                if page_id:
+                    page_seen(page_id, route == "/api/heartbeat")
+                self.send_json(200, {"ok": True})
+                return
             if route != "/api/separate":
                 self.send_json(404, {"error": "Not found"})
                 return
