@@ -152,117 +152,186 @@ def watch_pages(server):
         return
 
 
-# ---------- AI instrument separation (optional: needs "pip install demucs") ----------
+# ---------- AI instrument separation (optional) ----------
 # Demucs (Meta, open source) is a neural network trained to split a mix into stems,
 # the same family of technique that services like Suno use. htdemucs_6s gives
 # drums, bass, guitar, piano, vocals and "other"; for a sax recording the sax ends up
 # in vocals + other.
-SEP_MODEL = "htdemucs_6s"
-SEP_JOBS = {}            # id -> {"progress", "done", "error", "stems", "keys", "sr"}
+# It runs in a separate Python (by default ~/.practice-player-ai-venv, made by
+# mac/install-ai.sh), because PyTorch needs an older Python than the helper may use.
+SEP_JOBS = {}            # id -> {"progress", "done", "error", "stems", "keys", "proc"}
 SEP_LOCK = threading.Lock()
-SEP_STATE = {"separator": None, "device": None, "force_cpu": False}
+AI_STATE = {"python": None, "checked": False}
+
+SEP_WORKER = r"""
+import os, sys
+os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+try:
+    import certifi   # the python.org Python for macOS has no SSL certificates of its own
+    os.environ.setdefault("SSL_CERT_FILE", certifi.where())
+except Exception:
+    pass
+import numpy as np
+import torch
+from demucs.audio import convert_audio
+
+inp, sr, ch, outdir = sys.argv[1], int(sys.argv[2]), int(sys.argv[3]), sys.argv[4]
+pcm = np.fromfile(inp, dtype="<i2").astype(np.float32) / 32768.0
+wav = pcm.reshape(-1, ch).T.copy()
+if ch == 1:
+    wav = np.concatenate([wav, wav], axis=0)
+length = wav.shape[1]
+
+def callback(info):
+    if info.get("state") != "end":
+        return
+    models = max(1, info.get("models", 1))
+    frac = (info.get("model_idx_in_bag", 0) + min(1.0, (info.get("segment_offset", 0) + 1) / max(1, info.get("audio_length", 1)))) / models
+    print("progress %.4f" % frac, flush=True)
+
+def separate(device):
+    try:
+        from demucs.api import Separator          # Demucs 4.1
+    except ImportError:
+        Separator = None
+    if Separator is not None:
+        sep = Separator(model="htdemucs_6s", device=device, shifts=1, overlap=0.25, progress=False, callback=callback)
+        _, stems = sep.separate_tensor(torch.from_numpy(wav), sr)
+        return sep.samplerate, stems
+    # Demucs 4.0.1 (the version that installs on Intel Macs)
+    import types
+    import demucs.apply as dapply
+    from demucs.apply import apply_model
+    from demucs.pretrained import get_model
+
+    def tq(iterable, **kw):
+        items = list(iterable)
+        for i, item in enumerate(items):
+            yield item
+            print("progress %.4f" % ((i + 1) / max(1, len(items))), flush=True)
+
+    dapply.tqdm = types.SimpleNamespace(tqdm=tq)
+    model = get_model("htdemucs_6s")
+    model.eval()
+    w = convert_audio(torch.from_numpy(wav), sr, model.samplerate, model.audio_channels)
+    ref = w.mean(0)
+    mean, std = ref.mean(), ref.std() + 1e-8
+    with torch.no_grad():
+        out = apply_model(model, ((w - mean) / std)[None], device=device, shifts=1, split=True, overlap=0.25, progress=True)[0]
+    out = out * std + mean
+    return model.samplerate, dict(zip(model.sources, out))
+
+device = "mps" if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available() else "cpu"
+try:
+    model_sr, stems = separate(device)
+except Exception:
+    if device == "cpu":
+        raise
+    print("progress 0", flush=True)
+    model_sr, stems = separate("cpu")
+
+def back(x):
+    y = convert_audio(x, model_sr, sr, 2).numpy().astype(np.float32)
+    if y.shape[1] < length:
+        y = np.pad(y, ((0, 0), (0, length - y.shape[1])))
+    y = y[:, :length]
+    return np.ascontiguousarray(y[:1] if ch == 1 else y)
+
+out = {"sax": stems["vocals"] + stems["other"], "bass": stems["bass"], "drums": stems["drums"]}
+for name, x in out.items():
+    back(x).astype("<f4").tofile(os.path.join(outdir, name + ".f32"))
+piano = float((stems["piano"] ** 2).mean()) if "piano" in stems else 0.0
+guitar = float((stems["guitar"] ** 2).mean()) if "guitar" in stems else 0.0
+print("keys " + ("Piano" if piano >= guitar else "Guitar"), flush=True)
+print("done", flush=True)
+"""
+
+
+def ai_python():
+    """The Python that has Demucs + PyTorch, or None (checked once, it is fast)."""
+    if AI_STATE["checked"]:
+        return AI_STATE["python"]
+    candidates = [os.environ.get("PRACTICE_PLAYER_AI_PYTHON"),
+                  str(Path.home() / ".practice-player-ai-venv" / "bin" / "python"),
+                  sys.executable]
+    probe = "import importlib.util as u, sys; sys.exit(0 if u.find_spec('demucs') and u.find_spec('torch') else 1)"
+    for py in candidates:
+        if not py or not os.path.exists(py):
+            continue
+        try:
+            if subprocess.run([py, "-c", probe], timeout=20, capture_output=True).returncode == 0:
+                AI_STATE["python"] = py
+                break
+        except Exception:
+            pass
+    AI_STATE["checked"] = True
+    return AI_STATE["python"]
 
 
 def has_demucs():
-    try:
-        import importlib.util
-        return importlib.util.find_spec("demucs") is not None and importlib.util.find_spec("torch") is not None
-    except Exception:
-        return False
-
-
-def get_separator(callback):
-    os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
-    import torch
-    from demucs.api import Separator
-    if SEP_STATE["separator"] is None:
-        if SEP_STATE["force_cpu"]:
-            device = "cpu"
-        elif torch.cuda.is_available():
-            device = "cuda"
-        elif getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
-            device = "mps"
-        else:
-            device = "cpu"
-        SEP_STATE["separator"] = Separator(model=SEP_MODEL, device=device, shifts=1, overlap=0.25, progress=False)
-        SEP_STATE["device"] = device
-    SEP_STATE["separator"].update_parameter(callback=callback)
-    return SEP_STATE["separator"]
+    return ai_python() is not None
 
 
 def run_separation(job_id, pcm, sr, channels):
     job = SEP_JOBS[job_id]
+    work = Path(tempfile.mkdtemp(prefix="pp-sep-"))
     try:
-        import numpy as np
-        import torch
-        from demucs.audio import convert_audio
-        wav = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768.0
-        wav = wav.reshape(-1, channels).T.copy()
-        if channels == 1:
-            wav = np.concatenate([wav, wav], axis=0)
-        length = wav.shape[1]
-        tensor = torch.from_numpy(wav)
-
-        def callback(info):
-            if job.get("cancel"):
-                raise KeyboardInterrupt
-            if info.get("state") != "end":
-                return
-            models = max(1, info.get("models", 1))
-            frac = (info.get("model_idx_in_bag", 0) + min(1.0, (info.get("segment_offset", 0) + 1) / max(1, info.get("audio_length", 1)))) / models
-            job["progress"] = max(job["progress"], min(0.97, 0.05 + 0.92 * frac))
-
         with SEP_LOCK:
+            if job.get("cancel"):
+                raise RuntimeError("cancelled")
+            (work / "in.raw").write_bytes(pcm)
             job["progress"] = 0.03
-            try:
-                separator = get_separator(callback)
-                _, stems = separator.separate_tensor(tensor, sr)
-            except KeyboardInterrupt:
-                raise
-            except Exception:
-                if SEP_STATE["device"] in ("mps", "cuda"):
-                    # Some GPU back-ends miss an operation: retry on the CPU.
-                    SEP_STATE["separator"] = None
-                    SEP_STATE["force_cpu"] = True
-                    separator = get_separator(callback)
-                    _, stems = separator.separate_tensor(tensor, sr)
-                else:
-                    raise
-            model_sr = separator.samplerate
-
-        def back(x):
-            y = convert_audio(x, model_sr, sr, 2).numpy().astype(np.float32)
-            if y.shape[1] < length:
-                y = np.pad(y, ((0, 0), (0, length - y.shape[1])))
-            return np.ascontiguousarray(y[:, :length])
-
-        sax = back(stems["vocals"] + stems["other"])
-        bass = back(stems["bass"])
-        drums = back(stems["drums"])
-        piano = float((stems["piano"] ** 2).mean()) if "piano" in stems else 0.0
-        guitar = float((stems["guitar"] ** 2).mean()) if "guitar" in stems else 0.0
-        if channels == 1:
-            sax, bass, drums = sax[:1], bass[:1], drums[:1]
-        job.update(stems={"sax": sax, "bass": bass, "drums": drums},
-                   keys="Piano" if piano >= guitar else "Guitar", progress=1.0, done=True)
-    except KeyboardInterrupt:
-        job.update(error="cancelled", done=True)
+            proc = subprocess.Popen([ai_python(), "-c", SEP_WORKER, str(work / "in.raw"), str(sr), str(channels), str(work)],
+                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            job["proc"] = proc
+            err_lines = []
+            threading.Thread(target=lambda: err_lines.extend(proc.stderr), daemon=True).start()
+            for line in proc.stdout:
+                parts = line.split()
+                if parts[:1] == ["progress"]:
+                    job["progress"] = max(job["progress"] if float(parts[1]) > 0 else 0.03, min(0.97, 0.05 + 0.92 * float(parts[1])))
+                elif parts[:1] == ["keys"]:
+                    job["keys"] = parts[1]
+            proc.wait()
+            if job.get("cancel"):
+                raise RuntimeError("cancelled")
+            if proc.returncode != 0:
+                last = [l.strip() for l in err_lines if l.strip()]
+                raise RuntimeError(last[-1] if last else f"Demucs stopped (code {proc.returncode})")
+        stems = {}
+        for name in ("sax", "bass", "drums"):
+            stems[name] = ((work / (name + ".f32")).read_bytes(), channels)
+        job.update(stems=stems, progress=1.0, done=True)
     except Exception as exc:
         job.update(error=(str(exc).splitlines() or [exc.__class__.__name__])[0][:300], done=True)
-    # keep the 3 most recent finished jobs in memory
+    finally:
+        job.pop("proc", None)
+        shutil.rmtree(work, ignore_errors=True)
     finished = [k for k, v in SEP_JOBS.items() if v.get("done")]
-    for k in finished[:-3]:
+    for k in finished[:-3]:       # keep the 3 most recent results in memory
         SEP_JOBS.pop(k, None)
+
+
+def cancel_separation(job_id):
+    job = SEP_JOBS.get(job_id)
+    if job and not job["done"]:
+        job["cancel"] = True
+        proc = job.get("proc")
+        if proc:
+            try:
+                proc.kill()
+            except Exception:
+                pass
 
 
 def start_separation(body, sr, channels):
     if not has_demucs():
-        raise RuntimeError('AI separation is not installed. Run: python3 -m pip install -U demucs')
+        raise RuntimeError("AI separation is not installed (see mac/install-ai.sh).")
     job_id = hashlib.sha1(body + f"{sr}:{channels}".encode()).hexdigest()[:20]
     job = SEP_JOBS.get(job_id)
     if job and not job.get("error"):
         return job_id
-    SEP_JOBS[job_id] = {"progress": 0.0, "done": False, "error": None, "sr": sr}
+    SEP_JOBS[job_id] = {"progress": 0.0, "done": False, "error": None}
     threading.Thread(target=run_separation, args=(job_id, body, sr, channels), daemon=True).start()
     return job_id
 
@@ -447,9 +516,7 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     self.send_json(200, {"progress": job["progress"], "done": job["done"], "error": job["error"], "keys": job.get("keys")})
             elif route == "/api/sepcancel":
-                job = SEP_JOBS.get((query.get("id") or [""])[0])
-                if job and not job["done"]:
-                    job["cancel"] = True
+                cancel_separation((query.get("id") or [""])[0])
                 self.send_json(200, {"ok": True})
             elif route == "/api/stem":
                 job = SEP_JOBS.get((query.get("id") or [""])[0])
@@ -457,11 +524,11 @@ class Handler(BaseHTTPRequestHandler):
                 if not job or not job.get("stems") or name not in job["stems"]:
                     self.send_json(404, {"error": "Stem not ready"})
                     return
-                data = job["stems"][name].tobytes()   # planar float32: channel 0, then channel 1
+                data, stem_channels = job["stems"][name]   # planar float32: channel 0, then channel 1
                 self.send_response(200)
                 self.send_header("Content-Type", "application/octet-stream")
                 self.send_header("Content-Length", str(len(data)))
-                self.send_header("X-Channels", str(job["stems"][name].shape[0]))
+                self.send_header("X-Channels", str(stem_channels))
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(data)
@@ -543,9 +610,11 @@ def main(argv=None):
         ensure_ytdlp()
     if not has_ffmpeg():
         print("Note: ffmpeg was not found. Audio will be used as downloaded (usually m4a or webm) instead of FLAC.")
-    if not has_demucs():
-        print("Optional: for AI instrument separation (sax focus / backing), install Demucs:")
-        print(f"    {sys.executable} -m pip install -U demucs")
+    if has_demucs():
+        print(f"AI separation available (Demucs, {ai_python()}).")
+    else:
+        print("Optional: AI instrument separation is not installed. On a Mac run:")
+        print("    curl -fsSL https://raw.githubusercontent.com/Gabrieltrial/Trial/main/mac/install-ai.sh | bash")
     if not any(shutil.which(x) for x in ("deno", "node", "bun")):
         print("Note: YouTube extraction may need a JavaScript runtime (Deno or Node.js) to be installed.")
     atexit.register(lambda: shutil.rmtree(CACHE, ignore_errors=True))
@@ -575,6 +644,8 @@ def main(argv=None):
     except KeyboardInterrupt:
         pass
     finally:
+        for job_id in list(SEP_JOBS):
+            cancel_separation(job_id)
         server.server_close()
 
 
