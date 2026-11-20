@@ -41,7 +41,13 @@ on startTaller()
 end startTaller
 
 on idle
-	return 60
+	-- Quan es tanca la pàgina, el servidor s'atura sol; llavors l'app també es tanca.
+	try
+		do shell script "curl -fs --max-time 3 http://127.0.0.1:8765/api/ping"
+	on error
+		quit
+	end try
+	return 5
 end idle
 
 on quit

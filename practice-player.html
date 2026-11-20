@@ -2260,6 +2260,17 @@ window.addEventListener('keydown', e => {
 ['dragleave', 'drop'].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); document.body.classList.remove('dropping'); }));
 document.addEventListener('drop', e => { const f = [...e.dataTransfer.files]; if (f.length) loadFiles(f); });
 
+// Si la pàgina la serveix el servidor local, li diu que és oberta; en tancar-la, el servidor s'atura.
+(function keepHelperAlive() {
+  if (window.top !== window || !/^(127\.0\.0\.1|localhost)$/.test(location.hostname)) return;
+  const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const beat = () => fetch('/api/heartbeat?id=' + id, { cache: 'no-store' }).catch(() => {});
+  beat();
+  setInterval(beat, 20000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) beat(); });
+  addEventListener('pageshow', e => { if (e.persisted) beat(); });
+  addEventListener('pagehide', () => { fetch('/api/bye?id=' + id, { keepalive: true, cache: 'no-store' }).catch(() => {}); });
+})();
 buildPlBtns(); saxInfo(); buildLoops(); refreshUI(); computePeaks(); if (isWeb && !isHosted) detectHelper(); requestAnimationFrame(draw);
 </script>
 </body>

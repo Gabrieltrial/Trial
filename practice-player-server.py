@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import urllib.parse
 import webbrowser
 from concurrent.futures import ThreadPoolExecutor
@@ -22,6 +23,14 @@ PAGE = HERE / "practice-player.html"
 HUB = HERE / "index.html"
 CACHE = Path(tempfile.gettempdir()) / "practice-player-cache"
 DOWNLOAD_LOCK = threading.Lock()
+
+# Pages opened from this helper send a heartbeat every 20 s and say "bye" when they close.
+# When the last one is gone, the helper stops (unless --keep-running).
+PAGES = {}                 # page id -> time of its last heartbeat
+PAGES_LOCK = threading.Lock()
+PAGE_STATE = {"armed": False, "empty_since": None}
+BYE_GRACE = 8              # seconds to wait after the last page closes (a reload comes back sooner)
+HEARTBEAT_TIMEOUT = 600    # a page silent this long is forgotten (closed without saying bye)
 
 CONFIG = {"port": 8765, "max_minutes": 45, "cookies_from_browser": None, "origins": set()}
 
@@ -111,6 +120,36 @@ def search_all(query):
             except Exception as exc:
                 out["errors"][name] = str(exc).splitlines()[0][:300]
     return out
+
+
+def page_seen(page_id, alive):
+    with PAGES_LOCK:
+        if alive:
+            PAGES[page_id] = time.monotonic()
+            PAGE_STATE["armed"] = True
+        else:
+            PAGES.pop(page_id, None)
+
+
+def watch_pages(server):
+    while True:
+        time.sleep(2)
+        now = time.monotonic()
+        with PAGES_LOCK:
+            for page_id, seen in list(PAGES.items()):
+                if now - seen > HEARTBEAT_TIMEOUT:
+                    del PAGES[page_id]
+            if not PAGE_STATE["armed"] or PAGES:
+                PAGE_STATE["empty_since"] = None
+                continue
+            if PAGE_STATE["empty_since"] is None:
+                PAGE_STATE["empty_since"] = now
+                continue
+            if now - PAGE_STATE["empty_since"] < BYE_GRACE:
+                continue
+        print("The page was closed: stopping the helper.")
+        server.shutdown()
+        return
 
 
 def find_cached(key):
@@ -247,6 +286,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 self.wfile.write(data)
+            elif route in ("/api/heartbeat", "/api/bye"):
+                page_id = (query.get("id") or [""])[0][:64]
+                if page_id:
+                    page_seen(page_id, route == "/api/heartbeat")
+                self.send_json(200, {"ok": True})
             elif route == "/api/ping":
                 self.send_json(200, {"ok": True, "ytdlp": load_ytdlp() is not None, "ffmpeg": has_ffmpeg()})
             elif route == "/api/search":
@@ -310,6 +354,8 @@ def main(argv=None):
     parser.add_argument("--cookies-from-browser", default=None, metavar="BROWSER")
     parser.add_argument("--allow-origin", action="append", default=[], metavar="URL")
     parser.add_argument("--no-browser", action="store_true")
+    parser.add_argument("--keep-running", action="store_true",
+                        help="do not stop when the page is closed")
     parser.add_argument("--open", default=None, metavar="PAGE",
                         help="page or programs to open, e.g. practice-player.html or afinador+chord-practice")
     parser.add_argument("--no-install-prompt", action="store_true")
@@ -346,6 +392,9 @@ def main(argv=None):
         print("index.html / practice-player.html were not found next to this script, so only your hosted page can use the helper.")
         if not origins:
             print("Start it with: --allow-origin https://YOUR-USER.github.io")
+    if not args.keep_running:
+        threading.Thread(target=watch_pages, args=(server,), daemon=True).start()
+        print("It stops by itself when you close the page.")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
