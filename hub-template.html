@@ -54,9 +54,6 @@
   }
   .logo { width: 30px; height: 26px; flex: none; display: block; }
   .home { display: inline-flex; align-items: center; gap: 7px; }
-  .tab .logo { width: 22px; height: 19px; display: none; margin: -3px 0; }
-  .tab[aria-selected="true"] .logo { display: block; }
-  .tab.running[aria-selected="true"] .dot { display: none; }
   .tab .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: none; flex: none; }
   .tab.running .dot { display: inline-block; }
   .tab .x {
@@ -157,7 +154,21 @@ function makeFrame(app) {
   f.setAttribute('allow', ALLOW);
   f.allowFullscreen = true;
   f.srcdoc = JSON.parse(document.getElementById('src-' + app.id).textContent);
+  f.addEventListener('load', () => addLogo(f));
   return f;
+}
+// The logo goes in front of the program's own title (its first <h1>), in the title's colour.
+function addLogo(f) {
+  try {
+    const d = f.contentDocument, h = d && d.querySelector('h1');
+    if (!h || h.querySelector('.tm-logo')) return;
+    const tmp = d.createElement('span');
+    tmp.innerHTML = LOGO;
+    const svg = tmp.firstElementChild;
+    svg.setAttribute('class', 'tm-logo');
+    svg.setAttribute('style', 'display:inline-block;width:1.3em;height:1.12em;vertical-align:-0.18em;margin-right:0.35em;flex:none');
+    h.prepend(svg);
+  } catch (e) {}
 }
 
 /* ---------- programes principals ---------- */
@@ -168,7 +179,7 @@ for (const app of MAIN) {
   const t = document.createElement('button');
   t.className = 'tab'; t.dataset.id = app.id; t.setAttribute('role', 'tab');
   t.setAttribute('aria-selected', 'false');
-  t.innerHTML = '<span class="dot"></span>' + LOGO + '<span class="nm"></span><span class="x" title="Atura aquest programa">✕</span>';
+  t.innerHTML = '<span class="dot"></span><span class="nm"></span><span class="x" title="Atura aquest programa">✕</span>';
   t.querySelector('.nm').textContent = app.name;
   t.title = app.desc;
   t.addEventListener('click', e => {

@@ -89,7 +89,7 @@ button.toggle{min-width:46px;padding:3px 10px}
 #mp3Rate{padding:3px 4px;border-radius:7px}
 output{font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
 
-#loops{display:grid;grid-template-columns:1fr 1fr;grid-template-rows:repeat(5,auto);grid-auto-flow:column;gap:4px 10px}
+#loops{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);grid-template-rows:repeat(5,auto);grid-auto-flow:column;gap:4px 10px}
 .loop{--c:hsl(var(--h) 70% 58%);display:flex;align-items:center;gap:4px;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--c);border-radius:7px;padding:2px 6px;min-width:0;height:28px}
 .loop.on{box-shadow:0 0 0 2px var(--c) inset}
 .loop b{font-size:12px;width:14px;text-align:center;flex:none}
@@ -97,11 +97,12 @@ output{font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
 .loop button.lp{width:24px;padding:0;background:var(--c);border-color:var(--c);color:#111;font-weight:700}
 .loop button.ar{width:16px;padding:0;font-size:11px;line-height:1;touch-action:manipulation;user-select:none}
 .loop button.ar:hover{border-color:var(--c);color:var(--c)}
-.loop input.t{width:64px;flex:none;padding:1px 4px;font:inherit;font-size:12px;font-variant-numeric:tabular-nums;color:var(--text);background:#14171c;border:1px solid var(--line);border-radius:5px}
-.loop input.sp{flex:1;min-width:36px;accent-color:var(--c);height:14px}
+.loop input.t{width:64px;min-width:0;flex:none;padding:1px 4px;font:inherit;font-size:12px;font-variant-numeric:tabular-nums;color:var(--text);background:#14171c;border:1px solid var(--line);border-radius:5px}
+.loop input.sp{flex:1;min-width:20px;accent-color:var(--c);height:14px}
 .loop output{min-width:34px;font-size:12px;flex:none}
+@media (max-width:1150px){.loop output{display:none}.loop{gap:3px;padding:2px 4px}}
 .loop button.pat{font-weight:700;width:20px;padding:0}
-.loop button.pat.saved{background:var(--c);border-color:var(--c);color:#111}
+.loop button.pat.saved{background:#1f6f45;border-color:#2b8a57;color:#d8ffe8;box-shadow:inset 0 2px 4px rgba(0,0,0,.55);transform:translateY(1px)}
 
 @media (max-width:1180px){.keys{display:none}.ctl{grid-template-columns:1fr 1fr}.ctl>.box:nth-child(3){grid-column:1/-1}.transport{flex-wrap:wrap;row-gap:6px}}
 @media (max-width:960px){
@@ -2532,9 +2533,11 @@ async function storePattern(i, track, src, off, n, start, end) {
     const S = src.sax, B = src.back;
     const SL = S.SL, SR = S.SR || S.SL, DL = B.DL, DR = B.DR || B.DL;
     const hL = new Float32Array(n), hR = new Float32Array(n), dL = new Float32Array(n), dR = new Float32Array(n), mono = new Float32Array(n);
+    const xL = new Float32Array(n), xR = new Float32Array(n);
     for (let k = 0; k < n; k++) {
       const j = off + k;
       dL[k] = DL[j]; dR[k] = DR[j];
+      xL[k] = SL[j]; xR[k] = SR[j];
       hL[k] = X0[j] - SL[j] - DL[j]; hR[k] = X1[j] - SR[j] - DR[j];
       // chords are detected on the mix without drums: removing the sax as well takes chord tones with it
       mono[k] = 0.5 * (X0[j] - DL[j] + X1[j] - DR[j]);
@@ -2546,10 +2549,11 @@ async function storePattern(i, track, src, off, n, start, end) {
     const id = old >= 0 ? list[old].id : uid();
     await idb.put('pat:' + id + ':harm', { sr, L: hL, R: hR });
     await idb.put('pat:' + id + ':drums', { sr, L: dL, R: dR });
+    await idb.put('pat:' + id + ':sax', { sr, L: xL, R: xR });
     const entry = {
       id, song, name: 'Loop ' + (i + 1) + ' · ' + fmt(start) + '–' + fmt(end),
       start, end, dur: n / sr, sr,
-      key: an.key, chords: an.chords, method: S.ai ? 'ai' : 'classic', created: Date.now()
+      key: an.key, chords: an.chords, method: S.ai ? 'ai' : 'classic', hasSax: true, created: Date.now()
     };
     if (old >= 0) list[old] = Object.assign(list[old], entry, { chords: list[old].edited ? list[old].chords : entry.chords, key: list[old].edited ? list[old].key : entry.key });
     else list.push(entry);

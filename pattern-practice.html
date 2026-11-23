@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Pattern Practice</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root {
     --bg: #15131c; --panel: #221f2b; --panel-2: #2c2837; --line: #3a3547;
@@ -42,8 +45,8 @@
 
   /* ---------- stage ---------- */
   #right { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-  .stage { display: grid; grid-template-columns: 1fr 230px; gap: 14px; }
-  .now { background: radial-gradient(500px 220px at 50% 0, #3b3122, #191620); border: 1px solid #4a3d27; border-radius: 16px; padding: 16px 18px 18px; text-align: center; min-height: 250px; display: flex; flex-direction: column; }
+  .stage { display: grid; grid-template-columns: 1fr 260px; gap: 14px; }
+  .now { background: radial-gradient(500px 220px at 50% 0, #3b3122, #191620); border: 1px solid #4a3d27; border-radius: 16px; padding: 16px 22px 18px; text-align: center; min-height: 250px; display: flex; flex-direction: column; }
   .keyname { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 54px; font-weight: 800; color: var(--gold); line-height: 1.05; margin: 6px 0 2px; }
   .meta { color: var(--muted); font-size: 13px; min-height: 18px; }
   .chords { display: flex; gap: 6px; margin-top: auto; padding-top: 14px; }
@@ -56,6 +59,29 @@
   .next .keyname { font-size: 30px; color: #d9cfe8; }
   .next .chords { flex-wrap: wrap; padding-top: 10px; }
   .next .chip { font-size: 14px; padding: 6px 4px; flex: 1 1 40%; min-width: 0; border-radius: 8px; }
+  /* lead sheet: 4 bars per line on a staff, handwritten jazz chord symbols */
+  .sheet { margin-top: auto; padding-top: 10px; display: flex; flex-direction: column; gap: 4px; text-align: left; }
+  .line { position: relative; height: 92px; }
+  .line svg { position: absolute; left: 0; right: 0; bottom: 6px; width: 100%; height: 46px; overflow: visible; }
+  .line svg .st { stroke: #8f86a3; stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .line svg .bl { stroke: #cfc6de; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
+  .line svg .thick { stroke: #cfc6de; stroke-width: 4; vector-effect: non-scaling-stroke; }
+  .line svg .sl { stroke: #e9e2f3; stroke-width: 5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+  .line svg .dot { fill: #cfc6de; }
+  .line svg .ph { stroke: var(--gold); stroke-width: 2; vector-effect: non-scaling-stroke; }
+  .line svg .sim { fill: #cfc6de; font: 700 26px Kalam, cursive; }
+  .cs { position: absolute; top: 0; transform: translateX(2px); font-family: Kalam, "Comic Sans MS", cursive; font-weight: 700; font-size: 34px; line-height: 1; color: #f3eefb; white-space: nowrap; padding: 1px 4px; border-radius: 8px; }
+  .cs sup { font-size: .58em; vertical-align: .62em; margin-left: 1px; font-weight: 700; }
+  .cs.on { background: var(--gold); color: var(--gold-ink); }
+  .cs.edit { cursor: text; }
+  .cs.edit:hover { outline: 1px dashed var(--gold); }
+  .cs input { width: 7em; font: inherit; color: var(--gold-ink); background: var(--gold); border: 0; border-radius: 6px; padding: 0 4px; outline: none; }
+  .sheet.small .line { height: 46px; }
+  .sheet.small .line svg { height: 22px; bottom: 3px; }
+  .sheet.small .cs { font-size: 15px; }
+  .sheet.small .line svg .sl { stroke-width: 2.5; }
+  .sheet.small .line svg .sim { font-size: 13px; }
+  .saxrow span { display: flex; align-items: center; gap: 6px; color: var(--text); }
   .progress { display: flex; gap: 4px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
   .progress span { width: 22px; height: 6px; border-radius: 3px; background: #3a3547; }
   .progress span.done { background: #8a7550; }
@@ -101,13 +127,13 @@
           <div class="lbl" id="nowLbl">Tonalitat</div>
           <div class="keyname" id="keyName">—</div>
           <div class="meta" id="meta">Tria un patró de la llista</div>
-          <div class="chords" id="chords"></div>
+          <div class="sheet" id="chords"></div>
           <div class="progress" id="progress"></div>
         </div>
         <div class="next">
           <div class="lbl">Després</div>
           <div class="keyname" id="nextKey">—</div>
-          <div class="chords" id="nextChords"></div>
+          <div class="sheet small" id="nextChords"></div>
         </div>
       </div>
     </div>
@@ -144,10 +170,16 @@
         <label>Bateria
           <input type="range" id="drumVol" min="0" max="1.5" step="0.01" value="1">
         </label>
+        <label>Compassos del patró
+          <select id="bars"></select>
+        </label>
+        <label class="saxrow"><span><input type="checkbox" id="saxOn"> Saxo (es transporta amb l'acompanyament)</span>
+          <input type="range" id="saxVol" min="0" max="1.5" step="0.01" value="1">
+        </label>
       </div>
     </div>
     <div id="status"></div>
-    <div class="hint">Desa patrons des del Practice Player amb el botó <b>P</b> de cada bucle. Amb el patró aturat, fes clic en un acord per corregir-lo. La bateria no es transposa mai; només l'acompanyament harmònic.</div>
+    <div class="hint">Desa patrons des del Practice Player amb el botó <b>P</b> de cada bucle. Amb el patró aturat, fes clic en un acord per corregir-lo (buit = esborrar-lo). La bateria no es transposa mai; l'acompanyament harmònic i el saxo, sí.</div>
   </section>
 </main>
 
@@ -623,7 +655,7 @@ function buildKeys(orig, order) {
 // ---------- state ----------
 let patterns = readPatterns();
 let sel = store.get('pat-sel', null);
-let ctx = null, harmGain = null, drumGain = null;
+let ctx = null, harmGain = null, drumGain = null, saxGain = null;
 let session = null;          // running practice
 const cache = new Map();     // `${id}|${shift}|${tempo}|harm|drums` -> {L,R} (AudioBuffer later)
 let renderWorker = null, renderSeq = 0;
@@ -705,27 +737,80 @@ function updatePattern(id, patch) {
   renderLib();
 }
 
-// ---------- display ----------
-function chipsFor(box, p, step, big, hi = -1, editable = false) {
-  box.innerHTML = '';
-  const shift = shiftFor(step.pc, p.key.pc);
-  const total = p.dur || (p.chords.length ? p.chords[p.chords.length - 1].t + p.chords[p.chords.length - 1].d : 1);
+// ---------- display: lead sheet ----------
+const pretty = t => t.replace(/b/g, '♭').replace(/#/g, '♯');
+function chordHtml(label) {
+  const m = /^([A-G][b#]?)(.*)$/.exec(label);
+  if (!m) return label;
+  return pretty(m[1]) + (m[2] ? '<sup>' + pretty(m[2]).replace(/maj/g, 'maj') + '</sup>' : '');
+}
+// chords placed on beats: [{i, beat}] (i = index in p.chords)
+function beatsOf(p) {
+  const bars = p.bars || 4, total = bars * 4, beat = p.dur / total, out = [];
   (p.chords || []).forEach((c, i) => {
-    const d = document.createElement('div');
-    d.className = 'chip' + (i === hi ? ' on' : '') + (editable ? ' edit' : '');
-    if (big) d.style.flexGrow = String(Math.max(0.5, c.d / total * p.chords.length));
-    d.textContent = chordLabel(c, shift, step, p.key.minor);
-    if (editable) d.onclick = () => editChord(d, p, i);
-    box.append(d);
+    let b = Math.round(c.t / beat);
+    if (i === 0) b = 0;
+    b = Math.max(0, Math.min(total - 1, b));
+    if (out.length && b <= out[out.length - 1].beat) return;
+    out.push({ i, beat: b });
   });
+  return out;
+}
+// box: container; step: key; opts: { small, at (current beat, float), editable }
+function leadSheet(box, p, step, opts = {}) {
+  box.innerHTML = '';
+  const bars = p.bars || 4, placed = beatsOf(p), shift = shiftFor(step.pc, p.key.pc);
+  const W = 1000, H = 46, gap = H / 4, barW = W / 4;
+  let hiIdx = -1;
+  if (opts.at != null && opts.at >= 0) for (const c of placed) if (c.beat <= opts.at) hiIdx = c.i;
+  for (let line = 0; line * 4 < bars; line++) {
+    const el = document.createElement('div'); el.className = 'line';
+    let g = '';
+    for (let k = 0; k < 5; k++) g += `<line class="st" x1="0" x2="${W}" y1="${k * gap}" y2="${k * gap}"/>`;
+    const n = Math.min(4, bars - line * 4);
+    for (let b = 0; b < n; b++) {
+      const bar = line * 4 + b, x0 = b * barW;
+      // start of the loop: repeat sign ||:   end of the loop:  :||   otherwise a plain bar line
+      if (bar === 0) g += `<line class="thick" x1="2" x2="2" y1="0" y2="${H}"/><line class="bl" x1="12" x2="12" y1="0" y2="${H}"/><circle class="dot" cx="22" cy="${1.5 * gap}" r="3"/><circle class="dot" cx="22" cy="${2.5 * gap}" r="3"/>`;
+      else if (b === 0) g += `<line class="bl" x1="0" x2="0" y1="0" y2="${H}"/>`;
+      const starts = placed.filter(c => Math.floor(c.beat / 4) === bar);
+      if (!starts.length && bar > 0) g += `<text class="sim" x="${x0 + barW / 2}" y="${H / 2 + 9}" text-anchor="middle">%</text>`;
+      else for (let q = 0; q < 4; q++) {                       // beat slashes
+        const x = x0 + (q + 0.5) * barW / 4 + (bar === 0 ? 10 : 0);
+        g += `<line class="sl" x1="${x - 7}" x2="${x + 7}" y1="${2.6 * gap}" y2="${1.4 * gap}"/>`;
+      }
+      const xe = x0 + barW;
+      if (bar === bars - 1) g += `<circle class="dot" cx="${xe - 22}" cy="${1.5 * gap}" r="3"/><circle class="dot" cx="${xe - 22}" cy="${2.5 * gap}" r="3"/><line class="bl" x1="${xe - 12}" x2="${xe - 12}" y1="0" y2="${H}"/><line class="thick" x1="${xe - 2}" x2="${xe - 2}" y1="0" y2="${H}"/>`;
+      else if (b === 3) g += `<line class="bl" x1="${W}" x2="${W}" y1="0" y2="${H}"/>`;
+      else g += `<line class="bl" x1="${xe}" x2="${xe}" y1="0" y2="${H}"/>`;
+    }
+    if (opts.at != null && opts.at >= 0 && Math.floor(opts.at / 16) === line) {
+      const x = (opts.at - line * 16) / 16 * W;
+      g += `<line class="ph" x1="${x}" x2="${x}" y1="${-gap}" y2="${H + gap * 0.6}"/>`;
+    }
+    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${g}</svg>`;
+    for (const c of placed.filter(c => Math.floor(c.beat / 16) === line)) {
+      const cs = document.createElement('div');
+      const lab = chordLabel(p.chords[c.i], shift, step, p.key.minor);
+      cs.className = 'cs' + (c.i === hiIdx ? ' on' : '') + (opts.editable ? ' edit' : '');
+      cs.style.left = ((c.beat - line * 16) / 16 * 100 + (c.beat === 0 ? 2.6 : 0.4)) + '%';
+      cs.innerHTML = chordHtml(lab);
+      cs.dataset.label = lab;
+      if (opts.editable) cs.onclick = () => editChord(cs, p, c.i);
+      el.append(cs);
+    }
+    box.append(el);
+  }
 }
 function editChord(el, p, i) {
   if (el.querySelector('input')) return;
-  const old = el.textContent;
+  const old = el.dataset.label;
   el.textContent = '';
   const inp = document.createElement('input');
   inp.value = old; el.append(inp); inp.focus(); inp.select();
+  let closed = false;
   const done = save => {
+    if (closed) return; closed = true;
     if (save && !inp.value.trim()) {
       // empty = delete this chord; its time goes to the previous one (or the next, for the first)
       const list = readPatterns().find(x => x.id === p.id).chords.slice();
@@ -733,15 +818,14 @@ function editChord(el, p, i) {
         const [gone] = list.splice(i, 1);
         if (i > 0) list[i - 1] = Object.assign({}, list[i - 1], { d: +(list[i - 1].d + gone.d).toFixed(3) });
         else list[0] = Object.assign({}, list[0], { t: gone.t, d: +(list[0].d + gone.d).toFixed(3) });
-        // merge neighbours that became the same chord
         for (let k = list.length - 1; k > 0; k--) if (list[k].root === list[k - 1].root && list[k].q === list[k - 1].q) { list[k - 1].d = +(list[k - 1].d + list[k].d).toFixed(3); list.splice(k, 1); }
         updatePattern(p.id, { chords: list, edited: true });
       }
-    } else if (save) {
+    } else if (save && inp.value.trim() !== old) {
       const c = parseChord(inp.value);
       if (c) {
         const list = readPatterns().find(x => x.id === p.id).chords.slice();
-        // the chip shows the written name in the original key: back to concert pitch
+        // the sheet shows the written name in the original key: back to concert pitch
         list[i] = Object.assign({}, list[i], { root: mod12(c.root - inst()), q: c.q });
         updatePattern(p.id, { chords: list, edited: true });
       } else setStatus('No he entès l\'acord "' + inp.value + '" (exemples: Cm7, F7, Bbmaj7, Ebm7b5).');
@@ -750,6 +834,57 @@ function editChord(el, p, i) {
   };
   inp.onkeydown = e => { if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); };
   inp.onblur = () => done(true);
+}
+// How many 4/4 bars does a loop of `dur` seconds contain? Onset envelope of the drums
+// (or of the accompaniment), then the bar count whose beat best matches its periodicity.
+function estimateBars(L, R, sr, dur) {
+  const hop = Math.max(1, Math.round(sr / 100));            // 10 ms
+  const n = Math.floor(L.length / hop);
+  const env = new Float32Array(n);
+  let prev = 0;
+  for (let t = 0; t < n; t++) {
+    let e = 0;
+    for (let i = t * hop, end = i + hop; i < end; i++) { const v = (L[i] + R[i]) * 0.5; e += v * v; }
+    e = Math.log(1e-9 + e);
+    env[t] = Math.max(0, e - prev); prev = e;
+  }
+  const mean = env.reduce((a, b) => a + b, 0) / Math.max(1, n);
+  for (let t = 0; t < n; t++) env[t] -= mean;
+  const ac = lag => { let s = 0; for (let t = lag; t < n; t++) s += env[t] * env[t - lag]; return s / Math.max(1, n - lag); };
+  // the loop wraps: add the circular correlation too
+  const acc = lag => { let s = 0; for (let t = 0; t < n; t++) s += env[t] * env[(t + lag) % n]; return s / n; };
+  const cands = [];
+  for (let bars = 1; bars <= 16; bars++) {
+    const beat = dur / (bars * 4), bpm = 60 / beat;
+    if (bpm < 55 || bpm > 230) continue;
+    const lag = beat * sr / hop;
+    const sc = (ac(Math.round(lag)) + 0.5 * ac(Math.round(2 * lag)) + 0.5 * acc(Math.round(lag)))
+      * (bpm >= 80 && bpm <= 160 ? 1.12 : 1)                // most jazz/pop tempos
+      * ([1, 2, 4, 8, 16].includes(bars) ? 1.15 : 1);        // loops are usually 1, 2, 4 or 8 bars
+    cands.push({ bars, bpm, sc });
+  }
+  if (!cands.length) return Math.max(1, Math.round(dur / 2));
+  // half / double tempo look alike: among the near-best candidates take the most usual tempo
+  const top = Math.max(...cands.map(c => c.sc));
+  const near = cands.filter(c => c.sc >= 0.7 * top);
+  near.sort((x, y) => Math.abs(Math.log(x.bpm / 115)) - Math.abs(Math.log(y.bpm / 115)));
+  return near[0].bars;
+}
+
+// bar count: saved on the pattern, or estimated once from the drums (or the accompaniment)
+async function ensureBars(p) {
+  if (p.bars) return;
+  try {
+    const src = (await idb.get('pat:' + p.id + ':drums')) || (await idb.get('pat:' + p.id + ':harm'));
+    if (!src) return;
+    const bars = estimateBars(src.L, src.R, src.sr, p.dur);
+    updatePattern(p.id, { bars });
+    if (current() && current().id === p.id && !session) renderIdle();
+  } catch (e) {}
+}
+function fillBars() {
+  const s = $('#bars'); s.innerHTML = '';
+  for (let b = 1; b <= 16; b++) { const o = document.createElement('option'); o.value = b; o.textContent = b + (b === 1 ? ' compàs' : ' compassos'); s.append(o); }
 }
 function renderIdle() {
   const p = current();
@@ -760,12 +895,16 @@ function renderIdle() {
     $('#chords').innerHTML = ''; $('#nextKey').textContent = '—'; $('#nextChords').innerHTML = ''; $('#nowLbl').textContent = 'Tonalitat';
     return;
   }
+  if (!p.bars) ensureBars(p);
   $('#origKey').value = p.key.pc + (p.key.minor ? 'm' : '');
+  $('#bars').value = String(p.bars || 4);
+  $('#saxOn').disabled = !p.hasSax;
+  $('#saxOn').parentElement.title = p.hasSax ? '' : 'Aquest patró es va desar sense la pista del saxo: torna a prémer P al Practice Player per afegir-la.';
   const step = { pc: p.key.pc, flat: null };
   $('#nowLbl').textContent = 'Tonalitat original';
   $('#keyName').textContent = keyLabel(step, p.key.minor);
-  $('#meta').textContent = p.song + ' · ' + p.name.replace(/^Loop (\d+)/, 'Bucle $1') + ' · ' + p.dur.toFixed(1) + ' s · clic en un acord per corregir-lo (buit = esborrar-lo)';
-  chipsFor($('#chords'), p, step, true, -1, true);
+  $('#meta').textContent = p.song + ' · ' + p.name.replace(/^Loop (\d+)/, 'Bucle $1') + ' · ' + (p.bars || 4) + ' compassos';
+  leadSheet($('#chords'), p, step, { editable: true });
   $('#nextKey').textContent = '—'; $('#nextChords').innerHTML = '';
 }
 
@@ -820,22 +959,23 @@ async function start() {
   if (!p) return;
   if (!ctx) {
     ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'playback' });
-    harmGain = ctx.createGain(); drumGain = ctx.createGain();
-    harmGain.connect(ctx.destination); drumGain.connect(ctx.destination);
+    harmGain = ctx.createGain(); drumGain = ctx.createGain(); saxGain = ctx.createGain();
+    harmGain.connect(ctx.destination); drumGain.connect(ctx.destination); saxGain.connect(ctx.destination);
   }
   if (ctx.state === 'suspended') await ctx.resume();
   applyVolumes();
   setStatus('Carregant el patró…');
-  let harm, drums;
+  let harm, drums, sax = null;
   try {
     harm = await idb.get('pat:' + p.id + ':harm');
     drums = await idb.get('pat:' + p.id + ':drums');
+    if (p.hasSax) sax = await idb.get('pat:' + p.id + ':sax');
   } catch (e) { harm = null; }
   if (!harm) { setStatus('No trobo l\'àudio d\'aquest patró. Torna a desar-lo des del Practice Player (botó P).'); return; }
   const orders = Object.keys(ORDERS), order = orders[Math.floor(Math.random() * orders.length)];
   const tempo = +$('#speed').value, reps = +$('#reps').value;
   const keys = buildKeys(p.key.pc, order);
-  session = { p, harm, drums, keys, order, tempo, reps, sources: [], cycleDur: p.dur / tempo, plan: [], startAt: 0, scheduled: 0, timer: 0, raf: 0 };
+  session = { p, harm, drums, sax, keys, order, tempo, reps, sources: [], cycleDur: p.dur / tempo, plan: [], startAt: 0, scheduled: 0, timer: 0, raf: 0 };
   for (let k = 0; k < keys.length; k++) for (let r = 0; r < reps; r++) session.plan.push(k);
   $('#startBtn').textContent = 'Stop'; $('#startBtn').classList.add('stop');
   renderProgress();
@@ -854,6 +994,7 @@ function ensureKey(k) {
   const shift = shiftFor(s.keys[k].pc, s.p.key.pc);
   const tasks = [getBuffer(s.p, 'harm', shift, s.tempo, s.harm)];
   if (s.drums) tasks.push(getBuffer(s.p, 'drums', 0, s.tempo, s.drums));
+  if (s.sax && $('#saxOn').checked) tasks.push(getBuffer(s.p, 'sax', shift, s.tempo, s.sax));
   return Promise.all(tasks);
 }
 async function schedule() {
@@ -867,13 +1008,16 @@ async function schedule() {
       const shift = shiftFor(s.keys[k].pc, s.p.key.pc);
       const hk = s.p.id + '|harm|' + shift + '|' + s.tempo, dk = s.p.id + '|drums|0|' + s.tempo;
       const hb = await cache.get(hk), db = s.drums ? await cache.get(dk) : null;
+      // the sax joins as soon as its transposition is ready (it can be switched on while playing)
+      const xk = s.p.id + '|sax|' + shift + '|' + s.tempo;
+      const xb = s.sax && $('#saxOn').checked && cache.has(xk) ? await cache.get(xk) : null;
       if (session !== s) return;
       if (!hb) { ensureKey(k); break; }
       let when = s.startAt + s.scheduled * s.cycleDur;
       if (when < ctx.currentTime + 0.02) {         // rendering was late: shift the rest of the plan
         s.startAt += ctx.currentTime + 0.05 - when; when = s.startAt + s.scheduled * s.cycleDur;
       }
-      for (const [buf, gain] of [[hb, harmGain], [db, drumGain]]) {
+      for (const [buf, gain] of [[hb, harmGain], [db, drumGain], [xb, saxGain]]) {
         if (!buf) continue;
         const src = ctx.createBufferSource(); src.buffer = buf; src.connect(gain);
         src.start(when); src.stop(when + s.cycleDur + 0.01);
@@ -893,17 +1037,18 @@ function tick() {
   const ci = Math.max(0, Math.min(s.plan.length - 1, Math.floor(el / s.cycleDur)));
   const k = s.plan[ci], step = s.keys[k], p = s.p;
   const posInLoop = el < 0 ? -1 : (el - ci * s.cycleDur) * s.tempo;
-  let hi = -1;
-  (p.chords || []).forEach((c, i) => { if (posInLoop >= c.t && posInLoop < c.t + c.d) hi = i; });
+  const beats = (p.bars || 4) * 4;
+  const at = posInLoop < 0 ? -1 : Math.min(beats - 0.001, posInLoop / p.dur * beats);
+  const hi = Math.floor(at * 4);                     // redraw 4 times per beat (moving playhead)
   if (s.lastK !== k || s.lastHi !== hi) {
     s.lastK = k; s.lastHi = hi;
     $('#nowLbl').textContent = 'Tonalitat ' + (k + 1) + ' de ' + s.keys.length;
     $('#keyName').textContent = keyLabel(step, p.key.minor);
     const rep = ci - s.plan.indexOf(k) + 1;
     $('#meta').textContent = 'Ordre: ' + ORDERS[s.order] + ' · repetició ' + rep + ' de ' + s.reps;
-    chipsFor($('#chords'), p, step, true, hi);
+    leadSheet($('#chords'), p, step, { at });
     const nk = s.keys[k + 1];
-    if (nk) { $('#nextKey').textContent = keyLabel(nk, p.key.minor); chipsFor($('#nextChords'), p, nk, false); }
+    if (nk) { $('#nextKey').textContent = keyLabel(nk, p.key.minor); leadSheet($('#nextChords'), p, nk, { small: true }); }
     else { $('#nextKey').textContent = 'Fi'; $('#nextChords').innerHTML = ''; }
     renderProgress(k);
   }
@@ -933,6 +1078,7 @@ function applyVolumes() {
   if (!ctx) return;
   harmGain.gain.setTargetAtTime(+$('#harmVol').value, ctx.currentTime, 0.03);
   drumGain.gain.setTargetAtTime(+$('#drumVol').value, ctx.currentTime, 0.03);
+  saxGain.gain.setTargetAtTime($('#saxOn').checked ? +$('#saxVol').value : 0, ctx.currentTime, 0.03);
 }
 
 // ---------- wiring ----------
@@ -941,6 +1087,12 @@ $('#harmVol').oninput = $('#drumVol').oninput = () => { applyVolumes(); store.se
 $('#speed').oninput = () => { $('#speedV').textContent = Math.round($('#speed').value * 100) + '%'; store.set('pat-speed', +$('#speed').value); };
 $('#inst').onchange = () => { store.set('pat-inst', $('#inst').value); if (session) { session.lastK = null; } else renderIdle(); };
 $('#reps').onchange = () => store.set('pat-reps', $('#reps').value);
+$('#bars').onchange = () => { const p = current(); if (!p) return; if (session) stop(); updatePattern(p.id, { bars: +$('#bars').value }); renderIdle(); };
+$('#saxOn').onchange = () => {
+  store.set('pat-sax', $('#saxOn').checked); applyVolumes();
+  if (session && $('#saxOn').checked) for (let k = 0; k < session.keys.length; k++) if (session.plan[session.scheduled] === k) { ensureKey(k); ensureKey(k + 1); }
+};
+$('#saxVol').oninput = () => { applyVolumes(); store.set('pat-saxvol', +$('#saxVol').value); };
 document.addEventListener('keydown', e => { if (e.code === 'Space' && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); $('#startBtn').click(); } });
 // new patterns saved by the Practice Player (another tab of the app) show up at once
 addEventListener('storage', e => { if (e.key === PAT_KEY) { patterns = readPatterns(); renderLib(); if (!session) renderIdle(); } });
@@ -953,6 +1105,9 @@ addEventListener('focus', () => { patterns = readPatterns(); renderLib(); if (!s
   $('#speedV').textContent = Math.round($('#speed').value * 100) + '%';
   const ins = store.get('pat-inst', null); if (ins != null) $('#inst').value = ins;
   const rp = store.get('pat-reps', null); if (rp != null) $('#reps').value = rp;
+  fillBars();
+  $('#saxOn').checked = !!store.get('pat-sax', false);
+  const sv = store.get('pat-saxvol', null); if (sv != null) $('#saxVol').value = sv;
   if (sel && !current()) sel = null;
   if (!sel && patterns.length) sel = patterns[patterns.length - 1].id;
   renderLib(); renderIdle();
