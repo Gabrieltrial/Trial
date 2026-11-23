@@ -21,7 +21,7 @@
   }
   button, select, input { font: inherit; color: inherit; }
   button { cursor: pointer; }
-  main { max-width: 1180px; margin: 0 auto; padding: 18px 16px 28px; display: grid; grid-template-columns: 300px 1fr; gap: 18px; }
+  main { max-width: 1560px; margin: 0 auto; padding: 18px 16px 28px; display: grid; grid-template-columns: 240px 1fr; gap: 16px; }
   h1 { grid-column: 1 / -1; text-align: center; margin: 4px 0 0; font-size: 28px; }
   .sub { grid-column: 1 / -1; text-align: center; color: var(--muted); margin: -10px 0 4px; }
   .card { background: linear-gradient(180deg, #2a2635, #1f1c27); border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
@@ -50,7 +50,7 @@
 
   /* ---------- stage ---------- */
   #right { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
-  .stage { display: grid; grid-template-columns: 1fr 260px; gap: 14px; }
+  .stage { display: grid; grid-template-columns: 1fr 250px; gap: 14px; }
   .now { background: radial-gradient(500px 220px at 50% 0, #3b3122, #191620); border: 1px solid #4a3d27; border-radius: 16px; padding: 16px 22px 18px; text-align: center; min-height: 250px; display: flex; flex-direction: column; }
   .keyname { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 54px; font-weight: 800; color: var(--gold); line-height: 1.05; margin: 6px 0 2px; }
   .meta { color: var(--muted); font-size: 13px; min-height: 18px; }
@@ -66,7 +66,8 @@
   .next .chip { font-size: 14px; padding: 6px 4px; flex: 1 1 40%; min-width: 0; border-radius: 8px; }
   /* lead sheet: 4 bars per line on a staff, handwritten jazz chord symbols */
   .sheet { margin-top: auto; padding-top: 10px; display: flex; flex-direction: column; gap: 4px; text-align: left; }
-  .line { position: relative; height: 92px; }
+  .line { position: relative; height: 100px; --row: 0px; }
+  .line.tall { height: 136px; --row: 36px; }
   .line svg { position: absolute; left: 0; right: 0; bottom: 6px; width: 100%; height: 46px; overflow: visible; }
   .line svg .st { stroke: #8f86a3; stroke-width: 1; vector-effect: non-scaling-stroke; }
   .line svg .bl { stroke: #cfc6de; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
@@ -75,17 +76,22 @@
   .line svg .dot { fill: #cfc6de; }
   .line svg .ph { stroke: var(--gold); stroke-width: 2; vector-effect: non-scaling-stroke; }
   .line svg .sim { fill: #cfc6de; font: 700 26px Kalam, cursive; }
-  .cs { position: absolute; top: 0; transform: translateX(2px); font-family: Kalam, "Comic Sans MS", cursive; font-weight: 700; font-size: 34px; line-height: 1; color: #f3eefb; white-space: nowrap; padding: 1px 4px; border-radius: 8px; }
-  .cs sup { font-size: .58em; vertical-align: .62em; margin-left: 1px; font-weight: 700; }
+  .cs { position: absolute; top: var(--row); font-family: Kalam, "Comic Sans MS", cursive; font-weight: 700; font-size: 40px; line-height: 1.05; color: #f3eefb; white-space: nowrap; padding: 2px 6px; margin-left: -6px; border-radius: 8px; letter-spacing: .01em; }
+  .cs.up { top: 0; }
+  .cs sup { font-size: .68em; vertical-align: .5em; margin-left: 2px; font-weight: 700; }
   .cs.on { background: var(--gold); color: var(--gold-ink); }
   .cs.edit { cursor: text; }
   .cs.edit:hover { outline: 1px dashed var(--gold); }
   .cs input { width: 7em; font: inherit; color: var(--gold-ink); background: var(--gold); border: 0; border-radius: 6px; padding: 0 4px; outline: none; }
-  .sheet.small .line { height: 46px; }
+  .sheet.small .line { height: 50px; }
+  .sheet.small .line.tall { height: 66px; --row: 16px; }
   .sheet.small .line svg { height: 22px; bottom: 3px; }
-  .sheet.small .cs { font-size: 15px; }
+  .sheet.small .cs { font-size: 17px; padding: 1px 3px; margin-left: -3px; }
   .sheet.small .line svg .sl { stroke-width: 2.5; }
   .sheet.small .line svg .sim { font-size: 13px; }
+  .seg { display: flex; gap: 4px; }
+  .seg button { flex: 1; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 0; font-weight: 700; }
+  .seg button.on { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
   .saxrow span { display: flex; align-items: center; gap: 6px; color: var(--text); }
   .progress { display: flex; gap: 4px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
   .progress span { width: 22px; height: 6px; border-radius: 3px; background: #3a3547; }
@@ -157,12 +163,12 @@
         <label>Tonalitat original del patró
           <select id="origKey"></select>
         </label>
-        <label>Instrument (noms dels acords)
-          <select id="inst">
-            <option value="0">C (concert)</option>
-            <option value="2" selected>Bb (tenor, soprano, trompeta)</option>
-            <option value="9">Eb (alt, baríton)</option>
-          </select>
+        <label>Noms dels acords per a
+          <span class="seg" id="inst">
+            <button data-v="2" class="on" title="Saxo tenor i soprano, trompeta, clarinet">Bb</button>
+            <button data-v="9" title="Saxo alt i baríton">Eb</button>
+            <button data-v="0" title="Concert: piano, guitarra, flauta…">C</button>
+          </span>
         </label>
         <label>Repeticions per tonalitat
           <select id="reps">
@@ -717,7 +723,8 @@ const store = {
 
 // ---------- music helpers ----------
 const mod12 = n => ((n % 12) + 12) % 12;
-const inst = () => +$('#inst').value;
+let instVal = 2;                       // Bb (tenor sax) by default
+const inst = () => instVal;
 function useFlats(pc, minor, flatHint) {
   if (ENHARMONIC.includes(pc) && flatHint != null) return flatHint;
   return minor ? FLAT_MINOR.has(pc) : FLAT_MAJOR.has(pc);
@@ -919,14 +926,40 @@ function leadSheet(box, p, step, opts = {}) {
       const cs = document.createElement('div');
       const lab = chordLabel(p.chords[c.i], shift, step, p.key.minor);
       cs.className = 'cs' + (c.i === hiIdx ? ' on' : '') + (opts.editable ? ' edit' : '');
-      cs.style.left = ((c.beat - line * 16) / 16 * 100 + (c.beat === 0 ? 2.6 : 0.4)) + '%';
+      const bb = c.beat - line * 16, barIn = Math.floor(bb / 4), q = bb % 4;
+      const slashX = barIn * barW + (q + 0.5) * barW / 4 + (Math.floor(c.beat / 4) === 0 ? 10 : 0) - 8;
+      cs.style.left = (slashX / W * 100) + '%';
       cs.innerHTML = chordHtml(lab);
       cs.dataset.label = lab;
       if (opts.editable) cs.onclick = () => editChord(cs, p, c.i);
       el.append(cs);
     }
     box.append(el);
+    fitLine(el);
   }
+}
+// two chords close together must not overlap: shrink the line's symbols a little,
+// and if that is not enough lift every other crowded symbol to a second row
+function fitLine(el) {
+  const cs = [...el.querySelectorAll('.cs')];
+  if (cs.length < 2 || !el.offsetWidth) return;
+  const gap = 6;
+  let worst = 1;
+  for (let i = 0; i + 1 < cs.length; i++) {
+    const room = cs[i + 1].offsetLeft - cs[i].offsetLeft - gap, need = cs[i].offsetWidth;
+    if (need > room) worst = Math.min(worst, room / need);
+  }
+  if (worst < 1) {
+    const f = Math.max(0.72, worst), base = parseFloat(getComputedStyle(cs[0]).fontSize);
+    cs.forEach(c => { c.style.fontSize = (base * f) + 'px'; });
+  }
+  let lifted = false;
+  for (let i = 0; i + 1 < cs.length; i++) {
+    const a = cs[i], b = cs[i + 1];
+    if (a.classList.contains('up')) continue;
+    if (a.offsetLeft + a.offsetWidth + gap > b.offsetLeft) { b.classList.add('up'); lifted = true; }
+  }
+  el.classList.toggle('tall', lifted);
 }
 function editChord(el, p, i) {
   if (el.querySelector('input')) return;
@@ -1400,7 +1433,14 @@ $('#importFile').onchange = e => { if (e.target.files[0]) importPatterns(e.targe
 $('#startBtn').onclick = () => { if (session) stop(); else start(); };
 $('#harmVol').oninput = $('#drumVol').oninput = () => { applyVolumes(); store.set('pat-vol', [+$('#harmVol').value, +$('#drumVol').value]); };
 $('#speed').oninput = () => { $('#speedV').textContent = Math.round($('#speed').value * 100) + '%'; store.set('pat-speed', +$('#speed').value); };
-$('#inst').onchange = () => { store.set('pat-inst', $('#inst').value); if (session) { session.lastK = null; } else renderIdle(); };
+function setInst(v) {
+  instVal = v;
+  document.querySelectorAll('#inst button').forEach(b => b.classList.toggle('on', +b.dataset.v === v));
+}
+document.querySelectorAll('#inst button').forEach(b => b.onclick = () => {
+  setInst(+b.dataset.v); store.set('pat-inst', instVal);
+  if (session) session.lastK = null; else renderIdle();
+});
 $('#reps').onchange = () => store.set('pat-reps', $('#reps').value);
 $('#accomp').onchange = () => { store.set('pat-accomp', $('#accomp').value); if (session) { stop(); start(); } };
 $('#bars').onchange = () => { const p = current(); if (!p) return; if (session) stop(); updatePattern(p.id, { bars: +$('#bars').value }); renderIdle(); };
@@ -1419,7 +1459,7 @@ addEventListener('focus', () => { patterns = readPatterns(); renderLib(); if (!s
   const v = store.get('pat-vol', null); if (v) { $('#harmVol').value = v[0]; $('#drumVol').value = v[1]; }
   const sp = store.get('pat-speed', null); if (sp) { $('#speed').value = sp; }
   $('#speedV').textContent = Math.round($('#speed').value * 100) + '%';
-  const ins = store.get('pat-inst', null); if (ins != null) $('#inst').value = ins;
+  const ins = store.get('pat-inst', null); setInst([0, 2, 9].includes(+ins) && ins !== null ? +ins : 2);
   const rp = store.get('pat-reps', null); if (rp != null) $('#reps').value = rp;
   fillBars();
   const ac = store.get('pat-accomp', null); if (ac) $('#accomp').value = ac;
