@@ -105,6 +105,14 @@
   .seg { display: flex; gap: 4px; }
   .seg button { flex: 1; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 0; font-weight: 700; }
   .seg button.on { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+  .ireal .row.wrap { flex-wrap: wrap; gap: 8px; }
+  .ireal input { flex: 1 1 260px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; }
+  .ireal button { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 12px; }
+  .ireal button:hover { border-color: var(--gold); }
+  .ireal .match { border-color: var(--gold); }
+  .ireal .spacer { flex: 1; }
+  #irealMatches { margin-top: 8px; }
+  #irealInfo { margin-top: 6px; font-size: 12px; color: var(--muted); }
   .saxrow span { display: flex; align-items: center; gap: 6px; color: var(--text); }
   .progress { display: flex; gap: 4px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
   .progress span { width: 22px; height: 6px; border-radius: 3px; background: #3a3547; }
@@ -216,6 +224,21 @@
           <input type="range" id="saxVol" min="0" max="1.5" step="0.01" value="1">
         </label>
       </div>
+    </div>
+    <div class="card ireal">
+      <div class="lbl" style="margin-bottom:10px">Acords del Real Book (iReal Pro) · opcional</div>
+      <div class="row wrap">
+        <input id="irealSong" list="irealTitles" placeholder="Tema (escriu per buscar)…" autocomplete="off">
+        <datalist id="irealTitles"></datalist>
+        <button id="irealFind" title="Compara els acords detectats amb tot el tema i troba on és el bucle">Busca el bucle al tema</button>
+        <button id="irealUndo" title="Torna a posar els acords detectats de l'àudio">Acords detectats</button>
+        <span class="spacer"></span>
+        <button id="irealLoad" title="Fitxer exportat d'iReal Pro (Share → iReal Pro link / HTML)">Carrega temes d'iReal Pro…</button>
+        <button id="irealPaste" title="Enganxa un enllaç irealb:// copiat d'iReal Pro o del fòrum">Enganxa un enllaç…</button>
+        <input type="file" id="irealFile" accept=".html,.htm,.txt,text/html,text/plain" hidden>
+      </div>
+      <div id="irealMatches" class="row wrap"></div>
+      <div id="irealInfo" class="muted"></div>
     </div>
     <div id="status"></div>
     <div class="hint">Desa patrons des del Practice Player amb el botó <b>P</b> de cada bucle. Amb el patró aturat, fes clic en un acord per corregir-lo (buit = esborrar-lo). La bateria no es transposa mai; l'acompanyament harmònic i el saxo, sí.</div>
@@ -1654,7 +1677,8 @@ function renderIdle() {
   const step = { pc: p.key.pc, flat: null };
   $('#nowLbl').textContent = 'Tonalitat original';
   $('#keyName').textContent = keyLabel(step, p.key.minor);
-  $('#meta').textContent = p.song + ' · ' + p.name.replace(/^Loop (\d+)/, 'Bucle $1') + ' · ' + (p.bars || 4) + ' compassos';
+  $('#meta').textContent = p.song + ' · ' + p.name.replace(/^Loop (\d+)/, 'Bucle $1') + ' · ' + (p.bars || 4) + ' compassos' + (p.chart ? ' · acords de ' + p.chart.title + ', compàs ' + p.chart.start : '');
+  if (renderIdle.lastSel !== p.id) { renderIdle.lastSel = p.id; $('#irealMatches').innerHTML = ''; guessIrealSong(); }
   leadSheet($('#chords'), p, step, { editable: true });
   $('#nextKey').textContent = '—'; $('#nextChords').innerHTML = '';
 }
@@ -2121,6 +2145,248 @@ $('#exportBtn').onclick = exportPatterns;
 $('#importBtn').onclick = () => $('#importFile').click();
 $('#importFile').onchange = e => { if (e.target.files[0]) importPatterns(e.target.files[0]); e.target.value = ''; };
 
+// ---------- iReal Pro charts (irealb:// and irealbook:// links, as exported/shared by the app) ----------
+// A song: { title, composer, style, key: { pc, minor }, bars: [[{ beat, root, q }]] } with the bars
+// in playing order (repeats and 1st/2nd endings expanded), chords in concert pitch.
+const IREAL_PREFIX = '1r34LbKcu7';
+function irealObfusc50(s) {
+  const a = s.split('');
+  for (let i = 0; i < 5; i++) { a[49 - i] = s[i]; a[i] = s[49 - i]; }
+  for (let i = 10; i < 24; i++) { a[49 - i] = s[i]; a[i] = s[49 - i]; }
+  return a.join('');
+}
+function irealUnscramble(s) {
+  let r = '';
+  while (s.length > 51) { r += irealObfusc50(s.substring(0, 50)); s = s.substring(50); }
+  r += s;
+  return r.replace(/Kcl/g, '| x').replace(/LZ/g, ' |').replace(/XyQ/g, '   ');
+}
+const IREAL_PC = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+function irealRoot(t) {
+  let pc = IREAL_PC[t[0]];
+  if (t[1] === 'b') pc--; else if (t[1] === '#') pc++;
+  return (pc + 12) % 12;
+}
+// iReal quality -> the notation used here (m7, maj7, m7b5, dim7…)
+function irealQuality(q) {
+  const bass = q.indexOf('/') >= 0 ? q.slice(q.indexOf('/')) : '';
+  q = bass ? q.slice(0, q.indexOf('/')) : q;
+  if (q === '^') q = 'maj7';
+  q = q.replace(/^-\^/, 'm(maj)').replace(/\^/g, 'maj').replace(/^-/, 'm').replace(/^h7?/, 'm7b5').replace(/^o7?/, m => m === 'o7' ? 'dim7' : 'dim').replace(/^\+/, 'aug');
+  return q + bass;
+}
+function irealParseChords(music, ts) {
+  // remove what is not a chord or a bar: comments, section marks, endings kept as markers
+  let s = music.replace(/<[^>]*>/g, ' ').replace(/\*[A-Za-z]/g, ' ').replace(/Y+/g, ' ').replace(/[SQfUls]/g, ' ');
+  s = s.replace(/\([^)]*\)/g, ' ');                  // alternate chords
+  const bars = [];
+  let cur = { items: [], open: false, close: false, ending: 0 }, beatsPerBar = ts || 4;
+  const flush = (closeRepeat) => {
+    if (closeRepeat) cur.close = true;
+    if (cur.items.length || cur.close || cur.open || cur.ending) bars.push(cur);
+    cur = { items: [], open: false, close: false, ending: 0 };
+  };
+  const re = /(T\d\d)|(N\d)|(\{)|(\})|(\||\[|\]|Z)|(x)|(r)|(n)|(p)|(W(?:\/[A-G][b#]?)?)|([A-G][b#]?[^\s,|\[\]{}Z]*)/g;
+  let m;
+  while ((m = re.exec(s))) {
+    if (m[1]) { const t = m[1]; beatsPerBar = +t[1] === 1 && +t[2] === 2 ? 12 : +t[1]; if (t[1] === '6' && t[2] === '8') beatsPerBar = 6; continue; }
+    if (m[2]) { cur.ending = +m[2][1]; continue; }
+    if (m[3]) { if (cur.items.length) flush(false); cur.open = true; continue; }
+    if (m[4]) { flush(true); continue; }
+    if (m[5]) { if (cur.items.length || cur.ending) flush(false); continue; }
+    if (m[6]) { cur.items.push({ repeat: 1 }); continue; }
+    if (m[7]) { cur.items.push({ repeat: 2 }); continue; }
+    if (m[8]) { cur.items.push({ nc: true }); continue; }
+    if (m[9] || m[10]) { cur.items.push({ same: true }); continue; }
+    if (m[11]) { cur.items.push({ root: irealRoot(m[11]), q: irealQuality(m[11].replace(/^[A-G][b#]?/, '')) }); continue; }
+  }
+  flush(false);
+  // expand x / r (bar repeats) and place the chords on beats
+  const written = [];
+  for (const b of bars) {
+    if (b.items.length === 1 && b.items[0].repeat === 1) { const prev = written[written.length - 1]; written.push(Object.assign({}, b, { chords: prev ? prev.chords : [] })); continue; }
+    if (b.items.some(it => it.repeat === 2)) {
+      const p2 = written.slice(-2);
+      p2.forEach((pb, i) => written.push(Object.assign({}, b, { chords: pb.chords, open: i === 0 && b.open, close: i === 1 && b.close })));
+      continue;
+    }
+    const chords = [];
+    let last = written.length && written[written.length - 1].chords.length ? written[written.length - 1].chords.slice(-1)[0] : null;
+    const real = b.items.filter(it => !it.repeat);
+    const pos = { 1: [0], 2: [0, 2], 3: [0, 2, 3], 4: [0, 1, 2, 3] }[real.length] || real.map((_, i) => Math.floor(i * 4 / real.length));
+    real.forEach((it, i) => {
+      if (it.nc) return;
+      const c = it.same ? last : { root: it.root, q: it.q };
+      if (c) { chords.push({ beat: pos[i] * beatsPerBar / 4, root: c.root, q: c.q }); last = c; }
+    });
+    written.push(Object.assign({}, b, { chords }));
+  }
+  // endings: a bar marked N1 starts the first ending, which lasts until the repeat closes
+  let ending = 0;
+  for (const b of written) { if (b.ending) ending = b.ending; b.endingNo = ending; if (b.close) ending = 0; }
+  // playing order: { ... } played twice, the 1st ending only the first time
+  const out = [];
+  let start = 0, pass = 1;
+  const closed = new Set();
+  for (let i = 0; i < written.length; i++) {
+    const b = written[i];
+    if (b.open && pass === 1) start = i;
+    if (b.endingNo && b.endingNo !== pass) { if (b.close && pass === 1) {} continue; }
+    out.push(b.chords);
+    if (b.close && !closed.has(i)) { closed.add(i); pass = 2; i = start - 1; continue; }
+    if (b.close) pass = 1;
+  }
+  return { bars: out, beatsPerBar };
+}
+function irealParseSong(raw, scrambled) {
+  const f = raw.split('=');
+  let title = f[0] || '?', composer = f[1] || '', music = null, keyStr = '', style = '';
+  const mi = f.findIndex(x => x.startsWith(IREAL_PREFIX));
+  if (mi >= 0) music = irealUnscramble(f[mi].substring(IREAL_PREFIX.length));
+  else if (!scrambled) music = f.slice(4).join('=');
+  const keyIdx = f.findIndex((x, i) => i > 1 && /^[A-G][b#]?-?$/.test(x));
+  if (keyIdx >= 0) { keyStr = f[keyIdx]; style = f.slice(2, keyIdx).filter(Boolean).join(' '); }
+  if (!music) return null;
+  const ts = /T(\d)(\d)/.exec(music);
+  const { bars } = irealParseChords(music, ts ? +ts[1] : 4);
+  if (!bars.length) return null;
+  composer = composer.split(' ').reverse().join(' ').trim();          // iReal stores "Last First"
+  const key = keyStr ? { pc: irealRoot(keyStr), minor: keyStr.endsWith('-') } : { pc: 0, minor: false };
+  return { title: title.replace(/^The (.*), The$/i, 'The $1'), composer, style, key, bars };
+}
+// all the songs in a text (an exported .html, a .txt, or a pasted link)
+function irealParseText(text) {
+  const songs = [];
+  const links = text.match(/ireal(?:b|book):\/\/[^"'<>\s]+/g) || [];
+  for (const link of links) {
+    let body;
+    try { body = decodeURIComponent(link.replace(/^ireal(?:b|book):\/\//, '')); } catch (e) { continue; }
+    const scrambled = link.startsWith('irealb://');
+    const parts = body.split('===');
+    for (const part of parts) {
+      if (!part || part.indexOf('=') < 0) continue;           // the last part is the playlist name
+      const song = irealParseSong(part, scrambled);
+      if (song) songs.push(song);
+    }
+  }
+  return songs;
+}
+
+// ---------- Real Book chords for a pattern ----------
+let irealSongs = [];
+const normTitle = t => (t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\(.*?\)|\[.*?\]/g, ' ').replace(/\bthe\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+async function loadIreal() {
+  try { irealSongs = (await idb.get('ireal-songs')) || []; } catch (e) { irealSongs = []; }
+  fillIrealTitles();
+}
+function fillIrealTitles() {
+  const dl = $('#irealTitles'); dl.innerHTML = '';
+  for (const s of irealSongs) { const o = document.createElement('option'); o.value = s.title + (s.composer ? ' — ' + s.composer : ''); dl.append(o); }
+  $('#irealInfo').textContent = irealSongs.length ? irealSongs.length + ' temes d\'iReal Pro carregats.' : 'Carrega una llista exportada d\'iReal Pro (Share → iReal Pro link / HTML) o enganxa un enllaç irealb:// per posar els acords originals del tema.';
+}
+async function addIreal(text) {
+  const songs = irealParseText(text);
+  if (!songs.length) { setStatus('No he trobat cap tema d\'iReal Pro en aquest fitxer o enllaç.'); return; }
+  const byKey = new Map(irealSongs.map(s => [normTitle(s.title) + '|' + normTitle(s.composer), s]));
+  for (const s of songs) byKey.set(normTitle(s.title) + '|' + normTitle(s.composer), s);
+  irealSongs = [...byKey.values()].sort((a, b) => a.title.localeCompare(b.title));
+  try { await idb.put('ireal-songs', irealSongs); } catch (e) {}
+  fillIrealTitles(); guessIrealSong();
+  setStatus(songs.length + ' temes afegits (' + irealSongs.length + ' en total).');
+}
+function irealSelected() {
+  const v = $('#irealSong').value.trim();
+  return irealSongs.find(s => s.title + (s.composer ? ' — ' + s.composer : '') === v) || irealSongs.find(s => normTitle(s.title) === normTitle(v)) || null;
+}
+// the song of the pattern, by title ("Kenny Dorham - Blue Bossa (live)" -> Blue Bossa)
+function guessIrealSong() {
+  const p = current();
+  if (!p || !irealSongs.length) return;
+  if (p.chart) { const s = irealSongs.find(x => x.title === p.chart.title); if (s) { $('#irealSong').value = s.title + (s.composer ? ' — ' + s.composer : ''); return; } }
+  const t = ' ' + normTitle(p.song) + ' ';
+  let best = null;
+  for (const s of irealSongs) { const n = normTitle(s.title); if (n.length > 2 && t.includes(' ' + n + ' ') && (!best || n.length > normTitle(best.title).length)) best = s; }
+  $('#irealSong').value = best ? best.title + (best.composer ? ' — ' + best.composer : '') : '';
+}
+const family = q => /m7b5|ø/.test(q) ? 'half' : /dim|o/.test(q) ? 'dim' : /^m(?!aj)/.test(q) ? 'min' : /maj|^6|^$|^69|^add/.test(q) ? 'maj' : 'dom';
+// detected chords of the pattern on every beat
+function patternBeats(p, chords) {
+  const beats = (p.bars || 4) * 4, beat = p.dur / beats, out = new Array(beats).fill(null);
+  chords.forEach(c => { const b0 = Math.max(0, Math.round(c.t / beat)), b1 = Math.min(beats, Math.round((c.t + c.d) / beat)); for (let b = b0; b < Math.max(b1, b0 + 1) && b < beats; b++) out[b] = c; });
+  for (let b = 1; b < beats; b++) if (!out[b]) out[b] = out[b - 1];
+  return out;
+}
+function chartBeats(song) {
+  const out = [];
+  let last = null;
+  for (const bar of song.bars) for (let b = 0; b < 4; b++) { const c = bar.filter(x => x.beat <= b).pop(); if (c) last = c; out.push(last); }
+  return out;
+}
+// every start bar of the chart, every transposition: how well do the chords agree?
+function findInChart(p, song) {
+  const det = patternBeats(p, p.detectedChords || p.chords), cb = chartBeats(song), n = cb.length, L = det.length;
+  const res = [];
+  for (let start = 0; start < song.bars.length; start++) for (let t = 0; t < 12; t++) {
+    let sc = 0;
+    for (let b = 0; b < L; b++) {
+      const d = det[b], c = cb[(start * 4 + b) % n];
+      if (!d || !c) continue;
+      if ((c.root + t) % 12 === d.root) sc += family(c.q) === family(d.q) ? 1.5 : 1;
+    }
+    if (t === 0) sc += 0.4;                              // recordings are often in the Real Book key
+    res.push({ start, t, score: sc / (1.5 * L) });
+  }
+  res.sort((a, b) => b.score - a.score);
+  const out = [];
+  for (const r of res) { if (out.length >= 3) break; if (!out.some(o => o.start === r.start)) out.push(r); }
+  return out;
+}
+function applyChart(p, song, start, t) {
+  const bars = p.bars || 4, beat = p.dur / (bars * 4), chords = [];
+  for (let i = 0; i < bars; i++) {
+    const bar = song.bars[(start + i) % song.bars.length];
+    for (const c of bar) {
+      const root = (c.root + t) % 12, prev = chords[chords.length - 1];
+      if (prev && prev.root === root && prev.q === c.q) continue;
+      chords.push({ t: +((i * 4 + c.beat) * beat).toFixed(3), root, q: c.q });
+    }
+  }
+  chords.forEach((c, i) => { c.d = +(((i + 1 < chords.length ? chords[i + 1].t : p.dur) - c.t)).toFixed(3); });
+  updatePattern(p.id, {
+    detectedChords: p.detectedChords || p.chords, chords,
+    key: { pc: (song.key.pc + t) % 12, minor: song.key.minor },
+    chart: { title: song.title, composer: song.composer, start: start + 1, t }, edited: true
+  });
+  renderIdle();
+  setStatus('Acords de "' + song.title + '" a partir del compàs ' + (start + 1) + '.');
+}
+$('#irealLoad').onclick = () => $('#irealFile').click();
+$('#irealFile').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (f) addIreal(await f.text()); };
+$('#irealPaste').onclick = () => { const t = prompt('Enganxa aquí l\'enllaç irealb:// (d\'iReal Pro o del fòrum):'); if (t) addIreal(t); };
+$('#irealFind').onclick = () => {
+  const p = current(), song = irealSelected();
+  if (!p) { setStatus('Tria un patró.'); return; }
+  if (!song) { setStatus(irealSongs.length ? 'Tria el tema a la casella.' : 'Primer carrega temes d\'iReal Pro.'); return; }
+  const best = findInChart(p, song), box = $('#irealMatches');
+  box.innerHTML = '';
+  best.forEach((m, i) => {
+    const b = document.createElement('button');
+    if (i === 0) b.className = 'match';
+    const k = (song.key.pc + m.t) % 12;
+    b.textContent = 'Compàs ' + (m.start + 1) + ' · en ' + FLAT[k] + (song.key.minor ? 'm' : '') + (m.t ? ' (transposat)' : '') + ' · ' + Math.round(m.score * 100) + '%';
+    b.title = 'Posa els acords de ' + song.title + ' des del compàs ' + (m.start + 1);
+    b.onclick = () => { applyChart(current(), song, m.start, m.t); box.innerHTML = ''; };
+    box.append(b);
+  });
+  setStatus('Tria on comença el bucle dins del tema (la primera opció és la més probable).');
+};
+$('#irealUndo').onclick = () => {
+  const p = current();
+  if (!p || !p.detectedChords) { setStatus('Aquest patró ja té els acords detectats.'); return; }
+  updatePattern(p.id, { chords: p.detectedChords, detectedChords: null, chart: null });
+  renderIdle(); setStatus('Acords detectats de l\'àudio.');
+};
+
 // ---------- wiring ----------
 $('#startBtn').onclick = () => { if (session) stop(); else start(); };
 $('#harmVol').oninput = $('#drumVol').oninput = () => { applyVolumes(); store.set('pat-vol', [+$('#harmVol').value, +$('#drumVol').value]); };
@@ -2168,6 +2434,7 @@ addEventListener('focus', () => { patterns = readPatterns(); renderLib(); if (!s
   if (!sel && patterns.length) sel = patterns[patterns.length - 1].id;
   renderLib(); renderIdle();
   syncNow();
+  loadIreal().then(guessIrealSong);
 })();
 </script>
 </body>
