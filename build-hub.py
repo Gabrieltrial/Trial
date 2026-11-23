@@ -12,6 +12,7 @@ HERE = Path(__file__).resolve().parent
 # Order = order of the tabs. "tuner": shown in the side panel instead of a tab.
 APPS = [
     ("practice-player", "practice-player.html", "Practice Player", "Reprodueix cançons (també de YouTube) a la velocitat que vulguis, amb bucles."),
+    ("pattern-practice", "pattern-practice.html", "Pattern Practice", "Practica en totes les tonalitats els patrons desats al Practice Player (botó P)."),
     ("chord-practice", "chord-practice.html", "Chord Practice", "Practica canvis d'acords."),
     ("neo-soul-generator", "neo-soul-generator.html", "Neo Soul Generator", "Genera progressions neo soul."),
     ("scale-recognizer", "scale-recognizer.html", "Scale Recognizer", "Toca una escala i et diu quina és."),

@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pattern Practice</title>
+<style>
+  :root {
+    --bg: #15131c; --panel: #221f2b; --panel-2: #2c2837; --line: #3a3547;
+    --text: #efeaf6; --muted: #a49cb4; --gold: #f2c77e; --gold-ink: #2a1d07;
+    --accent: #7fd1b9; --danger: #e5726a;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; }
+  body {
+    background: radial-gradient(1200px 600px at 50% -10%, #2b2440, var(--bg));
+    color: var(--text); font: 14px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  button, select, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  main { max-width: 1180px; margin: 0 auto; padding: 18px 16px 28px; display: grid; grid-template-columns: 300px 1fr; gap: 18px; }
+  h1 { grid-column: 1 / -1; text-align: center; margin: 4px 0 0; font-size: 28px; }
+  .sub { grid-column: 1 / -1; text-align: center; color: var(--muted); margin: -10px 0 4px; }
+  .card { background: linear-gradient(180deg, #2a2635, #1f1c27); border: 1px solid var(--line); border-radius: 18px; padding: 14px; }
+  .lbl { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 700; }
+
+  /* ---------- library ---------- */
+  #lib { display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 140px); overflow: auto; }
+  .song { border-top: 1px solid var(--line); padding-top: 8px; }
+  .song:first-of-type { border-top: 0; padding-top: 0; }
+  .song h3 { margin: 2px 0 6px; font-size: 14px; }
+  .pat { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 7px 9px; margin-bottom: 5px; }
+  .pat:hover { border-color: var(--gold); }
+  .pat.sel { border-color: var(--gold); background: #3a3020; }
+  .pat .nm { flex: 1; min-width: 0; }
+  .pat .nm b { display: block; font-size: 13px; }
+  .pat .nm small { color: var(--muted); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pat .del { border: 0; background: transparent; color: var(--muted); border-radius: 6px; padding: 2px 6px; }
+  .pat .del:hover { background: var(--line); color: var(--danger); }
+  .pat .del.armed { color: var(--danger); font-weight: 700; }
+  .empty { color: var(--muted); font-size: 13px; }
+
+  /* ---------- stage ---------- */
+  #right { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+  .stage { display: grid; grid-template-columns: 1fr 230px; gap: 14px; }
+  .now { background: radial-gradient(500px 220px at 50% 0, #3b3122, #191620); border: 1px solid #4a3d27; border-radius: 16px; padding: 16px 18px 18px; text-align: center; min-height: 250px; display: flex; flex-direction: column; }
+  .keyname { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 54px; font-weight: 800; color: var(--gold); line-height: 1.05; margin: 6px 0 2px; }
+  .meta { color: var(--muted); font-size: 13px; min-height: 18px; }
+  .chords { display: flex; gap: 6px; margin-top: auto; padding-top: 14px; }
+  .chip { flex: 1 1 0; min-width: 3.6em; background: #2a2533; border: 1px solid var(--line); border-radius: 12px; padding: 12px 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; font-weight: 800; font-size: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; transition: background .08s, color .08s; }
+  .chip.on { background: var(--gold); color: var(--gold-ink); border-color: var(--gold); }
+  .chip.edit { cursor: text; }
+  .chip.edit:hover { border-color: var(--gold); }
+  .chip input { width: 100%; background: transparent; border: 0; text-align: center; font: inherit; color: inherit; outline: none; }
+  .next { background: #1b1822; border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; opacity: .85; }
+  .next .keyname { font-size: 30px; color: #d9cfe8; }
+  .next .chords { flex-wrap: wrap; padding-top: 10px; }
+  .next .chip { font-size: 14px; padding: 6px 4px; flex: 1 1 40%; min-width: 0; border-radius: 8px; }
+  .progress { display: flex; gap: 4px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+  .progress span { width: 22px; height: 6px; border-radius: 3px; background: #3a3547; }
+  .progress span.done { background: #8a7550; }
+  .progress span.cur { background: var(--gold); }
+
+  /* ---------- controls ---------- */
+  .ctl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 16px; align-items: end; }
+  .ctl label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
+  .ctl select, .ctl input[type=range] { width: 100%; }
+  select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+  input[type=range] { accent-color: var(--gold); }
+  .row { display: flex; gap: 10px; align-items: center; }
+  #startBtn { flex: 1; min-height: 56px; border-radius: 14px; border: 1px solid #d9a74f; background: linear-gradient(180deg, #a77b35, #7c5a24); font-size: 18px; font-weight: 700; }
+  #startBtn.stop { background: linear-gradient(180deg, #8a6a3a, #5d4522); }
+  #startBtn:disabled { opacity: .45; cursor: default; }
+  #status { color: var(--muted); min-height: 20px; text-align: center; }
+  .hint { color: var(--muted); font-size: 12px; text-align: center; }
+
+  @media (max-width: 860px) {
+    main { grid-template-columns: 1fr; }
+    #lib { max-height: none; }
+    .stage { grid-template-columns: 1fr; }
+    .ctl { grid-template-columns: 1fr 1fr; }
+    .keyname { font-size: 42px; }
+    .chip { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Pattern Practice</h1>
+  <div class="sub">Practica els patrons dels teus bucles en totes les tonalitats</div>
+
+  <section class="card">
+    <div class="lbl" style="margin-bottom:10px">Patrons</div>
+    <div id="lib"></div>
+  </section>
+
+  <section id="right">
+    <div class="card">
+      <div class="stage">
+        <div class="now">
+          <div class="lbl" id="nowLbl">Tonalitat</div>
+          <div class="keyname" id="keyName">—</div>
+          <div class="meta" id="meta">Tria un patró de la llista</div>
+          <div class="chords" id="chords"></div>
+          <div class="progress" id="progress"></div>
+        </div>
+        <div class="next">
+          <div class="lbl">Després</div>
+          <div class="keyname" id="nextKey">—</div>
+          <div class="chords" id="nextChords"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row" style="margin-bottom:14px">
+        <button id="startBtn" disabled>Start</button>
+      </div>
+      <div class="ctl">
+        <label>Tonalitat original del patró
+          <select id="origKey"></select>
+        </label>
+        <label>Instrument (noms dels acords)
+          <select id="inst">
+            <option value="0">C (concert)</option>
+            <option value="2" selected>Bb (tenor, soprano, trompeta)</option>
+            <option value="9">Eb (alt, baríton)</option>
+          </select>
+        </label>
+        <label>Repeticions per tonalitat
+          <select id="reps">
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </label>
+        <label>Velocitat <span id="speedV">100%</span>
+          <input type="range" id="speed" min="0.5" max="1.2" step="0.05" value="1">
+        </label>
+        <label>Acompanyament
+          <input type="range" id="harmVol" min="0" max="1.5" step="0.01" value="1">
+        </label>
+        <label>Bateria
+          <input type="range" id="drumVol" min="0" max="1.5" step="0.01" value="1">
+        </label>
+      </div>
+    </div>
+    <div id="status"></div>
+    <div class="hint">Desa patrons des del Practice Player amb el botó <b>P</b> de cada bucle. Amb el patró aturat, fes clic en un acord per corregir-lo. La bateria no es transposa mai; només l'acompanyament harmònic.</div>
+  </section>
+</main>
+
+<script id="engine-src" type="text/plain">
+// Same engine as practice-player.html (phase vocoder with formant preservation).
+class StretchEngine {
+  constructor(sr, post) {
+    this.sr = sr; this.post = post;
+    this.L = null; this.R = null; this.len = 0;
+    this.playing = false; this.tempo = 1; this.pitch = 1;
+    this.loop = false; this.ls = 0; this.le = 0;
+    this.gain = 0; this.seekPending = null; this.pos = 0;
+    this.reportCount = 0; this.endedSent = false;
+    this.Y = 1 << 16; this.ymask = this.Y - 1;
+    this.yqL = new Float32Array(this.Y); this.yqR = new Float32Array(this.Y);
+    this.hopPos = new Float64Array(1024);
+    // 'pvf' = phase vocoder + formant preservation, 'pv' = phase vocoder, 'wsola' = classic
+    this.algo = 'pvf'; this.ms = 85;
+    this.setup(85);
+  }
+  setup(ms) {
+    this.ms = ms;
+    const N = 1 << Math.max(8, Math.round(Math.log2(this.sr * ms / 1000)));
+    const pv = this.algo !== 'wsola';
+    this.N = N; this.Hs = pv ? N >> 2 : N >> 1; this.S = N >> 2;
+    this.win = new Float32Array(N);
+    for (let n = 0; n < N; n++) this.win[n] = 0.5 - 0.5 * Math.cos(2 * Math.PI * n / N);
+    const T = N + 2 * this.S;
+    this.tl = new Float32Array(T); this.tr = new Float32Array(T); this.tm = new Float32Array(T);
+    this.accL = new Float32Array(N); this.accR = new Float32Array(N);
+    this.tail = new Float32Array(this.Hs);
+    if (pv) this.setupPV(N);
+    this.resetStream();
+  }
+  setupPV(N) {
+    const half = N >> 1;
+    this.re = new Float64Array(N); this.im = new Float64Array(N);
+    this.cre = new Float64Array(N); this.cim = new Float64Array(N);
+    this.cosT = new Float64Array(half); this.sinT = new Float64Array(half);
+    for (let k = 0; k < half; k++) { this.cosT[k] = Math.cos(2 * Math.PI * k / N); this.sinT[k] = Math.sin(2 * Math.PI * k / N); }
+    const bits = Math.round(Math.log2(N));
+    this.rev = new Uint32Array(N);
+    for (let i = 0; i < N; i++) { let r = 0, x = i; for (let b = 0; b < bits; b++) { r = (r << 1) | (x & 1); x >>= 1; } this.rev[i] = r; }
+    const B = half + 1;
+    this.Lr = new Float64Array(B); this.Li = new Float64Array(B); this.Rr = new Float64Array(B); this.Ri = new Float64Array(B);
+    this.mag = new Float64Array(B); this.phi = new Float64Array(B);
+    this.prevPhi = new Float64Array(B); this.prevPsi = new Float64Array(B); this.psi = new Float64Array(B);
+    this.prevLogMag = new Float64Array(B);
+    this.logEnv = new Float64Array(B); this.fgain = new Float64Array(B);
+    this.isPeak = new Uint8Array(B); this.peakOf = new Int32Array(B);
+    this.fluxAvg = 0;
+  }
+  resetStream() {
+    this.accL.fill(0); this.accR.fill(0); this.yqL.fill(0); this.yqR.fill(0);
+    this.yWrite = 0; this.yRead = 0; this.hasTail = false; this.hopCount = 0; this.finished = false;
+    this.pvFresh = true; this.prevStart = 0; this.lastTransient = -1e9;
+  }
+  onMsg(m) {
+    switch (m.type) {
+      case 'load':
+        this.L = m.L; this.R = m.R || m.L; this.len = this.L.length;
+        this.loop = false; this.playing = false; this.gain = 0; this.seekPending = null;
+        this.pos = 0; this.resetStream(); this.endedSent = false; break;
+      case 'play':
+        this.playing = !!m.playing; if (this.playing) this.endedSent = false; break;
+      case 'swap':
+        if (m.L && m.L.length === this.len) { this.L = m.L; this.R = m.R || m.L; }
+        break;
+      case 'seek':
+        this.seekPending = Math.max(0, m.pos); break;
+      case 'params':
+        this.tempo = Math.min(4, Math.max(0.05, m.tempo));
+        this.pitch = Math.min(4, Math.max(0.25, m.pitch)); break;
+      case 'loop':
+        this.loop = !!m.enabled;
+        this.ls = Math.max(0, Math.floor(m.start)); this.le = Math.min(this.len, Math.floor(m.end));
+        if (this.le - this.ls < 64) this.loop = false;
+        break;
+      case 'window': {
+        const p = this.currentPos();
+        this.setup(m.ms); this.pos = p; this.gain = 0; break;
+      }
+      case 'algo': {
+        if (m.algo === this.algo) break;
+        const p = this.currentPos();
+        this.algo = m.algo; this.setup(this.ms); this.pos = p; this.gain = 0; break;
+      }
+    }
+  }
+  doSeek() {
+    let p = this.seekPending; this.seekPending = null;
+    if (this.loop && (p < this.ls || p >= this.le)) p = this.ls;
+    this.pos = p; this.resetStream(); this.endedSent = false;
+  }
+  currentPos() {
+    if (this.endedSent) return this.len;
+    if (this.hopCount === 0) return this.pos;
+    const Hs = this.Hs;
+    let h = Math.floor(this.yRead / Hs);
+    if (h >= this.hopCount) h = this.hopCount - 1;
+    let p = this.hopPos[h & 1023] + (this.yRead - h * Hs) * (this.tempo / this.pitch);
+    if (this.loop) {
+      const ll = this.le - this.ls;
+      if (ll > 0 && (p >= this.le || p < this.ls)) p = this.ls + (((p - this.ls) % ll) + ll) % ll;
+    } else p = Math.min(Math.max(p, 0), this.len);
+    return p;
+  }
+  fillTemp(base) {
+    const N = this.N, S = this.S, total = N + 2 * S, start = base - S;
+    const L = this.L, R = this.R, len = this.len, tl = this.tl, tr = this.tr, tm = this.tm;
+    if (!this.loop) {
+      if (start >= 0 && start + total <= len) {
+        tl.set(L.subarray(start, start + total)); tr.set(R.subarray(start, start + total));
+      } else {
+        for (let j = 0; j < total; j++) {
+          const i = start + j;
+          if (i >= 0 && i < len) { tl[j] = L[i]; tr[j] = R[i]; } else { tl[j] = 0; tr[j] = 0; }
+        }
+      }
+    } else {
+      const ls = this.ls, le = this.le, ll = le - ls;
+      if (start >= ls && start + total <= le) {
+        tl.set(L.subarray(start, start + total)); tr.set(R.subarray(start, start + total));
+      } else {
+        for (let j = 0; j < total; j++) {
+          let i = start + j;
+          if (i < ls || i >= le) i = ls + (((i - ls) % ll) + ll) % ll;
+          tl[j] = L[i]; tr[j] = R[i];
+        }
+      }
+    }
+    for (let j = 0; j < total; j++) tm[j] = 0.5 * (tl[j] + tr[j]);
+  }
+  search() {
+    const S = this.S, Hs = this.Hs, tail = this.tail, tm = this.tm;
+    let best = -Infinity, bd = 0;
+    for (let d = -S; d <= S; d += 2) {
+      const o = S + d; let dot = 0, e = 0;
+      for (let k = 0; k < Hs; k += 4) { const x = tm[o + k]; dot += tail[k] * x; e += x * x; }
+      let sc = dot / Math.sqrt(e + 1e-9);
+      if (sc > 0) sc *= 1 - 1e-4 * Math.abs(d) / S;
+      if (sc > best) { best = sc; bd = d; }
+    }
+    const d0 = Math.max(-S, bd - 2), d1 = Math.min(S, bd + 2);
+    best = -Infinity;
+    for (let d = d0; d <= d1; d++) {
+      const o = S + d; let dot = 0, e = 0;
+      for (let k = 0; k < Hs; k++) { const x = tm[o + k]; dot += tail[k] * x; e += x * x; }
+      let sc = dot / Math.sqrt(e + 1e-9);
+      if (sc > 0) sc *= 1 - 1e-4 * Math.abs(d) / S;
+      if (sc > best) { best = sc; bd = d; }
+    }
+    return bd;
+  }
+  fft(sgn) {
+    const N = this.N, re = this.re, im = this.im, rev = this.rev, cosT = this.cosT, sinT = this.sinT;
+    for (let i = 0; i < N; i++) {
+      const j = rev[i];
+      if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+    }
+    for (let size = 2; size <= N; size <<= 1) {
+      const hs = size >> 1, step = N / size;
+      for (let start = 0; start < N; start += size) {
+        for (let k = 0, tw = 0; k < hs; k++, tw += step) {
+          const wr = cosT[tw], wi = sgn * sinT[tw];
+          const a = start + k, b = a + hs;
+          const xr = re[b] * wr - im[b] * wi, xi = re[b] * wi + im[b] * wr;
+          re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+        }
+      }
+    }
+  }
+  // Spectral envelope (cepstral smoothing of the log magnitude) for formant preservation.
+  envelope() {
+    const N = this.N, half = N >> 1, re = this.re, im = this.im, mag = this.mag, env = this.logEnv;
+    for (let k = 0; k <= half; k++) { const v = Math.log(mag[k] + 1e-9); re[k] = v; im[k] = 0; if (k > 0 && k < half) { re[N - k] = v; im[N - k] = 0; } }
+    this.fft(1);
+    // Lifter below the shortest pitch period (~0.7 ms, above any sax note): keeps the formants, drops the harmonics.
+    const keep = Math.min(half - 1, Math.max(8, Math.round(this.sr * 0.0007)));
+    for (let n = 0; n < N; n++) {
+      const q = n <= half ? n : N - n;
+      const w = q < keep ? 1 : q < keep + 4 ? 0.5 + 0.5 * Math.cos(Math.PI * (q - keep) / 4) : 0;
+      re[n] *= w / N; im[n] *= w / N;
+    }
+    this.fft(-1);
+    for (let k = 0; k <= half; k++) env[k] = re[k];
+  }
+  produceHopPV() {
+    const N = this.N, half = N >> 1, Hs = this.Hs, S = this.S, mask = this.ymask;
+    const re = this.re, im = this.im, win = this.win;
+    const base = Math.floor(this.pos);
+    this.fillTemp(base);
+    const tl = this.tl, tr = this.tr;
+    for (let n = 0; n < N; n++) { const w = win[n]; re[n] = tl[S + n] * w; im[n] = tr[S + n] * w; }
+    this.fft(-1);
+    const Lr = this.Lr, Li = this.Li, Rr = this.Rr, Ri = this.Ri, mag = this.mag, phi = this.phi;
+    for (let k = 0; k <= half; k++) {
+      const k2 = (N - k) & (N - 1);
+      const zr = re[k], zi = im[k], wr = re[k2], wi = im[k2];
+      Lr[k] = (zr + wr) * 0.5; Li[k] = (zi - wi) * 0.5;
+      Rr[k] = (zi + wi) * 0.5; Ri[k] = (wr - zr) * 0.5;
+      const mr = Lr[k] + Rr[k], mi = Li[k] + Ri[k];
+      mag[k] = Math.sqrt(mr * mr + mi * mi);
+      phi[k] = Math.atan2(mi, mr);
+    }
+    const ratio = this.tempo / this.pitch;
+    const identity = Math.abs(ratio - 1) < 1e-6 && Math.abs(this.pitch - 1) < 1e-6;
+    let Ha = base - this.prevStart;
+    // Transients: phase reset keeps attacks sharp.
+    let flux = 0, cnt = 0;
+    const kLo = Math.max(1, Math.floor(200 * N / this.sr)), kHi = Math.min(half, Math.floor(12000 * N / this.sr));
+    let mx = 1e-9;
+    for (let k = kLo; k < kHi; k++) if (mag[k] > mx) mx = mag[k];
+    const eps = mx * 1e-3;   // ignore bins 60 dB below the frame peak (numerical noise)
+    for (let k = kLo; k < kHi; k++) {
+      const lm = Math.log(mag[k] + eps);
+      const d = lm - this.prevLogMag[k];
+      if (d > 0) flux += d;
+      this.prevLogMag[k] = lm; cnt++;
+    }
+    flux /= Math.max(1, cnt);
+    let transient = !this.pvFresh && flux > 0.35 && flux > 2.2 * this.fluxAvg && Math.abs(base - this.lastTransient) > N / 2;
+    if (transient) this.lastTransient = base;
+    this.fluxAvg += (flux - this.fluxAvg) * 0.15;
+    const psi = this.psi, prevPhi = this.prevPhi, prevPsi = this.prevPsi;
+    if (this.pvFresh || identity || transient || Ha <= 0) {
+      for (let k = 0; k <= half; k++) psi[k] = phi[k];
+    } else {
+      // Peaks of the magnitude spectrum, each bin belongs to its nearest peak (identity phase locking).
+      const isPeak = this.isPeak, peakOf = this.peakOf;
+      isPeak.fill(0);
+      let floor = 0;
+      for (let k = 0; k <= half; k++) floor = Math.max(floor, mag[k]);
+      floor *= 1e-5;
+      for (let k = 2; k < half - 1; k++) {
+        const m = mag[k];
+        if (m > floor && m > mag[k - 1] && m >= mag[k + 1] && m > mag[k - 2] && m >= mag[k + 2]) isPeak[k] = 1;
+      }
+      let last = -1;
+      for (let k = 0; k <= half; k++) {
+        if (isPeak[k]) {
+          if (last < 0) for (let j = 0; j < k; j++) peakOf[j] = k;
+          else { let lo = last; for (let j = last + 1; j < k; j++) if (mag[j] < mag[lo]) lo = j; for (let j = last + 1; j < k; j++) peakOf[j] = j < lo ? last : k; }
+          peakOf[k] = k; last = k;
+        }
+      }
+      if (last < 0) { for (let k = 0; k <= half; k++) psi[k] = phi[k]; }
+      else {
+        for (let j = last + 1; j <= half; j++) peakOf[j] = last;
+        const twoPi = 2 * Math.PI, sc = Hs / Ha;
+        for (let k = 0; k <= half; k++) {
+          if (!isPeak[k]) continue;
+          const omega = twoPi * k / N;
+          let d = phi[k] - prevPhi[k] - omega * Ha;
+          d -= twoPi * Math.round(d / twoPi);
+          psi[k] = prevPsi[k] + (omega * Ha + d) * sc;
+        }
+        for (let k = 0; k <= half; k++) {
+          const p = peakOf[k];
+          if (p !== k) psi[k] = psi[p] + phi[k] - phi[p];
+        }
+      }
+    }
+    for (let k = 0; k <= half; k++) { prevPhi[k] = phi[k]; let v = psi[k]; v -= 6.283185307179586 * Math.round(v / 6.283185307179586); prevPsi[k] = v; }
+    // Formant preservation: the output is resampled by "pitch", so pre-warp the envelope.
+    const fg = this.fgain;
+    const useF = this.algo === 'pvf' && Math.abs(this.pitch - 1) > 1e-3;
+    if (useF) {
+      this.envelope();
+      const env = this.logEnv, p = this.pitch;
+      for (let k = 0; k <= half; k++) {
+        const x = k * p;
+        let e;
+        if (x >= half) e = env[half];
+        else { const i0 = Math.floor(x), t = x - i0; e = env[i0] * (1 - t) + env[i0 + 1] * t; }
+        let g = Math.exp(e - env[k]);
+        fg[k] = g > 8 ? 8 : g < 0.125 ? 0.125 : g;
+      }
+    }
+    // Rotate both channels by the same phase correction (keeps the stereo image).
+    for (let k = 0; k <= half; k++) {
+      const rot = psi[k] - phi[k], c = Math.cos(rot), s = Math.sin(rot), g = useF ? fg[k] : 1;
+      const lr = (Lr[k] * c - Li[k] * s) * g, li = (Lr[k] * s + Li[k] * c) * g;
+      const rr = (Rr[k] * c - Ri[k] * s) * g, ri = (Rr[k] * s + Ri[k] * c) * g;
+      // pack Y = L + iR (both Hermitian) for one inverse FFT
+      re[k] = lr - ri; im[k] = li + rr;
+      if (k > 0 && k < half) { re[N - k] = lr + ri; im[N - k] = rr - li; }
+    }
+    this.fft(1);
+    const accL = this.accL, accR = this.accR, norm = 1 / (N * 1.5);
+    for (let n = 0; n < N; n++) { const w = win[n] * norm; accL[n] += re[n] * w; accR[n] += im[n] * w; }
+    const yqL = this.yqL, yqR = this.yqR;
+    for (let k = 0; k < Hs; k++) { const w = (this.yWrite + k) & mask; yqL[w] = accL[k]; yqR[w] = accR[k]; }
+    accL.copyWithin(0, Hs); accL.fill(0, N - Hs);
+    accR.copyWithin(0, Hs); accR.fill(0, N - Hs);
+    this.pvFresh = false; this.prevStart = base;
+    this.hopPos[this.hopCount & 1023] = this.pos;
+    this.hopCount++; this.yWrite += Hs;
+    this.pos += Hs * ratio;
+    if (this.loop) {
+      const ll = this.le - this.ls;
+      if (this.pos >= this.le) { this.pos = this.ls + ((this.pos - this.ls) % ll); this.prevStart = Math.floor(this.pos) - Math.round(Hs * ratio); }
+    }
+  }
+  produceHop() {
+    const N = this.N, Hs = this.Hs, S = this.S, mask = this.ymask;
+    if (this.loop) {
+      const ll = this.le - this.ls;
+      if (ll > 0 && (this.pos >= this.le || this.pos < this.ls))
+        this.pos = this.ls + (((this.pos - this.ls) % ll) + ll) % ll;
+    }
+    const accL = this.accL, accR = this.accR, yqL = this.yqL, yqR = this.yqR;
+    if (!this.loop && this.pos >= this.len) {
+      for (let k = 0; k < Hs; k++) { const w = (this.yWrite + k) & mask; yqL[w] = accL[k]; yqR[w] = accR[k]; }
+      this.hopPos[this.hopCount & 1023] = this.pos;
+      this.yWrite += Hs; this.hopCount++; this.finished = true;
+      return;
+    }
+    if (this.algo !== 'wsola') { this.produceHopPV(); return; }
+    this.fillTemp(Math.floor(this.pos));
+    const d = this.hasTail ? this.search() : 0;
+    const o = S + d, win = this.win, tl = this.tl, tr = this.tr, tm = this.tm, tail = this.tail;
+    for (let n = 0; n < N; n++) { const w = win[n]; accL[n] += w * tl[o + n]; accR[n] += w * tr[o + n]; }
+    for (let k = 0; k < Hs; k++) tail[k] = tm[o + Hs + k];
+    this.hasTail = true;
+    for (let k = 0; k < Hs; k++) { const w = (this.yWrite + k) & mask; yqL[w] = accL[k]; yqR[w] = accR[k]; }
+    accL.copyWithin(0, Hs); accL.fill(0, Hs);
+    accR.copyWithin(0, Hs); accR.fill(0, Hs);
+    this.hopPos[this.hopCount & 1023] = this.pos;
+    this.hopCount++; this.yWrite += Hs;
+    this.pos += Hs * (this.tempo / this.pitch);
+    if (this.loop) {
+      const ll = this.le - this.ls;
+      if (this.pos >= this.le) this.pos = this.ls + ((this.pos - this.ls) % ll);
+    }
+  }
+  render(oL, oR, n) {
+    if (!this.L) { oL.fill(0); if (oR) oR.fill(0); return; }
+    const step = 1 / 256, mask = this.ymask;
+    for (let i = 0; i < n; i++) {
+      const want = (this.playing && this.seekPending === null) ? 1 : 0;
+      if (this.gain < want) this.gain = Math.min(want, this.gain + step);
+      else if (this.gain > want) this.gain = Math.max(want, this.gain - step);
+      if (this.gain === 0 && this.seekPending !== null) this.doSeek();
+      if (this.gain === 0 && want === 0) { oL[i] = 0; if (oR) oR[i] = 0; continue; }
+      while (this.yRead + 3 >= this.yWrite && !this.finished) this.produceHop();
+      if (this.finished && this.yRead + 3 >= this.yWrite) {
+        oL[i] = 0; if (oR) oR[i] = 0;
+        if (!this.endedSent) {
+          this.endedSent = true; this.playing = false; this.pos = this.len;
+          this.post({ type: 'ended' });
+        }
+        continue;
+      }
+      const i0 = Math.floor(this.yRead), t = this.yRead - i0;
+      const a = (i0 - 1) & mask, b = i0 & mask, c = (i0 + 1) & mask, d = (i0 + 2) & mask;
+      let q = this.yqL, ym = q[a], y0 = q[b], y1 = q[c], y2 = q[d];
+      const vL = ((((y2 - ym) * 0.5 + 1.5 * (y0 - y1)) * t + (ym - 2.5 * y0 + 2 * y1 - 0.5 * y2)) * t + 0.5 * (y1 - ym)) * t + y0;
+      oL[i] = vL * this.gain;
+      if (oR) {
+        q = this.yqR; ym = q[a]; y0 = q[b]; y1 = q[c]; y2 = q[d];
+        const vR = ((((y2 - ym) * 0.5 + 1.5 * (y0 - y1)) * t + (ym - 2.5 * y0 + 2 * y1 - 0.5 * y2)) * t + 0.5 * (y1 - ym)) * t + y0;
+        oR[i] = vR * this.gain;
+      }
+      this.yRead += this.pitch;
+    }
+    this.reportCount += n;
+    if (this.reportCount >= 1024) {
+      this.reportCount = 0;
+      this.post({ type: 'pos', pos: this.currentPos() });
+    }
+  }
+}
+</script>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const PAT_KEY = 'pp-patterns';
+const SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+const ENHARMONIC = [1, 6, 8];                       // C#/Db, F#/Gb, G#/Ab appear twice
+const FLAT_MAJOR = new Set([0, 5, 10, 3, 8, 1, 6]); // C (jazz habit), F, Bb, Eb, Ab, Db, Gb
+const FLAT_MINOR = new Set([2, 7, 0, 5, 10, 3]);    // Dm, Gm, Cm, Fm, Bbm, Ebm
+const ORDERS = {
+  fourths: 'per quartes', fifths: 'per quintes', tones: 'per segones majors',
+  up: 'cromàtic ascendent', down: 'cromàtic descendent', random: 'aleatori'
+};
+
+// ---------- storage (shared with the Practice Player) ----------
+function readPatterns() { try { const a = JSON.parse(localStorage.getItem(PAT_KEY)); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function writePatterns(a) { try { localStorage.setItem(PAT_KEY, JSON.stringify(a)); } catch (e) {} }
+const idb = {
+  p: null,
+  open() {
+    if (!this.p) this.p = new Promise((res, rej) => {
+      try {
+        const r = indexedDB.open('pp-audio', 1);
+        r.onupgradeneeded = () => r.result.createObjectStore('f');
+        r.onsuccess = () => res(r.result);
+        r.onerror = () => rej(r.error);
+      } catch (e) { rej(e); }
+    });
+    return this.p;
+  },
+  async run(mode, fn) {
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('f', mode), rq = fn(tx.objectStore('f'));
+      tx.oncomplete = () => res(rq && rq.result);
+      tx.onerror = tx.onabort = () => rej(tx.error);
+    });
+  },
+  get(k) { return this.run('readonly', s => s.get(k)); },
+  del(k) { return this.run('readwrite', s => s.delete(k)); }
+};
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+};
+
+// ---------- music helpers ----------
+const mod12 = n => ((n % 12) + 12) % 12;
+const inst = () => +$('#inst').value;
+function useFlats(pc, minor, flatHint) {
+  if (ENHARMONIC.includes(pc) && flatHint != null) return flatHint;
+  return minor ? FLAT_MINOR.has(pc) : FLAT_MAJOR.has(pc);
+}
+// a key step: { pc (concert), flat (spelling) }
+function keyLabel(step, minor) {
+  const w = mod12(step.pc + inst());
+  const flat = useFlats(w, minor, ENHARMONIC.includes(w) ? step.flat : null);
+  return (flat ? FLAT : SHARP)[w] + (minor ? 'm' : '');
+}
+function chordLabel(ch, shift, step, minor) {
+  const keyW = mod12(step.pc + inst());
+  const flat = useFlats(keyW, minor, ENHARMONIC.includes(keyW) ? step.flat : null);
+  return (flat ? FLAT : SHARP)[mod12(ch.root + shift + inst())] + ch.q;
+}
+function parseChord(text) {
+  const m = /^\s*([A-Ga-g])([#b♯♭]?)(.*)$/.exec(text || '');
+  if (!m) return null;
+  let pc = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1].toUpperCase()];
+  if (m[2] === '#' || m[2] === '♯') pc++;
+  if (m[2] === 'b' || m[2] === '♭') pc--;
+  return { root: mod12(pc), q: m[3].trim().replace(/♭/g, 'b').replace(/♯/g, '#') };
+}
+// shortest transposition (-6..+5 semitones) keeps the audio closest to the recording
+const shiftFor = (target, orig) => { let s = mod12(target - orig); if (s > 5) s -= 12; return s; };
+
+function buildKeys(orig, order) {
+  let pcs;
+  const seq = step => Array.from({ length: 12 }, (_, i) => mod12(orig + i * step));
+  if (order === 'fourths') pcs = seq(5);
+  else if (order === 'fifths') pcs = seq(7);
+  else if (order === 'up') pcs = seq(1);
+  else if (order === 'down') pcs = seq(-1);
+  else if (order === 'tones') pcs = [0, 2, 4, 6, 8, 10, 1, 3, 5, 7, 9, 11].map(i => mod12(orig + i));
+  else {
+    const rest = Array.from({ length: 12 }, (_, i) => i).filter(p => p !== orig);
+    for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+    pcs = [orig, ...rest];
+  }
+  const flatFirst = order === 'fourths' || order === 'down';
+  const steps = [];
+  for (const pc of pcs) {
+    if (ENHARMONIC.includes(pc)) { steps.push({ pc, flat: flatFirst }); steps.push({ pc, flat: !flatFirst }); }
+    else steps.push({ pc, flat: null });
+  }
+  return steps;
+}
+
+// ---------- state ----------
+let patterns = readPatterns();
+let sel = store.get('pat-sel', null);
+let ctx = null, harmGain = null, drumGain = null;
+let session = null;          // running practice
+const cache = new Map();     // `${id}|${shift}|${tempo}|harm|drums` -> {L,R} (AudioBuffer later)
+let renderWorker = null, renderSeq = 0;
+const pending = new Map();
+
+const current = () => patterns.find(p => p.id === sel) || null;
+function setStatus(t) { $('#status').textContent = t || ''; }
+
+// ---------- library ----------
+function renderLib() {
+  const lib = $('#lib');
+  lib.innerHTML = '';
+  if (!patterns.length) {
+    lib.innerHTML = '<div class="empty">Encara no hi ha cap patró. Al Practice Player, marca un bucle i prem el botó <b>P</b>: es desarà aquí, en una llista amb el títol de la cançó.</div>';
+    return;
+  }
+  const bySong = new Map();
+  for (const p of patterns) { if (!bySong.has(p.song)) bySong.set(p.song, []); bySong.get(p.song).push(p); }
+  for (const [song, list] of bySong) {
+    const g = document.createElement('div'); g.className = 'song';
+    const h = document.createElement('h3'); h.textContent = song; g.append(h);
+    for (const p of list) {
+      const b = document.createElement('div');
+      b.className = 'pat' + (p.id === sel ? ' sel' : ''); b.tabIndex = 0;
+      const nm = document.createElement('div'); nm.className = 'nm';
+      const t = document.createElement('b'); t.textContent = p.name.replace(/^Loop (\d+)/, 'Bucle $1');
+      const s = document.createElement('small'); s.textContent = (p.chords || []).map(c => FLAT[c.root] + c.q).join(' · ') + ' · ' + FLAT[p.key.pc] + (p.key.minor ? 'm' : '');
+      nm.append(t, s);
+      const del = document.createElement('button'); del.className = 'del'; del.textContent = '✕'; del.title = 'Esborra aquest patró';
+      del.onclick = ev => {
+        ev.stopPropagation();
+        if (!del.classList.contains('armed')) { del.classList.add('armed'); del.textContent = 'Esborrar?'; setTimeout(() => { del.classList.remove('armed'); del.textContent = '✕'; }, 3000); return; }
+        removePattern(p.id);
+      };
+      b.append(nm, del);
+      b.onclick = () => select(p.id);
+      b.onkeydown = ev => { if (ev.key === 'Enter') select(p.id); };
+      g.append(b);
+    }
+    lib.append(g);
+  }
+}
+async function removePattern(id) {
+  if (session && session.p.id === id) stop();
+  patterns = readPatterns().filter(p => p.id !== id);
+  writePatterns(patterns);
+  idb.del('pat:' + id + ':harm').catch(() => {}); idb.del('pat:' + id + ':drums').catch(() => {});
+  if (sel === id) { sel = null; store.set('pat-sel', null); }
+  renderLib(); renderIdle();
+}
+function select(id) {
+  if (session) stop();
+  sel = id; store.set('pat-sel', id);
+  renderLib(); renderIdle();
+}
+
+// ---------- key select ----------
+function fillOrigKey() {
+  const s = $('#origKey'); s.innerHTML = '';
+  for (const minor of [false, true]) for (let pc = 0; pc < 12; pc++) {
+    const o = document.createElement('option');
+    o.value = pc + (minor ? 'm' : '');
+    o.textContent = (useFlats(pc, minor) ? FLAT : SHARP)[pc] + (minor ? ' menor' : ' major') + ' (concert)';
+    s.append(o);
+  }
+}
+$('#origKey').onchange = () => {
+  const p = current(); if (!p) return;
+  const v = $('#origKey').value;
+  updatePattern(p.id, { key: { pc: parseInt(v, 10), minor: v.endsWith('m') }, edited: true });
+  renderIdle();
+};
+function updatePattern(id, patch) {
+  patterns = readPatterns();
+  const i = patterns.findIndex(p => p.id === id);
+  if (i < 0) return;
+  Object.assign(patterns[i], patch);
+  writePatterns(patterns);
+  renderLib();
+}
+
+// ---------- display ----------
+function chipsFor(box, p, step, big, hi = -1, editable = false) {
+  box.innerHTML = '';
+  const shift = shiftFor(step.pc, p.key.pc);
+  const total = p.dur || (p.chords.length ? p.chords[p.chords.length - 1].t + p.chords[p.chords.length - 1].d : 1);
+  (p.chords || []).forEach((c, i) => {
+    const d = document.createElement('div');
+    d.className = 'chip' + (i === hi ? ' on' : '') + (editable ? ' edit' : '');
+    if (big) d.style.flexGrow = String(Math.max(0.5, c.d / total * p.chords.length));
+    d.textContent = chordLabel(c, shift, step, p.key.minor);
+    if (editable) d.onclick = () => editChord(d, p, i);
+    box.append(d);
+  });
+}
+function editChord(el, p, i) {
+  if (el.querySelector('input')) return;
+  const old = el.textContent;
+  el.textContent = '';
+  const inp = document.createElement('input');
+  inp.value = old; el.append(inp); inp.focus(); inp.select();
+  const done = save => {
+    if (save && !inp.value.trim()) {
+      // empty = delete this chord; its time goes to the previous one (or the next, for the first)
+      const list = readPatterns().find(x => x.id === p.id).chords.slice();
+      if (list.length > 1) {
+        const [gone] = list.splice(i, 1);
+        if (i > 0) list[i - 1] = Object.assign({}, list[i - 1], { d: +(list[i - 1].d + gone.d).toFixed(3) });
+        else list[0] = Object.assign({}, list[0], { t: gone.t, d: +(list[0].d + gone.d).toFixed(3) });
+        // merge neighbours that became the same chord
+        for (let k = list.length - 1; k > 0; k--) if (list[k].root === list[k - 1].root && list[k].q === list[k - 1].q) { list[k - 1].d = +(list[k - 1].d + list[k].d).toFixed(3); list.splice(k, 1); }
+        updatePattern(p.id, { chords: list, edited: true });
+      }
+    } else if (save) {
+      const c = parseChord(inp.value);
+      if (c) {
+        const list = readPatterns().find(x => x.id === p.id).chords.slice();
+        // the chip shows the written name in the original key: back to concert pitch
+        list[i] = Object.assign({}, list[i], { root: mod12(c.root - inst()), q: c.q });
+        updatePattern(p.id, { chords: list, edited: true });
+      } else setStatus('No he entès l\'acord "' + inp.value + '" (exemples: Cm7, F7, Bbmaj7, Ebm7b5).');
+    }
+    renderIdle();
+  };
+  inp.onkeydown = e => { if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); };
+  inp.onblur = () => done(true);
+}
+function renderIdle() {
+  const p = current();
+  $('#startBtn').disabled = !p;
+  $('#progress').innerHTML = '';
+  if (!p) {
+    $('#keyName').textContent = '—'; $('#meta').textContent = patterns.length ? 'Tria un patró de la llista' : 'Encara no hi ha cap patró';
+    $('#chords').innerHTML = ''; $('#nextKey').textContent = '—'; $('#nextChords').innerHTML = ''; $('#nowLbl').textContent = 'Tonalitat';
+    return;
+  }
+  $('#origKey').value = p.key.pc + (p.key.minor ? 'm' : '');
+  const step = { pc: p.key.pc, flat: null };
+  $('#nowLbl').textContent = 'Tonalitat original';
+  $('#keyName').textContent = keyLabel(step, p.key.minor);
+  $('#meta').textContent = p.song + ' · ' + p.name.replace(/^Loop (\d+)/, 'Bucle $1') + ' · ' + p.dur.toFixed(1) + ' s · clic en un acord per corregir-lo (buit = esborrar-lo)';
+  chipsFor($('#chords'), p, step, true, -1, true);
+  $('#nextKey').textContent = '—'; $('#nextChords').innerHTML = '';
+}
+
+// ---------- offline transposition (worker running the Practice Player engine) ----------
+function worker() {
+  if (renderWorker) return renderWorker;
+  const src = $('#engine-src').textContent + `
+    onmessage = e => {
+      const { id, L, R, sr, tempo, pitch } = e.data;
+      const len = L.length, out = Math.round(len / tempo), B = 128;
+      const eng = new StretchEngine(sr, () => {});
+      eng.onMsg({ type: 'algo', algo: 'pvf' });
+      eng.onMsg({ type: 'window', ms: 85 });
+      eng.onMsg({ type: 'load', L, R });
+      eng.onMsg({ type: 'loop', enabled: true, start: 0, end: len });
+      eng.onMsg({ type: 'params', tempo, pitch });
+      eng.onMsg({ type: 'play', playing: true });
+      // render two cycles and keep the second one: it is already in steady state
+      const total = 2 * out + B, oL = new Float32Array(total), oR = new Float32Array(total);
+      for (let i = 0; i + B <= total; i += B) eng.render(oL.subarray(i, i + B), oR.subarray(i, i + B), B);
+      const rL = oL.slice(out, 2 * out), rR = oR.slice(out, 2 * out);
+      postMessage({ id, L: rL, R: rR }, [rL.buffer, rR.buffer]);
+    };`;
+  renderWorker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+  renderWorker.onmessage = e => { const r = pending.get(e.data.id); if (r) { pending.delete(e.data.id); r(e.data); } };
+  return renderWorker;
+}
+function renderVia(L, R, sr, tempo, pitch) {
+  return new Promise(res => {
+    const id = ++renderSeq;
+    pending.set(id, res);
+    const l = L.slice(), r = R.slice();
+    worker().postMessage({ id, L: l, R: r, sr, tempo, pitch }, [l.buffer, r.buffer]);
+  });
+}
+const toBuffer = (d, sr) => { const b = ctx.createBuffer(2, d.L.length, sr); b.copyToChannel(d.L, 0); b.copyToChannel(d.R, 1); return b; };
+async function getBuffer(p, part, shift, tempo, src) {
+  const key = p.id + '|' + part + '|' + shift + '|' + tempo;
+  if (cache.has(key)) return cache.get(key);
+  const prom = (async () => {
+    if (shift === 0 && tempo === 1) return toBuffer(src, src.sr);
+    const r = await renderVia(src.L, src.R, src.sr, tempo, Math.pow(2, shift / 12));
+    return toBuffer(r, src.sr);
+  })();
+  cache.set(key, prom);
+  return prom;
+}
+
+// ---------- practice session ----------
+async function start() {
+  const p = current();
+  if (!p) return;
+  if (!ctx) {
+    ctx = new (window.AudioContext || window.webkitAudioContext)({ latencyHint: 'playback' });
+    harmGain = ctx.createGain(); drumGain = ctx.createGain();
+    harmGain.connect(ctx.destination); drumGain.connect(ctx.destination);
+  }
+  if (ctx.state === 'suspended') await ctx.resume();
+  applyVolumes();
+  setStatus('Carregant el patró…');
+  let harm, drums;
+  try {
+    harm = await idb.get('pat:' + p.id + ':harm');
+    drums = await idb.get('pat:' + p.id + ':drums');
+  } catch (e) { harm = null; }
+  if (!harm) { setStatus('No trobo l\'àudio d\'aquest patró. Torna a desar-lo des del Practice Player (botó P).'); return; }
+  const orders = Object.keys(ORDERS), order = orders[Math.floor(Math.random() * orders.length)];
+  const tempo = +$('#speed').value, reps = +$('#reps').value;
+  const keys = buildKeys(p.key.pc, order);
+  session = { p, harm, drums, keys, order, tempo, reps, sources: [], cycleDur: p.dur / tempo, plan: [], startAt: 0, scheduled: 0, timer: 0, raf: 0 };
+  for (let k = 0; k < keys.length; k++) for (let r = 0; r < reps; r++) session.plan.push(k);
+  $('#startBtn').textContent = 'Stop'; $('#startBtn').classList.add('stop');
+  renderProgress();
+  setStatus('Preparant la primera tonalitat…');
+  // first two keys before starting, the rest while playing
+  await ensureKey(0); ensureKey(1);
+  if (!session) return;
+  session.startAt = ctx.currentTime + 0.25;
+  setStatus('Ordre de les tonalitats: ' + ORDERS[order] + ' · ' + keys.length + ' tonalitats');
+  session.timer = setInterval(schedule, 120);
+  schedule();
+  session.raf = requestAnimationFrame(tick);
+}
+function ensureKey(k) {
+  const s = session; if (!s || k >= s.keys.length) return Promise.resolve();
+  const shift = shiftFor(s.keys[k].pc, s.p.key.pc);
+  const tasks = [getBuffer(s.p, 'harm', shift, s.tempo, s.harm)];
+  if (s.drums) tasks.push(getBuffer(s.p, 'drums', 0, s.tempo, s.drums));
+  return Promise.all(tasks);
+}
+async function schedule() {
+  const s = session; if (!s || s.busy) return;
+  s.busy = true;
+  try {
+    while (s.scheduled < s.plan.length) {
+      const at = s.startAt + s.scheduled * s.cycleDur;
+      if (at > ctx.currentTime + 1.2) break;
+      const k = s.plan[s.scheduled];
+      const shift = shiftFor(s.keys[k].pc, s.p.key.pc);
+      const hk = s.p.id + '|harm|' + shift + '|' + s.tempo, dk = s.p.id + '|drums|0|' + s.tempo;
+      const hb = await cache.get(hk), db = s.drums ? await cache.get(dk) : null;
+      if (session !== s) return;
+      if (!hb) { ensureKey(k); break; }
+      let when = s.startAt + s.scheduled * s.cycleDur;
+      if (when < ctx.currentTime + 0.02) {         // rendering was late: shift the rest of the plan
+        s.startAt += ctx.currentTime + 0.05 - when; when = s.startAt + s.scheduled * s.cycleDur;
+      }
+      for (const [buf, gain] of [[hb, harmGain], [db, drumGain]]) {
+        if (!buf) continue;
+        const src = ctx.createBufferSource(); src.buffer = buf; src.connect(gain);
+        src.start(when); src.stop(when + s.cycleDur + 0.01);
+        s.sources.push(src);
+      }
+      s.scheduled++;
+      ensureKey(k + 1); ensureKey(k + 2);
+    }
+    s.sources = s.sources.filter(x => x.buffer && true);
+    if (s.scheduled >= s.plan.length && ctx.currentTime > s.startAt + s.plan.length * s.cycleDur + 0.1) finish();
+  } finally { s.busy = false; }
+}
+function tick() {
+  const s = session; if (!s) return;
+  s.raf = requestAnimationFrame(tick);
+  const el = ctx.currentTime - s.startAt;
+  const ci = Math.max(0, Math.min(s.plan.length - 1, Math.floor(el / s.cycleDur)));
+  const k = s.plan[ci], step = s.keys[k], p = s.p;
+  const posInLoop = el < 0 ? -1 : (el - ci * s.cycleDur) * s.tempo;
+  let hi = -1;
+  (p.chords || []).forEach((c, i) => { if (posInLoop >= c.t && posInLoop < c.t + c.d) hi = i; });
+  if (s.lastK !== k || s.lastHi !== hi) {
+    s.lastK = k; s.lastHi = hi;
+    $('#nowLbl').textContent = 'Tonalitat ' + (k + 1) + ' de ' + s.keys.length;
+    $('#keyName').textContent = keyLabel(step, p.key.minor);
+    const rep = ci - s.plan.indexOf(k) + 1;
+    $('#meta').textContent = 'Ordre: ' + ORDERS[s.order] + ' · repetició ' + rep + ' de ' + s.reps;
+    chipsFor($('#chords'), p, step, true, hi);
+    const nk = s.keys[k + 1];
+    if (nk) { $('#nextKey').textContent = keyLabel(nk, p.key.minor); chipsFor($('#nextChords'), p, nk, false); }
+    else { $('#nextKey').textContent = 'Fi'; $('#nextChords').innerHTML = ''; }
+    renderProgress(k);
+  }
+}
+function renderProgress(k = -1) {
+  const s = session, box = $('#progress');
+  box.innerHTML = '';
+  if (!s) return;
+  s.keys.forEach((_, i) => { const d = document.createElement('span'); if (i < k) d.className = 'done'; if (i === k) d.className = 'cur'; box.append(d); });
+}
+function finish() {
+  const n = session ? session.keys.length : 0;
+  stop();
+  setStatus('Fet! Has tocat el patró en ' + n + ' tonalitats.');
+}
+function stop() {
+  const s = session; if (!s) return;
+  session = null;
+  clearInterval(s.timer); cancelAnimationFrame(s.raf);
+  const now = ctx.currentTime;
+  for (const src of s.sources) { try { src.stop(now + 0.02); } catch (e) {} }
+  $('#startBtn').textContent = 'Start'; $('#startBtn').classList.remove('stop');
+  setStatus('');
+  renderIdle();
+}
+function applyVolumes() {
+  if (!ctx) return;
+  harmGain.gain.setTargetAtTime(+$('#harmVol').value, ctx.currentTime, 0.03);
+  drumGain.gain.setTargetAtTime(+$('#drumVol').value, ctx.currentTime, 0.03);
+}
+
+// ---------- wiring ----------
+$('#startBtn').onclick = () => { if (session) stop(); else start(); };
+$('#harmVol').oninput = $('#drumVol').oninput = () => { applyVolumes(); store.set('pat-vol', [+$('#harmVol').value, +$('#drumVol').value]); };
+$('#speed').oninput = () => { $('#speedV').textContent = Math.round($('#speed').value * 100) + '%'; store.set('pat-speed', +$('#speed').value); };
+$('#inst').onchange = () => { store.set('pat-inst', $('#inst').value); if (session) { session.lastK = null; } else renderIdle(); };
+$('#reps').onchange = () => store.set('pat-reps', $('#reps').value);
+document.addEventListener('keydown', e => { if (e.code === 'Space' && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); $('#startBtn').click(); } });
+// new patterns saved by the Practice Player (another tab of the app) show up at once
+addEventListener('storage', e => { if (e.key === PAT_KEY) { patterns = readPatterns(); renderLib(); if (!session) renderIdle(); } });
+addEventListener('focus', () => { patterns = readPatterns(); renderLib(); if (!session) renderIdle(); });
+
+(function init() {
+  fillOrigKey();
+  const v = store.get('pat-vol', null); if (v) { $('#harmVol').value = v[0]; $('#drumVol').value = v[1]; }
+  const sp = store.get('pat-speed', null); if (sp) { $('#speed').value = sp; }
+  $('#speedV').textContent = Math.round($('#speed').value * 100) + '%';
+  const ins = store.get('pat-inst', null); if (ins != null) $('#inst').value = ins;
+  const rp = store.get('pat-reps', null); if (rp != null) $('#reps').value = rp;
+  if (sel && !current()) sel = null;
+  if (!sel && patterns.length) sel = patterns[patterns.length - 1].id;
+  renderLib(); renderIdle();
+})();
+</script>
+</body>
+</html>
