@@ -175,6 +175,12 @@
         <label>Velocitat <span id="speedV">100%</span>
           <input type="range" id="speed" min="0.5" max="1.2" step="0.05" value="1">
         </label>
+        <label>Tipus d'acompanyament
+          <select id="accomp">
+            <option value="orig">Original de la gravació (transposat)</option>
+            <option value="synth">Sintètic: piano i baix generats (bateria original)</option>
+          </select>
+        </label>
         <label>Acompanyament
           <input type="range" id="harmVol" min="0" max="1.5" step="0.01" value="1">
         </label>
@@ -1073,6 +1079,129 @@ async function getBuffer(p, part, shift, tempo, src) {
   return prom;
 }
 
+// ---------- synthetic accompaniment: electric piano + walking bass from the chord chart ----------
+// intervals of a chord symbol: 3rd, 5th, 7th (or 6th) and tensions
+function chordTones(q) {
+  q = (q || '').replace(/♭/g, 'b').replace(/♯/g, '#').replace(/Δ/g, 'maj').replace(/ø/g, 'm7b5').replace(/-/g, 'm');
+  const minor = /^m(?!aj)/.test(q) || /^min/.test(q);
+  const dim = /dim|°|o7/.test(q);
+  const half = /m7b5/.test(q);
+  let third = minor || dim || half ? 3 : 4, fifth = 7, seventh = null;
+  if (/sus4|sus(?!2)/.test(q)) third = 5; else if (/sus2/.test(q)) third = 2;
+  if (dim || half || /b5/.test(q)) fifth = 6;
+  if (/aug|\+|#5/.test(q)) fifth = 8;
+  if (/maj7|maj9|maj13|M7|maj/.test(q)) seventh = 11;
+  else if (dim && /7/.test(q) && !half) seventh = 9;
+  else if (/7|9|11|13/.test(q)) seventh = 10;
+  else if (/6/.test(q)) seventh = 9;
+  const ext = [];
+  if (/b9/.test(q)) ext.push(13); else if (/#9/.test(q)) ext.push(15); else if (/9|11|13/.test(q) || seventh != null) ext.push(14);
+  if (/#11/.test(q)) ext.push(18);
+  if (/b13/.test(q)) ext.push(20); else if (/13/.test(q)) ext.push(21);
+  return { third, fifth, seventh, ext, minor: third === 3 };
+}
+// rootless 4-note voicing near the previous one (smooth voice leading), lowest note ~ E3..D4
+function voiceChord(root, q, prev) {
+  const t = chordTones(q);
+  let pcs = [t.third, t.seventh != null ? t.seventh : t.fifth, (t.ext[0] != null ? t.ext[0] : 14) % 12, t.seventh != null ? (t.ext[1] != null ? t.ext[1] % 12 : t.fifth) : 0];
+  pcs = [...new Set(pcs.map(i => (root + i) % 12))];
+  let best = null;
+  for (let rot = 0; rot < pcs.length; rot++) {
+    const order = pcs.slice(rot).concat(pcs.slice(0, rot));
+    for (let base = 50; base <= 62; base++) {
+      if (base % 12 !== order[0]) continue;
+      const notes = [base];
+      for (let i = 1; i < order.length; i++) { let m = notes[i - 1] + 1; while (m % 12 !== order[i]) m++; notes.push(m); }
+      if (notes[notes.length - 1] > 76) continue;
+      const cost = prev ? notes.reduce((c, n, i) => c + Math.abs(n - (prev[i] != null ? prev[i] : prev[prev.length - 1])), 0) : Math.abs(base - 55) * 2;
+      if (!best || cost < best.cost) best = { notes, cost };
+    }
+  }
+  return best ? best.notes : pcs.map(pc => 52 + ((pc - 52) % 12 + 12) % 12);
+}
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+function epNote(ac, dest, t, midi, dur, vel, end) {
+  if (t >= end) return;
+  const f = mtof(midi), car = ac.createOscillator(), mod = ac.createOscillator(), mg = ac.createGain(), amp = ac.createGain();
+  const tine = ac.createOscillator(), tg = ac.createGain();
+  car.frequency.value = f; mod.frequency.value = f; tine.frequency.value = f * 14;
+  mg.gain.setValueAtTime(f * 2.2, t); mg.gain.exponentialRampToValueAtTime(f * 0.25, t + 0.9);
+  tg.gain.setValueAtTime(f * 0.6, t); tg.gain.exponentialRampToValueAtTime(1, t + 0.08);
+  mod.connect(mg); mg.connect(car.frequency); tine.connect(tg); tg.connect(car.frequency);
+  amp.gain.setValueAtTime(0, t); amp.gain.linearRampToValueAtTime(vel, t + 0.004);
+  amp.gain.setTargetAtTime(vel * 0.35, t + 0.004, 0.45);
+  const off = Math.min(t + dur, end - 0.01);
+  amp.gain.setTargetAtTime(0, off, 0.07);
+  car.connect(amp); amp.connect(dest);
+  for (const o of [car, mod, tine]) { o.start(t); o.stop(Math.min(end, off + 0.6)); }
+}
+function bassNote(ac, dest, t, midi, dur, vel, end) {
+  if (t >= end) return;
+  const f = mtof(midi), o1 = ac.createOscillator(), o2 = ac.createOscillator(), lp = ac.createBiquadFilter(), amp = ac.createGain();
+  o1.type = 'triangle'; o1.frequency.value = f; o2.type = 'sine'; o2.frequency.value = f;
+  lp.type = 'lowpass'; lp.frequency.setValueAtTime(1400, t); lp.frequency.exponentialRampToValueAtTime(500, t + 0.25); lp.Q.value = 0.7;
+  amp.gain.setValueAtTime(0, t); amp.gain.linearRampToValueAtTime(vel, t + 0.006);
+  amp.gain.setTargetAtTime(vel * 0.55, t + 0.006, 0.18);
+  const off = Math.min(t + dur * 0.92, end - 0.01);
+  amp.gain.setTargetAtTime(0, off, 0.03);
+  o1.connect(lp); o2.connect(lp); lp.connect(amp); amp.connect(dest);
+  for (const o of [o1, o2]) { o.start(t); o.stop(Math.min(end, off + 0.3)); }
+}
+// one cycle of the pattern in a key: rendered twice and the second cycle kept, so the
+// notes that ring over the loop point are already there (seamless loop)
+async function renderSynth(p, shift, tempo) {
+  const sr = p.sr || 44100, cyc = p.dur / tempo, len = Math.round(cyc * sr);
+  const ac = new OfflineAudioContext(2, 2 * len, sr);
+  const beats = (p.bars || 4) * 4, bd = cyc / beats;
+  const placed = beatsOf(p).map((c, k, arr) => ({ ch: p.chords[c.i], b0: c.beat, b1: k + 1 < arr.length ? arr[k + 1].beat : beats }));
+  const epBus = ac.createGain(); epBus.gain.value = 0.12;
+  const pan = ac.createStereoPanner(); pan.pan.value = -0.15; epBus.connect(pan); pan.connect(ac.destination);
+  const bassBus = ac.createGain(); bassBus.gain.value = 0.22; bassBus.connect(ac.destination);
+  let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const end = 2 * cyc;
+  let prevVoicing = null;
+  for (let cycle = 0; cycle < 2; cycle++) {
+    const off = cycle * cyc;
+    placed.forEach((c, k) => {
+      const root = mod12(c.ch.root + shift), q = c.ch.q;
+      const v = voiceChord(root, q, prevVoicing); prevVoicing = v;
+      const segLen = c.b1 - c.b0;
+      // comping: on the chord, then a Charleston-like push in longer chords
+      const hits = [[c.b0, Math.min(segLen, 1.6), 0.9]];
+      for (let b = c.b0 + 2; b < c.b1; b += 2) {
+        const pos = b - 0.5 + (rnd() < 0.5 ? 0 : 0.5);
+        if (pos > c.b0 + 0.5 && pos < c.b1 - 0.2) hits.push([pos, 0.6 + rnd() * 0.6, 0.6 + rnd() * 0.2]);
+      }
+      for (const [b, d, vel] of hits) v.forEach((n, i) => epNote(ac, epBus, off + b * bd + i * 0.004, n, d * bd, vel * 0.22, end));
+      // walking bass: root, chord tones, chromatic approach to the next chord's root
+      const t = chordTones(q);
+      const nextRoot = mod12(placed[(k + 1) % placed.length].ch.root + shift);
+      let bassRoot = 28 + mod12(root - 4);              // E1..D#2
+      if (bassRoot < 31) bassRoot += 12;
+      const tones = [0, t.fifth, 12, t.third + 12, t.seventh != null ? t.seventh : t.fifth];
+      for (let b = c.b0; b < c.b1; b++) {
+        let m;
+        if (b === c.b0) m = bassRoot;
+        else if (b === c.b1 - 1) {
+          const target = 28 + mod12(nextRoot - 4) + (28 + mod12(nextRoot - 4) < 31 ? 12 : 0);
+          m = target + (rnd() < 0.5 ? -1 : 1);
+        } else m = bassRoot + tones[1 + Math.floor(rnd() * (tones.length - 1))];
+        bassNote(ac, bassBus, off + b * bd, m, bd, 0.5, end);
+      }
+    });
+  }
+  const buf = await ac.startRendering();
+  const L = buf.getChannelData(0).slice(len, 2 * len), R = buf.getChannelData(1).slice(len, 2 * len);
+  const out = ctx.createBuffer(2, len, sr); out.copyToChannel(L, 0); out.copyToChannel(R, 1);
+  return out;
+}
+function synthTag(p) { const s = JSON.stringify([p.chords, p.bars || 4]); let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return 'synth' + (h >>> 0).toString(36); }
+function getSynth(p, tag, shift, tempo) {
+  const key = p.id + '|' + tag + '|' + shift + '|' + tempo;
+  if (!cache.has(key)) cache.set(key, renderSynth(p, shift, tempo));
+  return cache.get(key);
+}
+
 // ---------- practice session ----------
 async function start() {
   const p = current();
@@ -1095,7 +1224,8 @@ async function start() {
   const orders = Object.keys(ORDERS), order = orders[Math.floor(Math.random() * orders.length)];
   const tempo = +$('#speed').value, reps = +$('#reps').value;
   const keys = buildKeys(p.key.pc, order);
-  session = { p, harm, drums, sax, keys, order, tempo, reps, sources: [], cycleDur: p.dur / tempo, plan: [], startAt: 0, scheduled: 0, timer: 0, raf: 0 };
+  const synth = $('#accomp').value === 'synth';
+  session = { p, harm, drums, sax, synth, tag: synth ? synthTag(p) : 'harm', keys, order, tempo, reps, sources: [], cycleDur: p.dur / tempo, plan: [], startAt: 0, scheduled: 0, timer: 0, raf: 0 };
   for (let k = 0; k < keys.length; k++) for (let r = 0; r < reps; r++) session.plan.push(k);
   $('#startBtn').textContent = 'Stop'; $('#startBtn').classList.add('stop');
   renderProgress();
@@ -1112,7 +1242,7 @@ async function start() {
 function ensureKey(k) {
   const s = session; if (!s || k >= s.keys.length) return Promise.resolve();
   const shift = shiftFor(s.keys[k].pc, s.p.key.pc);
-  const tasks = [getBuffer(s.p, 'harm', shift, s.tempo, s.harm)];
+  const tasks = [s.synth ? getSynth(s.p, s.tag, shift, s.tempo) : getBuffer(s.p, 'harm', shift, s.tempo, s.harm)];
   if (s.drums) tasks.push(getBuffer(s.p, 'drums', 0, s.tempo, s.drums));
   if (s.sax && $('#saxOn').checked) tasks.push(getBuffer(s.p, 'sax', shift, s.tempo, s.sax));
   return Promise.all(tasks);
@@ -1126,7 +1256,7 @@ async function schedule() {
       if (at > ctx.currentTime + 1.2) break;
       const k = s.plan[s.scheduled];
       const shift = shiftFor(s.keys[k].pc, s.p.key.pc);
-      const hk = s.p.id + '|harm|' + shift + '|' + s.tempo, dk = s.p.id + '|drums|0|' + s.tempo;
+      const hk = s.p.id + '|' + s.tag + '|' + shift + '|' + s.tempo, dk = s.p.id + '|drums|0|' + s.tempo;
       const hb = await cache.get(hk), db = s.drums ? await cache.get(dk) : null;
       // the sax joins as soon as its transposition is ready (it can be switched on while playing)
       const xk = s.p.id + '|sax|' + shift + '|' + s.tempo;
@@ -1272,6 +1402,7 @@ $('#harmVol').oninput = $('#drumVol').oninput = () => { applyVolumes(); store.se
 $('#speed').oninput = () => { $('#speedV').textContent = Math.round($('#speed').value * 100) + '%'; store.set('pat-speed', +$('#speed').value); };
 $('#inst').onchange = () => { store.set('pat-inst', $('#inst').value); if (session) { session.lastK = null; } else renderIdle(); };
 $('#reps').onchange = () => store.set('pat-reps', $('#reps').value);
+$('#accomp').onchange = () => { store.set('pat-accomp', $('#accomp').value); if (session) { stop(); start(); } };
 $('#bars').onchange = () => { const p = current(); if (!p) return; if (session) stop(); updatePattern(p.id, { bars: +$('#bars').value }); renderIdle(); };
 $('#saxOn').onchange = () => {
   store.set('pat-sax', $('#saxOn').checked); applyVolumes();
@@ -1291,6 +1422,7 @@ addEventListener('focus', () => { patterns = readPatterns(); renderLib(); if (!s
   const ins = store.get('pat-inst', null); if (ins != null) $('#inst').value = ins;
   const rp = store.get('pat-reps', null); if (rp != null) $('#reps').value = rp;
   fillBars();
+  const ac = store.get('pat-accomp', null); if (ac) $('#accomp').value = ac;
   $('#saxOn').checked = !!store.get('pat-sax', false);
   const sv = store.get('pat-saxvol', null); if (sv != null) $('#saxVol').value = sv;
   if (sel && !current()) sel = null;
