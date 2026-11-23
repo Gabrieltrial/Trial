@@ -67,7 +67,6 @@
   /* lead sheet: 4 bars per line on a staff, handwritten jazz chord symbols */
   .sheet { margin-top: auto; padding-top: 10px; display: flex; flex-direction: column; gap: 4px; text-align: left; }
   .line { position: relative; height: 100px; --row: 0px; }
-  .line.tall { height: 136px; --row: 36px; }
   .line svg { position: absolute; left: 0; right: 0; bottom: 6px; width: 100%; height: 46px; overflow: visible; }
   .line svg .st { stroke: #8f86a3; stroke-width: 1; vector-effect: non-scaling-stroke; }
   .line svg .bl { stroke: #cfc6de; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
@@ -77,14 +76,12 @@
   .line svg .ph { stroke: var(--gold); stroke-width: 2; vector-effect: non-scaling-stroke; }
   .line svg .sim { fill: #cfc6de; font: 700 26px Kalam, cursive; }
   .cs { position: absolute; top: var(--row); font-family: Kalam, "Comic Sans MS", cursive; font-weight: 700; font-size: 40px; line-height: 1.05; color: #f3eefb; white-space: nowrap; padding: 2px 6px; margin-left: -6px; border-radius: 8px; letter-spacing: .01em; }
-  .cs.up { top: 0; }
   .cs sup { font-size: .68em; vertical-align: .5em; margin-left: 2px; font-weight: 700; }
   .cs.on { background: var(--gold); color: var(--gold-ink); }
   .cs.edit { cursor: text; }
   .cs.edit:hover { outline: 1px dashed var(--gold); }
   .cs input { width: 7em; font: inherit; color: var(--gold-ink); background: var(--gold); border: 0; border-radius: 6px; padding: 0 4px; outline: none; }
   .sheet.small .line { height: 50px; }
-  .sheet.small .line.tall { height: 66px; --row: 16px; }
   .sheet.small .line svg { height: 22px; bottom: 3px; }
   .sheet.small .cs { font-size: 17px; padding: 1px 3px; margin-left: -3px; }
   .sheet.small .line svg .sl { stroke-width: 2.5; }
@@ -872,10 +869,12 @@ async function syncNow() {
 
 // ---------- display: lead sheet ----------
 const pretty = t => t.replace(/b/g, '♭').replace(/#/g, '♯');
+// jazz notation: maj7 -> Δ (maj9 -> Δ9, maj7#11 -> Δ♯11), written as a superscript
 function chordHtml(label) {
   const m = /^([A-G][b#]?)(.*)$/.exec(label);
   if (!m) return label;
-  return pretty(m[1]) + (m[2] ? '<sup>' + pretty(m[2]).replace(/maj/g, 'maj') + '</sup>' : '');
+  const q = m[2].replace(/maj7/g, 'Δ').replace(/maj(?=\d)/g, 'Δ').replace(/^maj$/, 'Δ').replace(/^M7/, 'Δ');
+  return pretty(m[1]) + (q ? '<sup>' + pretty(q) + '</sup>' : '');
 }
 // chords placed on beats: [{i, beat}] (i = index in p.chords)
 function beatsOf(p) {
@@ -889,77 +888,78 @@ function beatsOf(p) {
   });
   return out;
 }
-// box: container; step: key; opts: { small, at (current beat, float), editable }
+// box: container; step: key; opts: { small, at (current beat, float), editable, perLine }
+// 4 bars per line; if the chords of a line cannot fit side by side even a bit smaller,
+// the sheet is drawn with 2 (wider) bars per line instead — symbols never go on top of each other.
 function leadSheet(box, p, step, opts = {}) {
+  const perLine = opts.perLine || 4;
   box.innerHTML = '';
   const bars = p.bars || 4, placed = beatsOf(p), shift = shiftFor(step.pc, p.key.pc);
-  const W = 1000, H = 46, gap = H / 4, barW = W / 4;
-  let hiIdx = -1;
+  const W = 1000, H = 46, gap = H / 4, barW = W / perLine, bpl = perLine * 4;
+  let hiIdx = -1, crowded = false;
   if (opts.at != null && opts.at >= 0) for (const c of placed) if (c.beat <= opts.at) hiIdx = c.i;
-  for (let line = 0; line * 4 < bars; line++) {
+  const slashAt = (bar, q) => (bar % perLine) * barW + (q + 0.5) * barW / 4 + (bar === 0 ? 10 : 0);
+  for (let line = 0; line * perLine < bars; line++) {
     const el = document.createElement('div'); el.className = 'line';
     let g = '';
     for (let k = 0; k < 5; k++) g += `<line class="st" x1="0" x2="${W}" y1="${k * gap}" y2="${k * gap}"/>`;
-    const n = Math.min(4, bars - line * 4);
+    const n = Math.min(perLine, bars - line * perLine);
     for (let b = 0; b < n; b++) {
-      const bar = line * 4 + b, x0 = b * barW;
+      const bar = line * perLine + b, x0 = b * barW;
       // start of the loop: repeat sign ||:   end of the loop:  :||   otherwise a plain bar line
       if (bar === 0) g += `<line class="thick" x1="2" x2="2" y1="0" y2="${H}"/><line class="bl" x1="12" x2="12" y1="0" y2="${H}"/><circle class="dot" cx="22" cy="${1.5 * gap}" r="3"/><circle class="dot" cx="22" cy="${2.5 * gap}" r="3"/>`;
       else if (b === 0) g += `<line class="bl" x1="0" x2="0" y1="0" y2="${H}"/>`;
       const starts = placed.filter(c => Math.floor(c.beat / 4) === bar);
       if (!starts.length && bar > 0) g += `<text class="sim" x="${x0 + barW / 2}" y="${H / 2 + 9}" text-anchor="middle">%</text>`;
       else for (let q = 0; q < 4; q++) {                       // beat slashes
-        const x = x0 + (q + 0.5) * barW / 4 + (bar === 0 ? 10 : 0);
+        const x = slashAt(bar, q);
         g += `<line class="sl" x1="${x - 7}" x2="${x + 7}" y1="${2.6 * gap}" y2="${1.4 * gap}"/>`;
       }
       const xe = x0 + barW;
       if (bar === bars - 1) g += `<circle class="dot" cx="${xe - 22}" cy="${1.5 * gap}" r="3"/><circle class="dot" cx="${xe - 22}" cy="${2.5 * gap}" r="3"/><line class="bl" x1="${xe - 12}" x2="${xe - 12}" y1="0" y2="${H}"/><line class="thick" x1="${xe - 2}" x2="${xe - 2}" y1="0" y2="${H}"/>`;
-      else if (b === 3) g += `<line class="bl" x1="${W}" x2="${W}" y1="0" y2="${H}"/>`;
-      else g += `<line class="bl" x1="${xe}" x2="${xe}" y1="0" y2="${H}"/>`;
+      else g += `<line class="bl" x1="${Math.min(W, xe)}" x2="${Math.min(W, xe)}" y1="0" y2="${H}"/>`;
     }
-    if (opts.at != null && opts.at >= 0 && Math.floor(opts.at / 16) === line) {
-      const x = (opts.at - line * 16) / 16 * W;
+    if (opts.at != null && opts.at >= 0 && Math.floor(opts.at / bpl) === line) {
+      const bt = opts.at - line * bpl, bar = line * perLine + Math.floor(bt / 4), q = bt % 4;
+      // playhead: moves from the slash of a beat to the slash of the next one
+      const x = slashAt(bar, Math.floor(q)) + (q % 1) * barW / 4 - 7;
       g += `<line class="ph" x1="${x}" x2="${x}" y1="${-gap}" y2="${H + gap * 0.6}"/>`;
     }
     el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${g}</svg>`;
-    for (const c of placed.filter(c => Math.floor(c.beat / 16) === line)) {
+    for (const c of placed.filter(c => Math.floor(c.beat / bpl) === line)) {
       const cs = document.createElement('div');
       const lab = chordLabel(p.chords[c.i], shift, step, p.key.minor);
       cs.className = 'cs' + (c.i === hiIdx ? ' on' : '') + (opts.editable ? ' edit' : '');
-      const bb = c.beat - line * 16, barIn = Math.floor(bb / 4), q = bb % 4;
-      const slashX = barIn * barW + (q + 0.5) * barW / 4 + (Math.floor(c.beat / 4) === 0 ? 10 : 0) - 8;
-      cs.style.left = (slashX / W * 100) + '%';
+      // the symbol starts exactly at the slash of its beat
+      cs.style.left = ((slashAt(Math.floor(c.beat / 4), c.beat % 4) - 7) / W * 100) + '%';
       cs.innerHTML = chordHtml(lab);
       cs.dataset.label = lab;
       if (opts.editable) cs.onclick = () => editChord(cs, p, c.i);
       el.append(cs);
     }
     box.append(el);
-    fitLine(el);
+    if (!fitLine(el)) crowded = true;
   }
+  if (crowded && perLine > 1 && bars > 1) leadSheet(box, p, step, Object.assign({}, opts, { perLine: perLine === 4 ? 2 : 1 }));
 }
-// two chords close together must not overlap: shrink the line's symbols a little,
-// and if that is not enough lift every other crowded symbol to a second row
+// shrink the symbols of a line a little if two of them touch; false if they still do not fit
 function fitLine(el) {
   const cs = [...el.querySelectorAll('.cs')];
-  if (cs.length < 2 || !el.offsetWidth) return;
-  const gap = 6;
-  let worst = 1;
-  for (let i = 0; i + 1 < cs.length; i++) {
-    const room = cs[i + 1].offsetLeft - cs[i].offsetLeft - gap, need = cs[i].offsetWidth;
-    if (need > room) worst = Math.min(worst, room / need);
-  }
-  if (worst < 1) {
-    const f = Math.max(0.72, worst), base = parseFloat(getComputedStyle(cs[0]).fontSize);
-    cs.forEach(c => { c.style.fontSize = (base * f) + 'px'; });
-  }
-  let lifted = false;
-  for (let i = 0; i + 1 < cs.length; i++) {
-    const a = cs[i], b = cs[i + 1];
-    if (a.classList.contains('up')) continue;
-    if (a.offsetLeft + a.offsetWidth + gap > b.offsetLeft) { b.classList.add('up'); lifted = true; }
-  }
-  el.classList.toggle('tall', lifted);
+  if (cs.length < 2 || !el.offsetWidth) return true;
+  const gap = 1;
+  const worstRatio = () => {
+    let w = 1;
+    for (let i = 0; i + 1 < cs.length; i++) {
+      const room = cs[i + 1].offsetLeft - cs[i].offsetLeft - gap, need = cs[i].offsetWidth;
+      if (need > room) w = Math.min(w, room / need);
+    }
+    return w;
+  };
+  const r = worstRatio();
+  if (r >= 1) return true;
+  const base = parseFloat(getComputedStyle(cs[0]).fontSize), f = Math.max(0.78, r * 0.98);
+  cs.forEach(c => { c.style.fontSize = (base * f) + 'px'; });
+  return worstRatio() >= 1;
 }
 function editChord(el, p, i) {
   if (el.querySelector('input')) return;
