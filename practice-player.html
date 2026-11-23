@@ -1523,6 +1523,7 @@ function saxInfo(p) {
   const el = $('#saxInfo');
   let s;
   if (!audio) s = 'Load a track, then choose a level.';
+  else if (saxRun && saxRun.t && saxRun.t.isPattern) s = 'Pattern: separating loop ' + (saxRun.t.loopNo) + ' only' + (saxRun.ai ? ' (AI)' : '') + '… ' + Math.round((p == null ? saxRun.p || 0 : p) * 100) + '%';
   else if (saxRun && saxRun.t === audio) s = (saxRun.ai ? 'AI separation (Demucs)… ' : saxRun.kind === 'back' ? 'Separating the instruments… ' : 'Analysing the melody… ') + Math.round((p == null ? saxRun.p || 0 : p) * 100) + '%';
   else if (saxLevel === 0 && backLevel === 0) s = 'Sax focus keeps the sax. Backing removes it and keeps the ticked instruments.';
   else if (saxLevel > 0 && saxValid(audio) && audio.sax.ai) s = 'Sax focus ' + saxLevel + ' · AI separation';
@@ -1625,7 +1626,7 @@ function syncSax() {
   if (!ok) {
     if (!(saxRun && saxRun.t === t && saxRun.type === saxType() && saxRun.kind === want)) startDsp(t, want);
   } else {
-    if (saxRun) cancelSax();
+    if (saxRun && !(saxRun.t && saxRun.t.isPattern)) cancelSax();
     applyMix();
   }
   saxInfo();
@@ -2498,52 +2499,63 @@ function findPattern(lp) {
   const song = songTitle(audio);
   return readPatterns().find(p => p.song === song && Math.abs(p.start - lp.start) < 0.002 && Math.abs(p.end - lp.end) < 0.002) || null;
 }
-function patternAfterSep(t) {
-  if (pendingPattern && pendingPattern.t === t && backValid(t)) {
-    const i = pendingPattern.i; pendingPattern = null;
-    savePattern(i);
-  }
-}
 const PC_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 async function savePattern(i) {
   const t = audio, lp = loops[i];
   if (!t) { setStatus('Load a track first.', true); return; }
   if (lp.start == null || lp.end == null || lp.end - lp.start < 0.5) { setStatus('Set the start and the end of loop ' + (i + 1) + ' first (at least half a second).', true); return; }
-  if (!backValid(t)) {
-    pendingPattern = { t, i };
-    if (!(saxRun && saxRun.t === t && saxRun.kind === 'back')) startDsp(t, 'back');
-    setStatus('Separating the instruments to save the pattern (the sax is removed)…');
-    return;
+  const sr = t.buffer.sampleRate, s0 = Math.max(0, Math.round(lp.start * sr)), s1 = Math.min(t.buffer.length, Math.round(lp.end * sr));
+  // the whole song is already separated: use it
+  if (backValid(t)) { storePattern(i, t, t, s0, s1 - s0, lp.start, lp.end); return; }
+  // otherwise separate only the loop, with 1 s of context on each side (cut off afterwards)
+  const pad = Math.round(sr), a = Math.max(0, s0 - pad), b = Math.min(t.buffer.length, s1 + pad);
+  const ch = Math.min(2, t.buffer.numberOfChannels);
+  const buf = new AudioBuffer({ length: b - a, numberOfChannels: ch, sampleRate: sr });
+  for (let c = 0; c < ch; c++) buf.copyToChannel(t.buffer.getChannelData(c).subarray(a, b), c);
+  const seg = { name: t.name, buffer: buf, duration: (b - a) / sr, isPattern: true, loopNo: i + 1 };
+  pendingPattern = { seg, i, track: t, off: s0 - a, n: s1 - s0, start: lp.start, end: lp.end };
+  startDsp(seg, 'back');
+  setStatus('Separating loop ' + (i + 1) + ' only (the sax is removed) to save the pattern…');
+}
+function patternAfterSep(t) {
+  const pp = pendingPattern;
+  if (pp && pp.seg === t && backValid(t)) {
+    pendingPattern = null;
+    storePattern(pp.i, pp.track, t, pp.off, pp.n, pp.start, pp.end);
   }
+}
+// src: the track or the separated loop; off/n: the loop inside src (samples)
+async function storePattern(i, track, src, off, n, start, end) {
   try {
-    const sr = t.buffer.sampleRate, s0 = Math.max(0, Math.round(lp.start * sr)), s1 = Math.min(t.buffer.length, Math.round(lp.end * sr)), n = s1 - s0;
-    const X0 = t.buffer.getChannelData(0), X1 = t.buffer.numberOfChannels > 1 ? t.buffer.getChannelData(1) : X0;
-    const S = t.sax, B = t.back;
+    const sr = src.buffer.sampleRate;
+    const X0 = src.buffer.getChannelData(0), X1 = src.buffer.numberOfChannels > 1 ? src.buffer.getChannelData(1) : X0;
+    const S = src.sax, B = src.back;
     const SL = S.SL, SR = S.SR || S.SL, DL = B.DL, DR = B.DR || B.DL;
     const hL = new Float32Array(n), hR = new Float32Array(n), dL = new Float32Array(n), dR = new Float32Array(n), mono = new Float32Array(n);
     for (let k = 0; k < n; k++) {
-      const j = s0 + k;
+      const j = off + k;
       dL[k] = DL[j]; dR[k] = DR[j];
       hL[k] = X0[j] - SL[j] - DL[j]; hR[k] = X1[j] - SR[j] - DR[j];
       // chords are detected on the mix without drums: removing the sax as well takes chord tones with it
       mono[k] = 0.5 * (X0[j] - DL[j] + X1[j] - DR[j]);
     }
     const an = analyzeChords(mono, sr);
-    const song = songTitle(t);
+    const song = songTitle(track);
     const list = readPatterns();
-    const old = list.findIndex(p => p.song === song && Math.abs(p.start - lp.start) < 0.002 && Math.abs(p.end - lp.end) < 0.002);
+    const old = list.findIndex(p => p.song === song && Math.abs(p.start - start) < 0.002 && Math.abs(p.end - end) < 0.002);
     const id = old >= 0 ? list[old].id : uid();
     await idb.put('pat:' + id + ':harm', { sr, L: hL, R: hR });
     await idb.put('pat:' + id + ':drums', { sr, L: dL, R: dR });
     const entry = {
-      id, song, name: 'Loop ' + (i + 1) + ' · ' + fmt(lp.start) + '–' + fmt(lp.end),
-      start: lp.start, end: lp.end, dur: n / sr, sr,
+      id, song, name: 'Loop ' + (i + 1) + ' · ' + fmt(start) + '–' + fmt(end),
+      start, end, dur: n / sr, sr,
       key: an.key, chords: an.chords, method: S.ai ? 'ai' : 'classic', created: Date.now()
     };
     if (old >= 0) list[old] = Object.assign(list[old], entry, { chords: list[old].edited ? list[old].chords : entry.chords, key: list[old].edited ? list[old].key : entry.key });
     else list.push(entry);
     writePatterns(list);
-    refreshLoop(i);
+    if (audio === track) refreshLoop(i);
+    saxInfo();
     const names = an.chords.map(c => PC_NAMES[c.root] + c.q).join(' · ');
     setStatus('Pattern saved in "' + song + '": ' + names + ' (key ' + PC_NAMES[an.key.pc] + (an.key.minor ? 'm' : '') + '). Open Pattern Practice to play it in every key.');
   } catch (e) {
