@@ -76,6 +76,7 @@
   .line svg .stem { stroke: #f3eefb; stroke-width: 1.4; }
   .line svg .flag, .line svg .tie { fill: none; stroke: #f3eefb; stroke-width: 1.6; stroke-linecap: round; }
   .line svg .ledger { stroke: #cfc6de; stroke-width: 1.2; }
+  .line svg .beam { fill: #f3eefb; }
   .line svg .acc { fill: #f3eefb; font: 700 16px "Noto Music", "Apple Symbols", "Segoe UI Symbol", serif; }
   .line svg .rest { fill: #cfc6de; stroke: #cfc6de; }
   .line svg .clef { fill: #e9e2f3; font: 44px "Noto Music", "Apple Symbols", "Segoe UI Symbol", serif; }
@@ -145,7 +146,7 @@
       <span id="diskState"></span>
       <button id="exportBtn" title="Desa tota la llista de patrons (amb l'àudio) en un fitxer, on vulguis">Desa la llista…</button>
       <button id="importBtn" title="Afegeix els patrons d'una llista desada">Carrega una llista…</button>
-      <button id="mp3Btn" title="Grava l'àudio original de cada patró en MP3 (P<número>-<tema>.mp3) a la carpeta que triïs">Grava MP3…</button>
+      <button id="mp3Btn" title="Grava en MP3 (P<número>-<tema>.mp3), a la carpeta que triïs, l'àudio original dels patrons que encara no s'han gravat: amb el saxo i a velocitat normal">Grava MP3…</button>
       <button id="clearBtn" class="danger" title="Esborra tots els patrons">Buida la llista</button>
       <input type="file" id="importFile" accept=".json,application/json" hidden>
     </div>
@@ -1291,6 +1292,19 @@ function leadSheet(box, p, step, opts = {}) {
       g += `<line class="ph" x1="${x}" x2="${x}" y1="${topM - gap}" y2="${yBot + gap * 0.6}"/>`;
     }
     el.innerHTML = `<svg width="${W}" height="${svgH}" viewBox="0 0 ${W} ${svgH}">${g}</svg>`;
+    // the treble clef glyph differs between fonts: measure it and fit it so that it spans from
+    // ~1.7 spaces below the staff to ~2.1 above it (its curl then wraps the G line)
+    const clef = el.querySelector('.clef');
+    if (clef) {
+      try {
+        const bb = clef.getBBox();
+        if (bb.height > 0) {
+          const top = topM - 2.1 * gap, bottom = yBot + 1.7 * gap, sc = (bottom - top) / bb.height;
+          const x0 = +clef.getAttribute('x');
+          clef.setAttribute('transform', `translate(${x0} ${top}) scale(${sc}) translate(${-bb.x} ${-bb.y})`);
+        }
+      } catch (e) {}
+    }
     for (const c of placed.filter(c => Math.floor(c.beat / (perLine * 4)) === line)) {
       const cs = document.createElement('div');
       const lab = chordLabel(p.chords[c.i], shift, step, p.key.minor);
@@ -1342,9 +1356,37 @@ function barNotes(bar, wr, xAt, yOf, gap, k, at, sig) {
   let g = '';
   const accState = {};
   const rx = gap * 0.62, ry = gap * 0.45;
+  // eighths in a row are beamed, in groups of up to 4 (beats 1-2 and 3-4), as in jazz charts
+  pieces.forEach(pc => { pc.x = xAt(bar, pc.pos) + 6 * k; pc.y = yOf(pc.n.step); });
+  const groups = [];
+  for (let i = 0; i < pieces.length; i++) {
+    const pc = pieces[i];
+    if (pc.v !== 1) continue;
+    const last = groups[groups.length - 1], prev = last && last[last.length - 1];
+    if (prev && prev.v === 1 && prev.pos + 1 === pc.pos && Math.floor(prev.pos / 4) === Math.floor(pc.pos / 4)) last.push(pc);
+    else groups.push([pc]);
+  }
+  for (const grp of groups) {
+    if (grp.length < 2) continue;
+    const avg = grp.reduce((t, p) => t + p.n.step, 0) / grp.length, up = avg < 34;
+    const sx = p => up ? p.x + rx - 0.6 : p.x - rx + 0.6;
+    const a = grp[0], z = grp[grp.length - 1], len = 3.3 * gap;
+    let y1 = up ? a.y - len : a.y + len, y2 = up ? z.y - len : z.y + len;
+    const maxSlope = gap * 0.9;                       // keep the beam gently sloped
+    if (Math.abs(y2 - y1) > maxSlope) y2 = y1 + Math.sign(y2 - y1) * maxSlope;
+    const yAt = x => y1 + (y2 - y1) * (x - sx(a)) / ((sx(z) - sx(a)) || 1);
+    // every stem at least 2.5 spaces long: move the beam outwards if needed
+    let push = 0;
+    for (const p of grp) { const d = up ? (p.y - yAt(sx(p))) : (yAt(sx(p)) - p.y); push = Math.max(push, 2.5 * gap - d); }
+    y1 += up ? -push : push; y2 += up ? -push : push;
+    for (const p of grp) p.beam = { up, sx: sx(p) };
+    for (const p of grp) p.beam.end = y1 + (y2 - y1) * (p.beam.sx - sx(a)) / ((sx(z) - sx(a)) || 1);
+    const th = 0.5 * gap * (up ? 1 : -1);
+    g += `<path class="beam" d="M${sx(a)} ${y1} L${sx(z)} ${y2} L${sx(z)} ${y2 + th} L${sx(a)} ${y1 + th} Z"/>`;
+  }
   let prevHead = null;
   for (const pc of pieces) {
-    const x = xAt(bar, pc.pos) + 6 * k, y = yOf(pc.n.step), up = pc.n.step < 34;
+    const x = pc.x, y = pc.y, up = pc.beam ? pc.beam.up : pc.n.step < 34;
     const hl = at != null && at >= 0 && at * 2 >= pc.n.s && at * 2 < pc.n.e;
     let h = '';
     // ledger lines
@@ -1361,9 +1403,9 @@ function barNotes(bar, wr, xAt, yOf, gap, k, at, sig) {
     const open = pc.v >= 4;
     h += `<ellipse class="nh${open ? ' open' : ''}" cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" transform="rotate(-20 ${x} ${y})"/>`;
     if (pc.v !== 8) {
-      const sx = up ? x + rx - 0.6 : x - rx + 0.6, sy = up ? y - 3.4 * gap : y + 3.4 * gap;
+      const sx = up ? x + rx - 0.6 : x - rx + 0.6, sy = pc.beam ? pc.beam.end : (up ? y - 3.4 * gap : y + 3.4 * gap);
       h += `<line class="stem" x1="${sx}" x2="${sx}" y1="${y}" y2="${sy}"/>`;
-      if (pc.v === 1) h += up
+      if (pc.v === 1 && !pc.beam) h += up
         ? `<path class="flag" d="M${sx} ${sy} q ${gap * 0.9} ${gap * 0.9} ${gap * 0.5} ${gap * 2.2}"/>`
         : `<path class="flag" d="M${sx} ${sy} q ${gap * 0.9} ${-gap * 0.9} ${gap * 0.5} ${-gap * 2.2}"/>`;
     }
@@ -2048,9 +2090,12 @@ async function chooseTarget() {
     await new Promise(r => setTimeout(r, 400));
   } };
 }
+// only the patterns not recorded before; always the original audio (with the sax, normal speed)
 async function saveMp3s() {
-  const list = readPatterns().slice().sort((a, b) => (a.num || 0) - (b.num || 0));
-  if (!list.length) { setStatus('No hi ha cap patró per gravar.'); return; }
+  const all = readPatterns().slice().sort((a, b) => (a.num || 0) - (b.num || 0));
+  if (!all.length) { setStatus('No hi ha cap patró per gravar.'); return; }
+  const list = all.filter(p => !p.mp3At);
+  if (!list.length) { setStatus('Tots els patrons ja estaven gravats en MP3 (' + all.length + ').'); return; }
   let target;
   try { target = await chooseTarget(); } catch (e) { setStatus('No s\'ha pogut triar la carpeta: ' + e.message); return; }
   if (!target) { setStatus(''); return; }
@@ -2064,10 +2109,11 @@ async function saveMp3s() {
     const n = parts[0].L.length, L = new Float32Array(n), R = new Float32Array(n);
     for (const a of parts) for (let i = 0; i < n; i++) { L[i] += a.L[i] || 0; R[i] += a.R[i] || 0; }
     const blob = await encodeMp3(L, R, parts[0].sr || p.sr || 44100, 192);
-    try { await target.write(mp3Name(p), blob); done++; }
+    try { await target.write(mp3Name(p), blob); done++; updatePattern(p.id, { mp3At: Date.now() }); }
     catch (e) { setStatus('Error en desar ' + mp3Name(p) + ': ' + e.message); return; }
   }
-  setStatus(done + ' MP3 desats a ' + target.label + '.');
+  const before = all.length - list.length;
+  setStatus(done + ' MP3 nous desats a ' + target.label + (before ? ' (' + before + ' ja estaven gravats)' : '') + '.');
 }
 $('#mp3Btn').onclick = saveMp3s;
 
