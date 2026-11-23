@@ -69,7 +69,19 @@
   /* lead sheet: 4 bars per line on a staff, handwritten jazz chord symbols */
   .sheet { margin-top: auto; padding-top: 10px; display: flex; flex-direction: column; gap: 4px; text-align: left; }
   .line { position: relative; height: 100px; --row: 0px; }
-  .line svg { position: absolute; left: 0; right: 0; bottom: 6px; width: 100%; height: 46px; overflow: visible; }
+  .line svg { position: absolute; left: 0; top: 46px; overflow: visible; }
+  .sheet.small .line svg { top: 22px; }
+  .line svg .nh { fill: #f3eefb; }
+  .line svg .nh.open { fill: none; stroke: #f3eefb; stroke-width: 1.6; }
+  .line svg .stem { stroke: #f3eefb; stroke-width: 1.4; }
+  .line svg .flag, .line svg .tie { fill: none; stroke: #f3eefb; stroke-width: 1.6; stroke-linecap: round; }
+  .line svg .ledger { stroke: #cfc6de; stroke-width: 1.2; }
+  .line svg .acc { fill: #f3eefb; font: 700 16px "Noto Music", "Apple Symbols", "Segoe UI Symbol", serif; }
+  .line svg .rest { fill: #cfc6de; stroke: #cfc6de; }
+  .line svg .clef { fill: #e9e2f3; font: 44px "Noto Music", "Apple Symbols", "Segoe UI Symbol", serif; }
+  .line svg .hl .nh, .line svg .hl .acc { fill: var(--gold); }
+  .line svg .hl .nh.open { fill: none; stroke: var(--gold); }
+  .line svg .hl .stem, .line svg .hl .flag { stroke: var(--gold); }
   .line svg .st { stroke: #8f86a3; stroke-width: 1; vector-effect: non-scaling-stroke; }
   .line svg .bl { stroke: #cfc6de; stroke-width: 1.4; vector-effect: non-scaling-stroke; }
   .line svg .thick { stroke: #cfc6de; stroke-width: 4; vector-effect: non-scaling-stroke; }
@@ -84,7 +96,8 @@
   .cs.edit:hover { outline: 1px dashed var(--gold); }
   .cs input { width: 7em; font: inherit; color: var(--gold-ink); background: var(--gold); border: 0; border-radius: 6px; padding: 0 4px; outline: none; }
   .sheet.small .line { height: 50px; }
-  .sheet.small .line svg { height: 22px; bottom: 3px; }
+  .sheet.small .line svg .acc { font-size: 9px; }
+  .sheet.small .line svg .clef { font-size: 22px; }
   .sheet.small .cs { font-size: 17px; padding: 1px 3px; margin-left: -3px; }
   .sheet.small .line svg .sl { stroke-width: 2.5; }
   .sheet.small .line svg .sim { font-size: 13px; }
@@ -197,6 +210,7 @@
         <label>Compassos del patró
           <select id="bars"></select>
         </label>
+        <label class="saxrow"><span><input type="checkbox" id="notesOn"> Notació del saxo a la partitura (transportada)</span></label>
         <label class="saxrow"><span><input type="checkbox" id="saxOn"> Saxo (es transporta amb l'acompanyament)</span>
           <input type="range" id="saxVol" min="0" max="1.5" step="0.01" value="1">
         </label>
@@ -1217,57 +1231,265 @@ function beatsOf(p) {
 // box: container; step: key; opts: { small, at (current beat, float), editable, perLine }
 // 4 bars per line; if the chords of a line cannot fit side by side even a bit smaller,
 // the sheet is drawn with 2 (wider) bars per line instead — symbols never go on top of each other.
+// With "notation" on, the transcribed sax line is written on the staff instead of the slashes.
+const showNotes = () => $('#notesOn').checked;
 function leadSheet(box, p, step, opts = {}) {
-  const perLine = opts.perLine || 4;
+  const perLine = opts.perLine || 4, small = !!opts.small;
   box.innerHTML = '';
   const bars = p.bars || 4, placed = beatsOf(p), shift = shiftFor(step.pc, p.key.pc);
-  const W = 1000, H = 46, gap = H / 4, barW = W / perLine, bpl = perLine * 4;
+  const mel = showNotes() && p.melody && p.melody.bars === bars ? p.melody.notes : null;
+  const k = small ? 0.5 : 1, gap = 9 * k, staffH = 4 * gap;
+  const topM = mel ? 30 * k : 6 * k, botM = mel ? 30 * k : 6 * k, labH = small ? 22 : 46;
+  const svgH = topM + staffH + botM, yBot = topM + staffH;          // y of the bottom staff line (E4)
+  const yOf = st => yBot - (st - 30) * gap / 2;                       // diatonic step (C0 = 0) -> y
   let hiIdx = -1, crowded = false;
   if (opts.at != null && opts.at >= 0) for (const c of placed) if (c.beat <= opts.at) hiIdx = c.i;
-  const slashAt = (bar, q) => (bar % perLine) * barW + (q + 0.5) * barW / 4 + (bar === 0 ? 10 : 0);
+  // written pitch of the sax line: concert + key shift + instrument (Bb = tenor sax, a 9th up)
+  let wr = null, sig = null;
+  if (mel) {
+    const instOff = { 2: 14, 9: 9, 0: 0 }[inst()] ?? 0;
+    const keyW = mod12(step.pc + inst()), flat = useFlats(keyW, p.key.minor, ENHARMONIC.includes(keyW) ? step.flat : null);
+    // one octave choice per pattern (from the original key) so it does not jump between keys
+    const base = mel.map(n => n.midi + instOff).sort((x, y) => x - y)[mel.length >> 1] || 71;
+    let oct = 0; while (base + oct > 81) oct -= 12; while (base + oct < 62) oct += 12;
+    sig = keySignature(keyW, p.key.minor, flat);
+    wr = mel.map(n => { const m = n.midi + shift + instOff + oct, nm = (flat ? FLAT : SHARP)[mod12(m)];
+      return { s: n.s, e: n.e, step: (Math.floor(m / 12) - 1) * 7 + 'CDEFGAB'.indexOf(nm[0]), letter: nm[0], acc: nm.slice(1) }; });
+  }
   for (let line = 0; line * perLine < bars; line++) {
     const el = document.createElement('div'); el.className = 'line';
+    el.style.height = (labH + svgH + 4) + 'px';
+    box.append(el);
+    const W = el.clientWidth || (small ? 230 : 900), barW = W / perLine;
+    const sigW = sig ? sig.steps.length * 8 + 6 : 0;
+    const padL = bar => ((bar === 0 ? 22 : 10) + (mel && bar % perLine === 0 ? 30 + sigW : 0)) * k, padR = 8 * k;
+    const xAt = (bar, eighth) => (bar % perLine) * barW + padL(bar) + eighth * (barW - padL(bar) - padR) / 8;
     let g = '';
-    for (let k = 0; k < 5; k++) g += `<line class="st" x1="0" x2="${W}" y1="${k * gap}" y2="${k * gap}"/>`;
+    for (let q = 0; q < 5; q++) g += `<line class="st" x1="0" x2="${W}" y1="${topM + q * gap}" y2="${topM + q * gap}"/>`;
+    if (mel) {
+      const cx = (line === 0 ? 14 : 2) * k;
+      g += `<text class="clef" x="${cx}" y="${yBot + 7 * k}">𝄞</text>`;
+      if (sig) sig.steps.forEach((st, i) => { g += `<text class="acc" x="${cx + (30 + i * 8) * k}" y="${yOf(st) + 5 * k}">${sig.sym}</text>`; });
+    }
     const n = Math.min(perLine, bars - line * perLine);
     for (let b = 0; b < n; b++) {
-      const bar = line * perLine + b, x0 = b * barW;
-      // start of the loop: repeat sign ||:   end of the loop:  :||   otherwise a plain bar line
-      if (bar === 0) g += `<line class="thick" x1="2" x2="2" y1="0" y2="${H}"/><line class="bl" x1="12" x2="12" y1="0" y2="${H}"/><circle class="dot" cx="22" cy="${1.5 * gap}" r="3"/><circle class="dot" cx="22" cy="${2.5 * gap}" r="3"/>`;
-      else if (b === 0) g += `<line class="bl" x1="0" x2="0" y1="0" y2="${H}"/>`;
+      const bar = line * perLine + b, x0 = b * barW, xe = x0 + barW, t = topM, B = topM + staffH;
+      if (bar === 0) g += `<line class="thick" x1="2" x2="2" y1="${t}" y2="${B}"/><line class="bl" x1="${8 * k + 4}" x2="${8 * k + 4}" y1="${t}" y2="${B}"/><circle class="dot" cx="${14 * k + 4}" cy="${t + 1.5 * gap}" r="${2.5 * k}"/><circle class="dot" cx="${14 * k + 4}" cy="${t + 2.5 * gap}" r="${2.5 * k}"/>`;
+      else if (b === 0) g += `<line class="bl" x1="0" x2="0" y1="${t}" y2="${B}"/>`;
       const starts = placed.filter(c => Math.floor(c.beat / 4) === bar);
-      if (!starts.length && bar > 0) g += `<text class="sim" x="${x0 + barW / 2}" y="${H / 2 + 9}" text-anchor="middle">%</text>`;
-      else for (let q = 0; q < 4; q++) {                       // beat slashes
-        const x = slashAt(bar, q);
-        g += `<line class="sl" x1="${x - 7}" x2="${x + 7}" y1="${2.6 * gap}" y2="${1.4 * gap}"/>`;
+      if (mel) g += barNotes(bar, wr, xAt, yOf, gap, k, opts.at, sig);
+      else if (!starts.length && bar > 0) g += `<text class="sim" x="${x0 + barW / 2}" y="${t + 2 * gap + 9 * k}" text-anchor="middle">%</text>`;
+      else for (let q = 0; q < 4; q++) {
+        const x = xAt(bar, 2 * q) + 6 * k;
+        g += `<line class="sl" x1="${x - 6 * k}" x2="${x + 6 * k}" y1="${t + 2.6 * gap}" y2="${t + 1.4 * gap}"/>`;
       }
-      const xe = x0 + barW;
-      if (bar === bars - 1) g += `<circle class="dot" cx="${xe - 22}" cy="${1.5 * gap}" r="3"/><circle class="dot" cx="${xe - 22}" cy="${2.5 * gap}" r="3"/><line class="bl" x1="${xe - 12}" x2="${xe - 12}" y1="0" y2="${H}"/><line class="thick" x1="${xe - 2}" x2="${xe - 2}" y1="0" y2="${H}"/>`;
-      else g += `<line class="bl" x1="${Math.min(W, xe)}" x2="${Math.min(W, xe)}" y1="0" y2="${H}"/>`;
+      if (bar === bars - 1) g += `<circle class="dot" cx="${xe - 16 * k - 4}" cy="${t + 1.5 * gap}" r="${2.5 * k}"/><circle class="dot" cx="${xe - 16 * k - 4}" cy="${t + 2.5 * gap}" r="${2.5 * k}"/><line class="bl" x1="${xe - 8 * k - 4}" x2="${xe - 8 * k - 4}" y1="${t}" y2="${B}"/><line class="thick" x1="${xe - 2}" x2="${xe - 2}" y1="${t}" y2="${B}"/>`;
+      else g += `<line class="bl" x1="${Math.min(W - 0.5, xe)}" x2="${Math.min(W - 0.5, xe)}" y1="${t}" y2="${B}"/>`;
     }
-    if (opts.at != null && opts.at >= 0 && Math.floor(opts.at / bpl) === line) {
-      const bt = opts.at - line * bpl, bar = line * perLine + Math.floor(bt / 4), q = bt % 4;
-      // playhead: moves from the slash of a beat to the slash of the next one
-      const x = slashAt(bar, Math.floor(q)) + (q % 1) * barW / 4 - 7;
-      g += `<line class="ph" x1="${x}" x2="${x}" y1="${-gap}" y2="${H + gap * 0.6}"/>`;
+    if (opts.at != null && opts.at >= 0 && Math.floor(opts.at / (perLine * 4)) === line) {
+      const bar = Math.floor(opts.at / 4), x = xAt(bar, (opts.at % 4) * 2);
+      g += `<line class="ph" x1="${x}" x2="${x}" y1="${topM - gap}" y2="${yBot + gap * 0.6}"/>`;
     }
-    el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${g}</svg>`;
-    for (const c of placed.filter(c => Math.floor(c.beat / bpl) === line)) {
+    el.innerHTML = `<svg width="${W}" height="${svgH}" viewBox="0 0 ${W} ${svgH}">${g}</svg>`;
+    for (const c of placed.filter(c => Math.floor(c.beat / (perLine * 4)) === line)) {
       const cs = document.createElement('div');
       const lab = chordLabel(p.chords[c.i], shift, step, p.key.minor);
       cs.className = 'cs' + (c.i === hiIdx ? ' on' : '') + (opts.editable ? ' edit' : '');
-      // the symbol starts exactly at the slash of its beat
-      cs.style.left = ((slashAt(Math.floor(c.beat / 4), c.beat % 4) - 7) / W * 100) + '%';
+      // the symbol starts exactly at its beat
+      cs.style.left = (xAt(Math.floor(c.beat / 4), (c.beat % 4) * 2) / W * 100) + '%';
       cs.innerHTML = chordHtml(lab);
       cs.dataset.label = lab;
       if (opts.editable) cs.onclick = () => editChord(cs, p, c.i);
       el.append(cs);
     }
-    box.append(el);
     if (!fitLine(el)) crowded = true;
   }
   if (crowded && perLine > 1 && bars > 1) leadSheet(box, p, step, Object.assign({}, opts, { perLine: perLine === 4 ? 2 : 1 }));
 }
+// ----- standard notation of one bar: notes (split into written values, tied), rests, accidentals
+const VALUES = [8, 6, 4, 3, 2, 1];                 // in eighths: whole, dotted half, half, dotted quarter, quarter, eighth
+function splitValues(len) { const out = []; while (len > 0) { const v = VALUES.find(x => x <= len); out.push(v); len -= v; } return out; }
+// key signature of a written key (pc + spelling); none for theoretical keys (G#, D#, A# major…)
+function keySignature(pc, minor, flat) {
+  const major = minor ? mod12(pc + 3) : pc;
+  const name = (flat ? FLAT : SHARP)[major];
+  const sharps = { C: 0, G: 1, D: 2, A: 3, E: 4, B: 5, 'F#': 6, 'C#': 7 }, flats = { F: 1, Bb: 2, Eb: 3, Ab: 4, Db: 5, Gb: 6 };
+  if (name in sharps) {
+    const n = sharps[name];
+    return n ? { sym: '♯', acc: '#', steps: [38, 35, 39, 36, 33, 37, 34].slice(0, n), letters: 'FCGDAEB'.slice(0, n) } : null;
+  }
+  if (name in flats) {
+    const n = flats[name];
+    return { sym: '♭', acc: 'b', steps: [34, 37, 33, 36, 32, 35, 31].slice(0, n), letters: 'BEADGCF'.slice(0, n) };
+  }
+  return null;
+}
+function barNotes(bar, wr, xAt, yOf, gap, k, at, sig) {
+  const b0 = bar * 8, b1 = b0 + 8, pieces = [];
+  for (const n of wr) {
+    const s = Math.max(n.s, b0), e = Math.min(n.e, b1);
+    if (e <= s) continue;
+    let pos = s;
+    splitValues(e - s).forEach((v, i) => { pieces.push({ n, pos: pos - b0, v, tieIn: i > 0 || s > n.s }); pos += v; });
+  }
+  pieces.sort((x, y) => x.pos - y.pos);
+  // rests in the gaps
+  const rests = [];
+  let cur = 0;
+  const fill = (a, z) => { let p = a; while (p < z) { const v = (p === 0 && z - p === 8) ? 8 : [4, 2, 1].find(x => x <= z - p && p % x === 0) || 1; rests.push({ pos: p, v }); p += v; } };
+  for (const pc of pieces) { if (pc.pos > cur) fill(cur, pc.pos); cur = Math.max(cur, pc.pos + pc.v); }
+  if (cur < 8) fill(cur, 8);
+  let g = '';
+  const accState = {};
+  const rx = gap * 0.62, ry = gap * 0.45;
+  let prevHead = null;
+  for (const pc of pieces) {
+    const x = xAt(bar, pc.pos) + 6 * k, y = yOf(pc.n.step), up = pc.n.step < 34;
+    const hl = at != null && at >= 0 && at * 2 >= pc.n.s && at * 2 < pc.n.e;
+    let h = '';
+    // ledger lines
+    for (let st = 28; st >= pc.n.step; st -= 2) h += `<line class="ledger" x1="${x - rx * 1.7}" x2="${x + rx * 1.7}" y1="${yOf(st)}" y2="${yOf(st)}"/>`;
+    for (let st = 40; st <= pc.n.step; st += 2) h += `<line class="ledger" x1="${x - rx * 1.7}" x2="${x + rx * 1.7}" y1="${yOf(st)}" y2="${yOf(st)}"/>`;
+    // accidental: only where the note differs from the key signature or from an earlier note in the bar
+    const key = pc.n.letter + pc.n.step;
+    const was = key in accState ? accState[key] : (sig && sig.letters.includes(pc.n.letter) ? sig.acc : '');
+    if (!pc.tieIn && pc.n.acc !== was) {
+      const sym = pc.n.acc === '#' ? '♯' : pc.n.acc === 'b' ? '♭' : '♮';
+      h += `<text class="acc" x="${x - rx - 12 * k}" y="${y + 5 * k}">${sym}</text>`;
+    }
+    if (!pc.tieIn) accState[key] = pc.n.acc;
+    const open = pc.v >= 4;
+    h += `<ellipse class="nh${open ? ' open' : ''}" cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" transform="rotate(-20 ${x} ${y})"/>`;
+    if (pc.v !== 8) {
+      const sx = up ? x + rx - 0.6 : x - rx + 0.6, sy = up ? y - 3.4 * gap : y + 3.4 * gap;
+      h += `<line class="stem" x1="${sx}" x2="${sx}" y1="${y}" y2="${sy}"/>`;
+      if (pc.v === 1) h += up
+        ? `<path class="flag" d="M${sx} ${sy} q ${gap * 0.9} ${gap * 0.9} ${gap * 0.5} ${gap * 2.2}"/>`
+        : `<path class="flag" d="M${sx} ${sy} q ${gap * 0.9} ${-gap * 0.9} ${gap * 0.5} ${-gap * 2.2}"/>`;
+    }
+    if (pc.v === 3 || pc.v === 6) h += `<circle class="nh" cx="${x + rx + gap * 0.45}" cy="${pc.n.step % 2 === 0 ? y - gap / 2 : y}" r="${1.7 * k}"/>`;
+    if (pc.tieIn && prevHead && prevHead.n === pc.n) {
+      const dy = up ? gap * 0.9 : -gap * 0.9;
+      h += `<path class="tie" d="M${prevHead.x + rx} ${y + dy * 0.5} Q ${(prevHead.x + x) / 2} ${y + dy * 1.6} ${x - rx} ${y + dy * 0.5}"/>`;
+    }
+    prevHead = { n: pc.n, x };
+    g += `<g${hl ? ' class="hl"' : ''}>${h}</g>`;
+  }
+  // a tie coming from the previous bar: short arc into the first note
+  const first = pieces[0];
+  if (first && first.tieIn && first.pos === 0) {
+    const x = xAt(bar, 0) + 6 * k, y = yOf(first.n.step), dy = first.n.step < 34 ? gap * 0.9 : -gap * 0.9;
+    g += `<path class="tie" d="M${x - rx - 16 * k} ${y + dy * 0.5} Q ${x - rx - 8 * k} ${y + dy * 1.4} ${x - rx} ${y + dy * 0.5}"/>`;
+  }
+  for (const r of rests) {
+    const x = xAt(bar, r.pos) + 6 * k, mid = yOf(34);
+    if (r.v === 8) g += `<rect class="rest" x="${xAt(bar, 3.5)}" y="${yOf(38) + gap}" width="${gap * 1.2}" height="${gap * 0.5}"/>`;
+    else if (r.v === 4) g += `<rect class="rest" x="${x - gap * 0.6}" y="${mid - gap * 0.5}" width="${gap * 1.2}" height="${gap * 0.5}"/>`;
+    else if (r.v === 2) g += `<path class="rest" fill="none" stroke-width="${2.2 * k}" d="M${x - gap * 0.3} ${mid - gap * 1.5} l ${gap * 0.6} ${gap * 0.8} l ${-gap * 0.6} ${gap * 0.6} l ${gap * 0.6} ${gap * 0.8} q ${-gap * 0.9} ${-gap * 0.3} ${-gap * 0.2} ${gap * 0.9}"/>`;
+    else g += `<circle class="rest" cx="${x - gap * 0.25}" cy="${mid - gap * 0.6}" r="${gap * 0.25}"/><path class="rest" fill="none" stroke-width="${1.6 * k}" d="M${x - gap * 0.2} ${mid - gap * 0.45} Q ${x + gap * 0.35} ${mid - gap * 0.4} ${x + gap * 0.45} ${mid - gap * 0.8} L ${x - gap * 0.15} ${mid + gap * 0.9}"/>`;
+  }
+  return g;
+}
+// transcription of the sax runs in a worker (about a second per 10 s of audio)
+const TRANSCRIBE_SRC = transcribeSax.toString();
+function transcribeInWorker(L, R, sr, dur, bars) {
+  return new Promise((res, rej) => {
+    const w = new Worker(URL.createObjectURL(new Blob([TRANSCRIBE_SRC + '\nonmessage=e=>{const d=e.data;postMessage(transcribeSax(d.L,d.R,d.sr,d.dur,d.bars));};'], { type: 'text/javascript' })));
+    w.onmessage = e => { w.terminate(); res(e.data); };
+    w.onerror = e => { w.terminate(); rej(e); };
+    w.postMessage({ L, R, sr, dur, bars });
+  });
+}
+const transcribing = new Set();
+async function ensureMelody(p) {
+  const bars = p.bars || 4;
+  if (!p.hasSax || (p.melody && p.melody.bars === bars) || transcribing.has(p.id)) return;
+  transcribing.add(p.id);
+  setStatus('Transcrivint el saxo…');
+  try {
+    const a = await PatSync.audio(p.id, 'sax');
+    if (!a) { setStatus('Aquest patró no té la pista del saxo.'); return; }
+    const notes = await transcribeInWorker(a.L, a.R, a.sr || p.sr, p.dur, bars);
+    updatePattern(p.id, { melody: { bars, notes } });
+    setStatus(notes.length + ' notes transcrites.');
+    if (session && session.p.id === p.id) { session.p = current(); session.lastK = null; } else if (!session) renderIdle();
+  } catch (e) { setStatus('No s\'ha pogut transcriure el saxo.'); }
+  finally { transcribing.delete(p.id); }
+}
+// Monophonic transcription of the sax stem of a pattern: notes in concert pitch, quantized to eighths.
+// returns [{ s, e, midi }] with s/e in eighth notes from the start of the loop
+function transcribeSax(L, R, sr, dur, bars) {
+  const n = L.length, x = new Float32Array(n);
+  for (let i = 0; i < n; i++) x[i] = 0.5 * (L[i] + (R ? R[i] : L[i]));
+  const hop = Math.max(1, Math.round(sr * 0.005)), W = Math.round(sr * 0.023), maxLag = Math.floor(sr / 90), minLag = Math.floor(sr / 1400);
+  const frames = Math.max(0, Math.floor((n - W - maxLag) / hop));
+  const midi = new Float32Array(frames).fill(NaN), rms = new Float32Array(frames);
+  const d = new Float32Array(maxLag + 2);
+  for (let f = 0; f < frames; f++) {
+    const o = f * hop;
+    let e = 0;
+    for (let i = 0; i < W; i++) e += x[o + i] * x[o + i];
+    rms[f] = Math.sqrt(e / W);
+  }
+  const loud = [...rms].sort((a, b) => a - b)[Math.floor(frames * 0.95)] || 1e-9;
+  for (let f = 0; f < frames; f++) {
+    if (rms[f] < loud * 0.08) continue;                   // ~-22 dB from the loud parts: silence / bleed
+    const o = f * hop;
+    let cum = 0; d[0] = 1;
+    for (let tau = 1; tau <= maxLag; tau++) {
+      let sum = 0;
+      for (let i = 0; i < W; i++) { const v = x[o + i] - x[o + i + tau]; sum += v * v; }
+      cum += sum; d[tau] = cum ? sum * tau / cum : 1;
+    }
+    let best = -1;
+    for (let tau = minLag; tau <= maxLag; tau++) if (d[tau] < 0.18) { while (tau + 1 <= maxLag && d[tau + 1] < d[tau]) tau++; best = tau; break; }
+    if (best < 2) continue;
+    const a = d[best - 1], b = d[best], c = d[best + 1], den = a + c - 2 * b;
+    const lag = best + (den ? (a - c) / (2 * den) : 0);
+    midi[f] = 69 + 12 * Math.log2(sr / lag / 440);
+  }
+  // median of 5 frames removes single-frame octave slips
+  const med = new Float32Array(frames).fill(NaN);
+  for (let f = 0; f < frames; f++) {
+    const w = [];
+    for (let k = f - 2; k <= f + 2; k++) if (k >= 0 && k < frames && !isNaN(midi[k])) w.push(midi[k]);
+    if (w.length >= 3 && !isNaN(midi[f])) { w.sort((p, q) => p - q); med[f] = w[w.length >> 1]; }
+  }
+  // segment into notes: a new note on a pitch change, or on a re-attack (energy jump) of the same pitch
+  const notes = [];
+  let cur = null;
+  const close = f => { if (cur && f - cur.f0 >= 10) notes.push({ t: cur.f0 * hop / sr, d: (f - cur.f0) * hop / sr, midi: Math.round(median(cur.ps)) }); cur = null; };
+  const median = a => { const s = [...a].sort((p, q) => p - q); return s[s.length >> 1]; };
+  for (let f = 0; f < frames; f++) {
+    const m = med[f];
+    if (isNaN(m)) { close(f); continue; }
+    const attack = f >= 6 && rms[f] > 2.2 * rms[f - 6] && rms[f - 6] < loud * 0.5;
+    if (cur && Math.abs(m - median(cur.ps.slice(-8))) < 0.6 && !attack) { cur.ps.push(m); continue; }
+    close(f);
+    cur = { f0: f, ps: [m] };
+  }
+  close(frames);
+  // quantize to eighths
+  const total = bars * 8, e8 = dur / total, out = [];
+  for (const nt of notes) {
+    let s = Math.round(nt.t / e8), e = Math.round((nt.t + nt.d) / e8);
+    if (s >= total) continue;
+    if (e <= s) e = s + 1;
+    e = Math.min(e, total);
+    const prev = out[out.length - 1];
+    if (prev && s <= prev.s) { if (e - s > prev.e - prev.s) { prev.e = e; prev.midi = nt.midi; } continue; }
+    if (prev && prev.e > s) prev.e = s;
+    out.push({ s, e, midi: nt.midi });
+  }
+  // a lone eighth far from both neighbours is leakage from another instrument
+  return out.filter((n, i) => {
+    if (n.e - n.s > 1) return true;
+    const a = out[i - 1], b = out[i + 1];
+    const far = x => !x || Math.abs(x.midi - n.midi) > 15;
+    return !(far(a) && far(b) && (a || b));
+  });
+}
+
 // shrink the symbols of a line a little if two of them touch; false if they still do not fit
 function fitLine(el) {
   const cs = [...el.querySelectorAll('.cs')];
@@ -1384,6 +1606,8 @@ function renderIdle() {
   $('#origKey').value = p.key.pc + (p.key.minor ? 'm' : '');
   $('#bars').value = String(p.bars || 4);
   $('#saxOn').disabled = !p.hasSax;
+  $('#notesOn').disabled = !p.hasSax;
+  if (showNotes() && p.hasSax) ensureMelody(p);
   $('#saxOn').parentElement.title = p.hasSax ? '' : 'Aquest patró es va desar sense la pista del saxo: torna a prémer P al Practice Player per afegir-la.';
   const step = { pc: p.key.pc, flat: null };
   $('#nowLbl').textContent = 'Tonalitat original';
@@ -1870,6 +2094,12 @@ $('#saxOn').onchange = () => {
   store.set('pat-sax', $('#saxOn').checked); applyVolumes();
   if (session && $('#saxOn').checked) for (let k = 0; k < session.keys.length; k++) if (session.plan[session.scheduled] === k) { ensureKey(k); ensureKey(k + 1); }
 };
+$('#notesOn').onchange = () => {
+  store.set('pat-notes', $('#notesOn').checked);
+  const p = session ? session.p : current();
+  if ($('#notesOn').checked && p) ensureMelody(p);
+  if (session) session.lastK = null; else renderIdle();
+};
 $('#saxVol').oninput = () => { applyVolumes(); store.set('pat-saxvol', +$('#saxVol').value); };
 document.addEventListener('keydown', e => { if (e.code === 'Space' && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); $('#startBtn').click(); } });
 // new patterns saved by the Practice Player (another tab of the app) show up at once
@@ -1886,6 +2116,7 @@ addEventListener('focus', () => { patterns = readPatterns(); renderLib(); if (!s
   fillBars();
   const ac = store.get('pat-accomp', null); if (ac) $('#accomp').value = ac;
   $('#saxOn').checked = !!store.get('pat-sax', false);
+  $('#notesOn').checked = !!store.get('pat-notes', false);
   const sv = store.get('pat-saxvol', null); if (sv != null) $('#saxVol').value = sv;
   if (sel && !current()) sel = null;
   if (!sel && patterns.length) sel = patterns[patterns.length - 1].id;
