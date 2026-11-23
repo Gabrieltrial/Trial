@@ -233,6 +233,7 @@
         <button id="irealFind" title="Compara els acords detectats amb tot el tema i troba on és el bucle">Busca el bucle al tema</button>
         <button id="irealUndo" title="Torna a posar els acords detectats de l'àudio">Acords detectats</button>
         <span class="spacer"></span>
+        <button id="irealWeb" title="El teu ordinador baixa les llistes públiques del web d'iReal Pro (cal el Taller musical engegat amb el servidor)">Baixa les llistes d'iReal Pro</button>
         <button id="irealLoad" title="Fitxer exportat d'iReal Pro (Share → iReal Pro link / HTML)">Carrega temes d'iReal Pro…</button>
         <button id="irealPaste" title="Enganxa un enllaç irealb:// copiat d'iReal Pro o del fòrum">Enganxa un enllaç…</button>
         <input type="file" id="irealFile" accept=".html,.htm,.txt,text/html,text/plain" hidden>
@@ -2365,6 +2366,38 @@ function applyChart(p, song, start, t) {
   renderIdle();
   setStatus('Acords de "' + song.title + '" a partir del compàs ' + (start + 1) + '.');
 }
+// the public playlists of the iReal Pro website, downloaded by the helper on this computer:
+// the irealb:// links of the playlists page, or of the pages it links to (one level)
+const IREAL_START = 'https://www.irealpro.com/main-playlists';
+async function downloadIrealLists() {
+  await PatSync.sync();
+  if (!PatSync.hasHelper()) { setStatus('Cal el Taller musical engegat amb el servidor (l\'app del Dock) per baixar les llistes.'); return; }
+  const base = PatSync.base();
+  const get = async url => {
+    const r = await fetch(base + '/api/ireal-fetch?url=' + encodeURIComponent(url), { cache: 'no-store' });
+    const t = await r.text();
+    if (!r.ok) { let m = t; try { m = JSON.parse(t).error; } catch (e) {} throw new Error(m); }
+    return t.replace(/&amp;/g, '&');
+  };
+  try {
+    setStatus('Baixant la pàgina de llistes d\'iReal Pro…');
+    const page = await get(IREAL_START);
+    let found = (page.match(/ireal(?:b|book):\/\/[^"'<>\s]+/g) || []);
+    if (!found.length) {
+      // the playlists may be on pages of their own
+      const links = [...new Set((page.match(/href="([^"]+)"/g) || []).map(h => h.slice(6, -1))
+        .map(h => { try { return new URL(h, IREAL_START).href; } catch (e) { return null; } })
+        .filter(u => u && /^https:\/\/(www\.)?(irealpro|irealb)\.com\//.test(u) && /playlist|jazz|standard|showthread/i.test(u)))].slice(0, 25);
+      for (let i = 0; i < links.length; i++) {
+        setStatus('Buscant llistes (' + (i + 1) + ' de ' + links.length + ')…');
+        try { found = found.concat((await get(links[i])).match(/ireal(?:b|book):\/\/[^"'<>\s]+/g) || []); } catch (e) {}
+      }
+    }
+    if (!found.length) { setStatus('No he trobat llistes a la web d\'iReal Pro. Fes servir "Carrega temes…" amb una llista exportada des de l\'app.'); return; }
+    await addIreal(found.join('\n'));
+  } catch (e) { setStatus('No s\'han pogut baixar les llistes: ' + e.message); }
+}
+$('#irealWeb').onclick = downloadIrealLists;
 $('#irealLoad').onclick = () => $('#irealFile').click();
 $('#irealFile').onchange = async e => { const f = e.target.files[0]; e.target.value = ''; if (f) addIreal(await f.text()); };
 $('#irealPaste').onclick = () => { const t = prompt('Enganxa aquí l\'enllaç irealb:// (d\'iReal Pro o del fòrum):'); if (t) addIreal(t); };

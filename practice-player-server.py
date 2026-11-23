@@ -395,6 +395,27 @@ def safe_file_name(name):
     return name[:180] or "file"
 
 
+# ---------- iReal Pro public playlists (downloaded by this computer, for Pattern Practice) ----------
+IREAL_HOSTS = {"www.irealpro.com", "irealpro.com", "forums.irealpro.com", "www.irealb.com", "irealb.com"}
+
+
+def fetch_ireal_page(url):
+    import ssl
+    import urllib.request
+    host = (urllib.parse.urlparse(url).hostname or "").lower()
+    if urllib.parse.urlparse(url).scheme != "https" or host not in IREAL_HOSTS:
+        raise RuntimeError("Only pages of the iReal Pro website can be downloaded.")
+    try:
+        import certifi                     # the python.org Python for macOS has no certificates of its own
+        context = ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        context = ssl.create_default_context()
+    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh) TallerMusical"})
+    with urllib.request.urlopen(req, timeout=40, context=context) as r:
+        data = r.read(30 * 1024 * 1024)
+    return data.decode("utf-8", "replace")
+
+
 def find_cached(key):
     for path in glob.glob(str(CACHE / (key + ".*"))):
         if not path.endswith((".part", ".ytdl", ".json")):
@@ -639,6 +660,15 @@ class Handler(BaseHTTPRequestHandler):
                 data = path.read_bytes()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
+            elif route == "/api/ireal-fetch":
+                text = fetch_ireal_page((query.get("url") or [""])[0])
+                data = text.encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; charset=utf-8")
                 self.send_header("Content-Length", str(len(data)))
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
