@@ -336,6 +336,42 @@ def start_separation(body, sr, channels):
     return job_id
 
 
+# ---------- saved patterns (Pattern Practice) ----------
+# Kept on disk next to this script, so they survive the browser: patterns/index.json
+# (the list) and patterns/<id>.<part>.f32 (audio: channel L then R, float32).
+PATTERN_DIR = HERE / "patterns"
+PATTERN_LOCK = threading.Lock()
+PATTERN_PARTS = ("harm", "drums", "sax")
+
+
+def pattern_id_ok(value):
+    return bool(value) and len(value) <= 40 and all(c.isalnum() or c == "-" for c in value)
+
+
+def read_pattern_index():
+    try:
+        data = json.loads((PATTERN_DIR / "index.json").read_text(encoding="utf-8"))
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
+
+
+def write_pattern_index(items):
+    PATTERN_DIR.mkdir(parents=True, exist_ok=True)
+    tmp = PATTERN_DIR / "index.json.tmp"
+    tmp.write_text(json.dumps(items, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, PATTERN_DIR / "index.json")
+
+
+def pattern_files():
+    files = {}
+    if PATTERN_DIR.exists():
+        for f in PATTERN_DIR.glob("*.f32"):
+            pid, _, part = f.stem.rpartition(".")
+            files.setdefault(pid, []).append(part)
+    return files
+
+
 def find_cached(key):
     for path in glob.glob(str(CACHE / (key + ".*"))):
         if not path.endswith((".part", ".ytdl", ".json")):
@@ -464,6 +500,46 @@ class Handler(BaseHTTPRequestHandler):
                     page_seen(page_id, route == "/api/heartbeat")
                 self.send_json(200, {"ok": True})
                 return
+            if route == "/api/patterns/meta":
+                size = int(self.headers.get("Content-Length") or 0)
+                if not (0 < size <= 20 * 1024 * 1024):
+                    self.send_json(400, {"error": "Bad list"})
+                    return
+                items = json.loads(self.rfile.read(size).decode("utf-8")).get("patterns")
+                if not isinstance(items, list) or not all(isinstance(x, dict) and pattern_id_ok(str(x.get("id", ""))) for x in items):
+                    self.send_json(400, {"error": "Bad list"})
+                    return
+                with PATTERN_LOCK:
+                    write_pattern_index(items)
+                self.send_json(200, {"ok": True})
+                return
+            if route == "/api/patterns/audio":
+                q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                pid, part = (q.get("id") or [""])[0], (q.get("part") or [""])[0]
+                size = int(self.headers.get("Content-Length") or 0)
+                if not pattern_id_ok(pid) or part not in PATTERN_PARTS or not (0 < size <= 400 * 1024 * 1024):
+                    self.send_json(400, {"error": "Bad audio"})
+                    return
+                data = self.rfile.read(size)
+                with PATTERN_LOCK:
+                    PATTERN_DIR.mkdir(parents=True, exist_ok=True)
+                    tmp = PATTERN_DIR / f"{pid}.{part}.tmp"
+                    tmp.write_bytes(data)
+                    os.replace(tmp, PATTERN_DIR / f"{pid}.{part}.f32")
+                self.send_json(200, {"ok": True})
+                return
+            if route == "/api/patterns/delete":
+                q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                pid = (q.get("id") or [""])[0]
+                if not pattern_id_ok(pid):
+                    self.send_json(400, {"error": "Bad id"})
+                    return
+                with PATTERN_LOCK:
+                    write_pattern_index([x for x in read_pattern_index() if x.get("id") != pid])
+                    for part in PATTERN_PARTS:
+                        (PATTERN_DIR / f"{pid}.{part}.f32").unlink(missing_ok=True)
+                self.send_json(200, {"ok": True})
+                return
             if route != "/api/separate":
                 self.send_json(404, {"error": "Not found"})
                 return
@@ -507,6 +583,22 @@ class Handler(BaseHTTPRequestHandler):
                 if page_id:
                     page_seen(page_id, route == "/api/heartbeat")
                 self.send_json(200, {"ok": True})
+            elif route == "/api/patterns":
+                with PATTERN_LOCK:
+                    self.send_json(200, {"patterns": read_pattern_index(), "files": pattern_files()})
+            elif route == "/api/patterns/audio":
+                pid, part = (query.get("id") or [""])[0], (query.get("part") or [""])[0]
+                path = PATTERN_DIR / f"{pid}.{part}.f32"
+                if not pattern_id_ok(pid) or part not in PATTERN_PARTS or not path.exists():
+                    self.send_json(404, {"error": "Not found"})
+                    return
+                data = path.read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(len(data)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(data)
             elif route == "/api/ping":
                 self.send_json(200, {"ok": True, "ytdlp": load_ytdlp() is not None, "ffmpeg": has_ffmpeg(), "demucs": has_demucs()})
             elif route == "/api/sepstatus":

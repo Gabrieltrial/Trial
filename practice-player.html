@@ -2494,6 +2494,102 @@ const PAT_KEY = 'pp-patterns';
 let pendingPattern = null;
 function readPatterns() { try { const a = JSON.parse(localStorage.getItem(PAT_KEY)); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
 function writePatterns(a) { localStorage.setItem(PAT_KEY, JSON.stringify(a)); }
+// ---------- keeping every pattern (shared by practice-player.html and pattern-practice.html) ----------
+// The list lives in localStorage ('pp-patterns') and the audio in IndexedDB, and both are copied
+// to disk by the local helper (folder "patterns" next to practice-player-server.py), so nothing is
+// lost if the browser clears its data. Deleted patterns are remembered so they do not come back.
+const PAT_DEL_KEY = 'pp-patterns-deleted';
+const PAT_PARTS = ['harm', 'drums', 'sax'];
+const PatSync = (() => {
+  let base = null, lastTry = 0, running = null;
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+  const deleted = () => { try { const a = JSON.parse(localStorage.getItem(PAT_DEL_KEY)); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+  async function findBase() {
+    if (base !== null) return base;
+    if (Date.now() - lastTry < 20000) return null;
+    lastTry = Date.now();
+    const cands = [];
+    try { if (/^(127\.0\.0\.1|localhost)$/.test(new URL(self.origin).hostname)) cands.push(''); } catch (e) {}
+    cands.push('http://127.0.0.1:' + (new URLSearchParams(location.search).get('helper') || '8765'));
+    for (const b of cands) {
+      try {
+        const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 2500);
+        const r = await fetch(b + '/api/patterns', { cache: 'no-store', signal: ctl.signal });
+        clearTimeout(t);
+        if (r.ok) { base = b; return base; }
+      } catch (e) {}
+    }
+    return null;
+  }
+  async function upload(b, id, part, a) {
+    const r = await fetch(b + '/api/patterns/audio?id=' + encodeURIComponent(id) + '&part=' + part, {
+      method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: new Blob([a.L, a.R])
+    });
+    if (!r.ok) throw new Error('upload failed');
+  }
+  async function doSync() {
+    const b = await findBase();
+    if (b === null) return false;
+    try {
+      const r = await fetch(b + '/api/patterns', { cache: 'no-store' });
+      const { patterns: srv, files } = await r.json();
+      const dead = new Set(deleted());
+      const stamp = x => x.updated || x.created || 0;
+      const map = new Map();
+      for (const x of srv) if (!dead.has(x.id)) map.set(x.id, x);
+      for (const x of readPatterns()) {
+        if (dead.has(x.id)) continue;
+        const y = map.get(x.id);
+        if (!y || stamp(x) >= stamp(y)) map.set(x.id, x);
+      }
+      const merged = [...map.values()].sort((x, y) => (x.created || 0) - (y.created || 0));
+      for (const id of dead) if (srv.some(x => x.id === id)) await fetch(b + '/api/patterns/delete?id=' + encodeURIComponent(id), { method: 'POST' });
+      const mj = JSON.stringify(merged);
+      if (mj !== JSON.stringify(readPatterns())) writePatterns(merged);
+      if (mj !== JSON.stringify(srv.filter(x => !dead.has(x.id)))) {
+        await fetch(b + '/api/patterns/meta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patterns: merged }) });
+      }
+      for (const x of merged) for (const part of PAT_PARTS) {
+        if ((files[x.id] || []).includes(part)) continue;
+        const a = await idb.get('pat:' + x.id + ':' + part).catch(() => null);
+        if (a) await upload(b, x.id, part, a);
+      }
+      return true;
+    } catch (e) {
+      base = null;                     // the helper went away: look for it again later
+      return false;
+    }
+  }
+  return {
+    // one sync at a time; returns true when the helper has a copy of everything
+    sync() { if (!running) running = doSync().finally(() => { running = null; }); return running; },
+    undelete(id) {
+      try { localStorage.setItem(PAT_DEL_KEY, JSON.stringify(deleted().filter(x => x !== id))); } catch (e) {}
+    },
+    markDeleted(id) {
+      const d = deleted(); if (!d.includes(id)) d.push(id);
+      try { localStorage.setItem(PAT_DEL_KEY, JSON.stringify(d.slice(-500))); } catch (e) {}
+    },
+    // audio of a pattern: from this browser, or from the copy on disk
+    async audio(id, part) {
+      let a = await idb.get('pat:' + id + ':' + part).catch(() => null);
+      if (a) return a;
+      const b = await findBase();
+      if (b === null) return null;
+      try {
+        const r = await fetch(b + '/api/patterns/audio?id=' + encodeURIComponent(id) + '&part=' + part, { cache: 'no-store' });
+        if (!r.ok) return null;
+        const all = new Float32Array(await r.arrayBuffer()), n = all.length / 2;
+        const p = readPatterns().find(x => x.id === id);
+        a = { sr: (p && p.sr) || 44100, L: all.slice(0, n), R: all.slice(n) };
+        idb.put('pat:' + id + ':' + part, a).catch(() => {});
+        return a;
+      } catch (e) { return null; }
+    },
+    hasHelper: () => base !== null
+  };
+})();
+
 const songTitle = t => (t.name || 'Song').replace(/\.(mp3|wav|flac|ogg|oga|opus|m4a|aac|webm|mp4)$/i, '');
 function findPattern(lp) {
   if (!audio || lp.start == null || lp.end == null) return null;
@@ -2553,11 +2649,12 @@ async function storePattern(i, track, src, off, n, start, end) {
     const entry = {
       id, song, name: 'Loop ' + (i + 1) + ' · ' + fmt(start) + '–' + fmt(end),
       start, end, dur: n / sr, sr,
-      key: an.key, chords: an.chords, method: S.ai ? 'ai' : 'classic', hasSax: true, created: Date.now()
+      key: an.key, chords: an.chords, method: S.ai ? 'ai' : 'classic', hasSax: true, created: Date.now(), updated: Date.now()
     };
     if (old >= 0) list[old] = Object.assign(list[old], entry, { chords: list[old].edited ? list[old].chords : entry.chords, key: list[old].edited ? list[old].key : entry.key });
     else list.push(entry);
     writePatterns(list);
+    PatSync.sync();                     // copy to disk through the helper (if it is running)
     if (audio === track) refreshLoop(i);
     saxInfo();
     const names = an.chords.map(c => PC_NAMES[c.root] + c.q).join(' · ');
@@ -2838,6 +2935,7 @@ document.addEventListener('drop', e => { const f = [...e.dataTransfer.files]; if
     }
   });
 })();
+PatSync.sync();
 buildPlBtns(); saxInfo(); buildLoops(); refreshUI(); computePeaks(); if (isWeb && !isHosted) detectHelper(); requestAnimationFrame(draw);
 </script>
 </body>

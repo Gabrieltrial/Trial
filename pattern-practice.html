@@ -42,6 +42,11 @@
   .pat .del:hover { background: var(--line); color: var(--danger); }
   .pat .del.armed { color: var(--danger); font-weight: 700; }
   .empty { color: var(--muted); font-size: 13px; }
+  .libtools { display: flex; gap: 6px; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+  .libtools button { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; }
+  .libtools button:hover { border-color: var(--gold); }
+  #diskState { flex: 1; font-size: 12px; color: var(--muted); min-width: 120px; }
+  #diskState.ok { color: var(--accent); }
 
   /* ---------- stage ---------- */
   #right { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
@@ -118,6 +123,12 @@
   <section class="card">
     <div class="lbl" style="margin-bottom:10px">Patrons</div>
     <div id="lib"></div>
+    <div class="libtools">
+      <span id="diskState"></span>
+      <button id="exportBtn" title="Desa tots els patrons (amb l'àudio) en un fitxer">Exporta</button>
+      <button id="importBtn" title="Afegeix els patrons d'un fitxer exportat">Importa</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </div>
   </section>
 
   <section id="right">
@@ -594,8 +605,105 @@ const idb = {
     });
   },
   get(k) { return this.run('readonly', s => s.get(k)); },
+  put(k, v) { return this.run('readwrite', s => s.put(v, k)); },
   del(k) { return this.run('readwrite', s => s.delete(k)); }
 };
+// ---------- keeping every pattern (shared by practice-player.html and pattern-practice.html) ----------
+// The list lives in localStorage ('pp-patterns') and the audio in IndexedDB, and both are copied
+// to disk by the local helper (folder "patterns" next to practice-player-server.py), so nothing is
+// lost if the browser clears its data. Deleted patterns are remembered so they do not come back.
+const PAT_DEL_KEY = 'pp-patterns-deleted';
+const PAT_PARTS = ['harm', 'drums', 'sax'];
+const PatSync = (() => {
+  let base = null, lastTry = 0, running = null;
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+  const deleted = () => { try { const a = JSON.parse(localStorage.getItem(PAT_DEL_KEY)); return Array.isArray(a) ? a : []; } catch (e) { return []; } };
+  async function findBase() {
+    if (base !== null) return base;
+    if (Date.now() - lastTry < 20000) return null;
+    lastTry = Date.now();
+    const cands = [];
+    try { if (/^(127\.0\.0\.1|localhost)$/.test(new URL(self.origin).hostname)) cands.push(''); } catch (e) {}
+    cands.push('http://127.0.0.1:' + (new URLSearchParams(location.search).get('helper') || '8765'));
+    for (const b of cands) {
+      try {
+        const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 2500);
+        const r = await fetch(b + '/api/patterns', { cache: 'no-store', signal: ctl.signal });
+        clearTimeout(t);
+        if (r.ok) { base = b; return base; }
+      } catch (e) {}
+    }
+    return null;
+  }
+  async function upload(b, id, part, a) {
+    const r = await fetch(b + '/api/patterns/audio?id=' + encodeURIComponent(id) + '&part=' + part, {
+      method: 'POST', headers: { 'Content-Type': 'application/octet-stream' }, body: new Blob([a.L, a.R])
+    });
+    if (!r.ok) throw new Error('upload failed');
+  }
+  async function doSync() {
+    const b = await findBase();
+    if (b === null) return false;
+    try {
+      const r = await fetch(b + '/api/patterns', { cache: 'no-store' });
+      const { patterns: srv, files } = await r.json();
+      const dead = new Set(deleted());
+      const stamp = x => x.updated || x.created || 0;
+      const map = new Map();
+      for (const x of srv) if (!dead.has(x.id)) map.set(x.id, x);
+      for (const x of readPatterns()) {
+        if (dead.has(x.id)) continue;
+        const y = map.get(x.id);
+        if (!y || stamp(x) >= stamp(y)) map.set(x.id, x);
+      }
+      const merged = [...map.values()].sort((x, y) => (x.created || 0) - (y.created || 0));
+      for (const id of dead) if (srv.some(x => x.id === id)) await fetch(b + '/api/patterns/delete?id=' + encodeURIComponent(id), { method: 'POST' });
+      const mj = JSON.stringify(merged);
+      if (mj !== JSON.stringify(readPatterns())) writePatterns(merged);
+      if (mj !== JSON.stringify(srv.filter(x => !dead.has(x.id)))) {
+        await fetch(b + '/api/patterns/meta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ patterns: merged }) });
+      }
+      for (const x of merged) for (const part of PAT_PARTS) {
+        if ((files[x.id] || []).includes(part)) continue;
+        const a = await idb.get('pat:' + x.id + ':' + part).catch(() => null);
+        if (a) await upload(b, x.id, part, a);
+      }
+      return true;
+    } catch (e) {
+      base = null;                     // the helper went away: look for it again later
+      return false;
+    }
+  }
+  return {
+    // one sync at a time; returns true when the helper has a copy of everything
+    sync() { if (!running) running = doSync().finally(() => { running = null; }); return running; },
+    undelete(id) {
+      try { localStorage.setItem(PAT_DEL_KEY, JSON.stringify(deleted().filter(x => x !== id))); } catch (e) {}
+    },
+    markDeleted(id) {
+      const d = deleted(); if (!d.includes(id)) d.push(id);
+      try { localStorage.setItem(PAT_DEL_KEY, JSON.stringify(d.slice(-500))); } catch (e) {}
+    },
+    // audio of a pattern: from this browser, or from the copy on disk
+    async audio(id, part) {
+      let a = await idb.get('pat:' + id + ':' + part).catch(() => null);
+      if (a) return a;
+      const b = await findBase();
+      if (b === null) return null;
+      try {
+        const r = await fetch(b + '/api/patterns/audio?id=' + encodeURIComponent(id) + '&part=' + part, { cache: 'no-store' });
+        if (!r.ok) return null;
+        const all = new Float32Array(await r.arrayBuffer()), n = all.length / 2;
+        const p = readPatterns().find(x => x.id === id);
+        a = { sr: (p && p.sr) || 44100, L: all.slice(0, n), R: all.slice(n) };
+        idb.put('pat:' + id + ':' + part, a).catch(() => {});
+        return a;
+      } catch (e) { return null; }
+    },
+    hasHelper: () => base !== null
+  };
+})();
+
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
@@ -700,8 +808,10 @@ function renderLib() {
 }
 async function removePattern(id) {
   if (session && session.p.id === id) stop();
+  PatSync.markDeleted(id);
   patterns = readPatterns().filter(p => p.id !== id);
   writePatterns(patterns);
+  syncNow();
   idb.del('pat:' + id + ':harm').catch(() => {}); idb.del('pat:' + id + ':drums').catch(() => {});
   if (sel === id) { sel = null; store.set('pat-sel', null); }
   renderLib(); renderIdle();
@@ -732,9 +842,19 @@ function updatePattern(id, patch) {
   patterns = readPatterns();
   const i = patterns.findIndex(p => p.id === id);
   if (i < 0) return;
-  Object.assign(patterns[i], patch);
+  Object.assign(patterns[i], patch, { updated: Date.now() });
   writePatterns(patterns);
   renderLib();
+  clearTimeout(updatePattern.t); updatePattern.t = setTimeout(syncNow, 800);
+}
+async function syncNow() {
+  const ok = await PatSync.sync();
+  const fresh = readPatterns();
+  if (JSON.stringify(fresh) !== JSON.stringify(patterns)) { patterns = fresh; renderLib(); if (!session) renderIdle(); }
+  const el = $('#diskState');
+  el.textContent = ok ? '✓ Còpia al disc (' + patterns.length + ')' : 'Només en aquest navegador';
+  el.title = ok ? 'Els patrons també estan desats a la carpeta "patterns" del Taller musical.' : 'El servidor del Taller musical no està engegat: els patrons només són en aquest navegador. Fes servir Exporta per tenir-ne una còpia.';
+  el.className = ok ? 'ok' : '';
 }
 
 // ---------- display: lead sheet ----------
@@ -875,7 +995,7 @@ function estimateBars(L, R, sr, dur) {
 async function ensureBars(p) {
   if (p.bars) return;
   try {
-    const src = (await idb.get('pat:' + p.id + ':drums')) || (await idb.get('pat:' + p.id + ':harm'));
+    const src = (await PatSync.audio(p.id, 'drums')) || (await PatSync.audio(p.id, 'harm'));
     if (!src) return;
     const bars = estimateBars(src.L, src.R, src.sr, p.dur);
     updatePattern(p.id, { bars });
@@ -967,9 +1087,9 @@ async function start() {
   setStatus('Carregant el patró…');
   let harm, drums, sax = null;
   try {
-    harm = await idb.get('pat:' + p.id + ':harm');
-    drums = await idb.get('pat:' + p.id + ':drums');
-    if (p.hasSax) sax = await idb.get('pat:' + p.id + ':sax');
+    harm = await PatSync.audio(p.id, 'harm');
+    drums = await PatSync.audio(p.id, 'drums');
+    if (p.hasSax) sax = await PatSync.audio(p.id, 'sax');
   } catch (e) { harm = null; }
   if (!harm) { setStatus('No trobo l\'àudio d\'aquest patró. Torna a desar-lo des del Practice Player (botó P).'); return; }
   const orders = Object.keys(ORDERS), order = orders[Math.floor(Math.random() * orders.length)];
@@ -1081,6 +1201,71 @@ function applyVolumes() {
   saxGain.gain.setTargetAtTime($('#saxOn').checked ? +$('#saxVol').value : 0, ctx.currentTime, 0.03);
 }
 
+// ---------- export / import (backup, or to move the patterns to another computer) ----------
+function b64FromInt16(f32a, f32b) {
+  const n = f32a.length, pcm = new Int16Array(2 * n);
+  for (let i = 0; i < n; i++) {
+    const a = Math.max(-1, Math.min(1, f32a[i])), b = Math.max(-1, Math.min(1, f32b[i]));
+    pcm[i] = a < 0 ? a * 32768 : a * 32767; pcm[n + i] = b < 0 ? b * 32768 : b * 32767;
+  }
+  const u8 = new Uint8Array(pcm.buffer); let s = '';
+  for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+function int16FromB64(b64) {
+  const bin = atob(b64), u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  const pcm = new Int16Array(u8.buffer), n = pcm.length / 2, L = new Float32Array(n), R = new Float32Array(n);
+  for (let i = 0; i < n; i++) { L[i] = pcm[i] / 32768; R[i] = pcm[n + i] / 32768; }
+  return { L, R };
+}
+async function exportPatterns() {
+  const list = readPatterns();
+  if (!list.length) { setStatus('No hi ha cap patró per exportar.'); return; }
+  setStatus('Preparant el fitxer…');
+  const audio = {};
+  for (const p of list) {
+    audio[p.id] = {};
+    for (const part of PAT_PARTS) {
+      const a = await PatSync.audio(p.id, part);
+      if (a) audio[p.id][part] = { sr: a.sr, pcm16: b64FromInt16(a.L, a.R) };
+    }
+  }
+  const blob = new Blob([JSON.stringify({ app: 'Pattern Practice', version: 1, patterns: list, audio })], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'patrons-' + new Date().toISOString().slice(0, 10) + '.json';
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  setStatus(list.length + ' patrons exportats.');
+}
+async function importPatterns(file) {
+  try {
+    const data = JSON.parse(await file.text());
+    if (!data || !Array.isArray(data.patterns)) throw new Error('no és un fitxer de patrons');
+    const list = readPatterns();
+    let n = 0;
+    for (const p of data.patterns) {
+      if (!p || !p.id) continue;
+      const i = list.findIndex(x => x.id === p.id);
+      if (i >= 0 && (list[i].updated || list[i].created || 0) >= (p.updated || p.created || 0)) continue;
+      for (const part of PAT_PARTS) {
+        const a = data.audio && data.audio[p.id] && data.audio[p.id][part];
+        if (a) await idb.put('pat:' + p.id + ':' + part, Object.assign({ sr: a.sr }, int16FromB64(a.pcm16)));
+      }
+      if (i >= 0) list[i] = p; else list.push(p);
+      PatSync.undelete(p.id);          // importing brings back a pattern deleted before
+      n++;
+    }
+    writePatterns(list); patterns = list;
+    renderLib(); renderIdle(); syncNow();
+    setStatus(n ? n + ' patrons importats.' : 'Ja tenies tots aquests patrons.');
+  } catch (e) { setStatus('No s\'ha pogut importar: ' + e.message); }
+}
+$('#exportBtn').onclick = exportPatterns;
+$('#importBtn').onclick = () => $('#importFile').click();
+$('#importFile').onchange = e => { if (e.target.files[0]) importPatterns(e.target.files[0]); e.target.value = ''; };
+
 // ---------- wiring ----------
 $('#startBtn').onclick = () => { if (session) stop(); else start(); };
 $('#harmVol').oninput = $('#drumVol').oninput = () => { applyVolumes(); store.set('pat-vol', [+$('#harmVol').value, +$('#drumVol').value]); };
@@ -1096,7 +1281,7 @@ $('#saxVol').oninput = () => { applyVolumes(); store.set('pat-saxvol', +$('#saxV
 document.addEventListener('keydown', e => { if (e.code === 'Space' && !/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName)) { e.preventDefault(); $('#startBtn').click(); } });
 // new patterns saved by the Practice Player (another tab of the app) show up at once
 addEventListener('storage', e => { if (e.key === PAT_KEY) { patterns = readPatterns(); renderLib(); if (!session) renderIdle(); } });
-addEventListener('focus', () => { patterns = readPatterns(); renderLib(); if (!session) renderIdle(); });
+addEventListener('focus', () => { patterns = readPatterns(); renderLib(); if (!session) renderIdle(); syncNow(); });
 
 (function init() {
   fillOrigKey();
@@ -1111,6 +1296,7 @@ addEventListener('focus', () => { patterns = readPatterns(); renderLib(); if (!s
   if (sel && !current()) sel = null;
   if (!sel && patterns.length) sel = patterns[patterns.length - 1].id;
   renderLib(); renderIdle();
+  syncNow();
 })();
 </script>
 </body>
