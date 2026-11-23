@@ -2586,7 +2586,8 @@ const PatSync = (() => {
         return a;
       } catch (e) { return null; }
     },
-    hasHelper: () => base !== null
+    hasHelper: () => base !== null,
+    base: () => base
   };
 })();
 
@@ -2651,6 +2652,7 @@ async function storePattern(i, track, src, off, n, start, end) {
       start, end, dur: n / sr, sr,
       key: an.key, chords: an.chords, method: S.ai ? 'ai' : 'classic', hasSax: true, created: Date.now(), updated: Date.now()
     };
+    entry.num = old >= 0 && list[old].num ? list[old].num : list.reduce((m, x) => Math.max(m, x.num || 0), 0) + 1;
     if (old >= 0) list[old] = Object.assign(list[old], entry, { chords: list[old].edited ? list[old].chords : entry.chords, key: list[old].edited ? list[old].key : entry.key });
     else list.push(entry);
     writePatterns(list);

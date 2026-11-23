@@ -372,6 +372,29 @@ def pattern_files():
     return files
 
 
+# ---------- saving files in a folder the user chooses (for browsers without a folder picker) ----------
+CHOSEN_DIRS = set()     # only folders picked in the dialog below can be written to
+
+
+def choose_folder(prompt):
+    if sys.platform != "darwin":
+        raise RuntimeError("The folder dialog is only available on a Mac.")
+    script = ['-e', 'activate', '-e', 'POSIX path of (choose folder with prompt "%s")' % prompt.replace('"', "'")]
+    r = subprocess.run(["osascript"] + script, capture_output=True, text=True, timeout=900)
+    if r.returncode != 0:
+        return None          # cancelled
+    path = os.path.realpath(r.stdout.strip())
+    if not os.path.isdir(path):
+        return None
+    CHOSEN_DIRS.add(path)
+    return path
+
+
+def safe_file_name(name):
+    name = "".join(c for c in name if c not in '/\\:*?"<>|\0').strip().strip(".")
+    return name[:180] or "file"
+
+
 def find_cached(key):
     for path in glob.glob(str(CACHE / (key + ".*"))):
         if not path.endswith((".part", ".ytdl", ".json")):
@@ -499,6 +522,27 @@ class Handler(BaseHTTPRequestHandler):
                 if page_id:
                     page_seen(page_id, route == "/api/heartbeat")
                 self.send_json(200, {"ok": True})
+                return
+            if route == "/api/choose-folder":
+                q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                path = choose_folder((q.get("prompt") or ["Choose a folder"])[0][:120])
+                self.send_json(200, {"path": path} if path else {"cancelled": True})
+                return
+            if route == "/api/save-file":
+                q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+                folder = os.path.realpath((q.get("dir") or [""])[0])
+                name = safe_file_name((q.get("name") or [""])[0])
+                size = int(self.headers.get("Content-Length") or 0)
+                if folder not in CHOSEN_DIRS or not (0 < size <= 500 * 1024 * 1024):
+                    self.send_json(403, {"error": "Choose the folder first."})
+                    return
+                data = self.rfile.read(size)
+                target = os.path.join(folder, name)
+                tmp = target + ".part"
+                with open(tmp, "wb") as fh:
+                    fh.write(data)
+                os.replace(tmp, target)
+                self.send_json(200, {"ok": True, "path": target})
                 return
             if route == "/api/patterns/meta":
                 size = int(self.headers.get("Content-Length") or 0)
