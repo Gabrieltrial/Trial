@@ -932,7 +932,10 @@ class StretchEngine {
 'use strict';
 const $ = s => document.querySelector(s);
 const PAT_KEY = 'pp-patterns';
-const SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+// chord and key names: never A# or D# (always Bb, Eb); C#/Db, F#/Gb, G#/Ab follow the key
+const SHARP = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'G#', 'A', 'Bb', 'B'];
+// note names on the staff keep real sharps in sharp keys (the leading tone of E is D#)
+const NOTE_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 const FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
 const ENHARMONIC = [1, 6, 8];                       // C#/Db, F#/Gb, G#/Ab appear twice
 const FLAT_MAJOR = new Set([0, 5, 10, 3, 8, 1, 6]); // C (jazz habit), F, Bb, Eb, Ab, Db, Gb
@@ -1077,6 +1080,7 @@ const mod12 = n => ((n % 12) + 12) % 12;
 let instVal = 2;                       // Bb (tenor sax) by default
 const inst = () => instVal;
 function useFlats(pc, minor, flatHint) {
+  if (pc === 3 || pc === 10) return true;               // Eb and Bb, never D# or A#
   if (ENHARMONIC.includes(pc) && flatHint != null) return flatHint;
   return minor ? FLAT_MINOR.has(pc) : FLAT_MAJOR.has(pc);
 }
@@ -1118,7 +1122,8 @@ function buildKeys(orig, order) {
   const flatFirst = order === 'fourths' || order === 'down';
   const steps = [];
   for (const pc of pcs) {
-    if (ENHARMONIC.includes(pc)) { steps.push({ pc, flat: flatFirst }); steps.push({ pc, flat: !flatFirst }); }
+    // the twice-played keys are the ones the player READS as C#/Db, F#/Gb, G#/Ab (written pitch)
+    if (ENHARMONIC.includes(mod12(pc + inst()))) { steps.push({ pc, flat: flatFirst }); steps.push({ pc, flat: !flatFirst }); }
     else steps.push({ pc, flat: null });
   }
   return steps;
@@ -1277,7 +1282,7 @@ function leadSheet(box, p, step, opts = {}) {
     const base = mel.map(n => n.midi + instOff).sort((x, y) => x - y)[mel.length >> 1] || 71;
     let oct = 0; while (base + oct > 81) oct -= 12; while (base + oct < 62) oct += 12;
     sig = keySignature(keyW, p.key.minor, flat);
-    wr = mel.map(n => { const m = n.midi + shift + instOff + oct, nm = (flat ? FLAT : SHARP)[mod12(m)];
+    wr = mel.map(n => { const m = n.midi + shift + instOff + oct, nm = (flat ? FLAT : NOTE_SHARP)[mod12(m)];
       return { s: n.s, e: n.e, step: (Math.floor(m / 12) - 1) * 7 + 'CDEFGAB'.indexOf(nm[0]), letter: nm[0], acc: nm.slice(1) }; });
   }
   for (let line = 0; line * perLine < bars; line++) {
