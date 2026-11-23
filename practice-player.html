@@ -100,6 +100,8 @@ output{font-variant-numeric:tabular-nums;min-width:58px;text-align:right}
 .loop input.t{width:64px;flex:none;padding:1px 4px;font:inherit;font-size:12px;font-variant-numeric:tabular-nums;color:var(--text);background:#14171c;border:1px solid var(--line);border-radius:5px}
 .loop input.sp{flex:1;min-width:36px;accent-color:var(--c);height:14px}
 .loop output{min-width:34px;font-size:12px;flex:none}
+.loop button.pat{font-weight:700;width:20px;padding:0}
+.loop button.pat.saved{background:var(--c);border-color:var(--c);color:#111}
 
 @media (max-width:1180px){.keys{display:none}.ctl{grid-template-columns:1fr 1fr}.ctl>.box:nth-child(3){grid-column:1/-1}.transport{flex-wrap:wrap;row-gap:6px}}
 @media (max-width:960px){
@@ -1507,6 +1509,7 @@ async function startAiSep(t, kind) {
     t.back = { type, BL: B.L, BR: stereo ? B.R : null, DL: D.L, DR: stereo ? D.R : null, keys: j.keys || 'Piano/Gtr', bassVoiced: 1 };
     if (audio === t && (saxLevel > 0 || backLevel > 0)) applyMix();
     saxInfo();
+    patternAfterSep(t);
   } catch (e) {
     if (job.cancelled) return;
     saxRun = null;
@@ -1551,6 +1554,7 @@ function startDsp(t, kind, noAI) {
     if (kind === 'back') t.back = { type, BL: res.BL, BR: res.BR, DL: res.DL, DR: res.DR, keys: classifyKeys(res.keys), bassVoiced: res.bassVoiced };
     if (audio === t && (saxLevel > 0 || backLevel > 0)) applyMix();
     saxInfo();
+    patternAfterSep(t);
   };
   const progress = p => { if (!job.cancelled) { job.p = p; saxInfo(p); } };
   const msg = d => Object.assign({ kind, sr, saxCfg: saxCfg(type), bassCfg: BASS_CFG, sax: have }, d);
@@ -2428,7 +2432,7 @@ function buildLoops() {
       <button class="ar" data-n="start" data-d="-1" title="Start earlier">◂</button><input class="t ts" placeholder="start" spellcheck="false" title="Loop start (m:ss.mmm)"><button class="ar" data-n="start" data-d="1" title="Start later">▸</button><button class="sS" title="Set the start at the cursor">Set</button>
       <button class="ar" data-n="end" data-d="-1" title="End earlier">◂</button><input class="t te" placeholder="end" spellcheck="false" title="Loop end (m:ss.mmm)"><button class="ar" data-n="end" data-d="1" title="End later">▸</button><button class="sE" title="Set the end at the cursor">Set</button>
       <input type="range" class="sp" min="0.2" max="2" step="0.01" value="1" title="Loop speed">
-      <output class="spv">100%</output><button class="rs" title="Reset speed to 100%">↺</button><button class="clr" title="Clear loop">✕</button>`;
+      <output class="spv">100%</output><button class="rs" title="Reset speed to 100%">↺</button><button class="pat" title="Save this loop as a pattern for Pattern Practice (accompaniment in every key)">P</button><button class="clr" title="Clear loop">✕</button>`;
     grid.append(c);
     const q = s => c.querySelector(s);
     const e = { c, ts: q('.ts'), te: q('.te'), sp: q('.sp'), spv: q('.spv'), lp: q('.lp') };
@@ -2442,6 +2446,8 @@ function buildLoops() {
     q('.rs').onclick = () => { e.sp.value = 1; e.sp.oninput(); };
     q('.clr').onclick = () => { if (mode === i && playing) pauseAll(); lp.start = lp.end = null; lp.speed = 1; refreshLoop(i); saveLoops(); };
     e.lp.onclick = () => playLoop(i);
+    e.pat = q('.pat');
+    e.pat.onclick = () => savePattern(i);
   });
 }
 function setBound(i, which, sec) {
@@ -2477,11 +2483,257 @@ function holdRepeat(btn, fn) {
   ['pointerup', 'pointerleave', 'pointercancel', 'blur'].forEach(n => btn.addEventListener(n, stop));
   btn.addEventListener('click', ev => { if (ev.detail === 0) fn(); });
 }
+// ---------- Patterns (for Pattern Practice) ----------
+// A pattern = one loop of a song, without the sax: the harmonic accompaniment (bass +
+// piano/guitar, transposed by Pattern Practice) and the drums (never transposed), plus the
+// detected chords and key. Shared with pattern-practice.html through localStorage
+// ('pp-patterns', the list) and IndexedDB ('pp-audio', the audio: 'pat:<id>:harm' / ':drums').
+const PAT_KEY = 'pp-patterns';
+let pendingPattern = null;
+function readPatterns() { try { const a = JSON.parse(localStorage.getItem(PAT_KEY)); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+function writePatterns(a) { localStorage.setItem(PAT_KEY, JSON.stringify(a)); }
+const songTitle = t => (t.name || 'Song').replace(/\.(mp3|wav|flac|ogg|oga|opus|m4a|aac|webm|mp4)$/i, '');
+function findPattern(lp) {
+  if (!audio || lp.start == null || lp.end == null) return null;
+  const song = songTitle(audio);
+  return readPatterns().find(p => p.song === song && Math.abs(p.start - lp.start) < 0.002 && Math.abs(p.end - lp.end) < 0.002) || null;
+}
+function patternAfterSep(t) {
+  if (pendingPattern && pendingPattern.t === t && backValid(t)) {
+    const i = pendingPattern.i; pendingPattern = null;
+    savePattern(i);
+  }
+}
+const PC_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+async function savePattern(i) {
+  const t = audio, lp = loops[i];
+  if (!t) { setStatus('Load a track first.', true); return; }
+  if (lp.start == null || lp.end == null || lp.end - lp.start < 0.5) { setStatus('Set the start and the end of loop ' + (i + 1) + ' first (at least half a second).', true); return; }
+  if (!backValid(t)) {
+    pendingPattern = { t, i };
+    if (!(saxRun && saxRun.t === t && saxRun.kind === 'back')) startDsp(t, 'back');
+    setStatus('Separating the instruments to save the pattern (the sax is removed)…');
+    return;
+  }
+  try {
+    const sr = t.buffer.sampleRate, s0 = Math.max(0, Math.round(lp.start * sr)), s1 = Math.min(t.buffer.length, Math.round(lp.end * sr)), n = s1 - s0;
+    const X0 = t.buffer.getChannelData(0), X1 = t.buffer.numberOfChannels > 1 ? t.buffer.getChannelData(1) : X0;
+    const S = t.sax, B = t.back;
+    const SL = S.SL, SR = S.SR || S.SL, DL = B.DL, DR = B.DR || B.DL;
+    const hL = new Float32Array(n), hR = new Float32Array(n), dL = new Float32Array(n), dR = new Float32Array(n), mono = new Float32Array(n);
+    for (let k = 0; k < n; k++) {
+      const j = s0 + k;
+      dL[k] = DL[j]; dR[k] = DR[j];
+      hL[k] = X0[j] - SL[j] - DL[j]; hR[k] = X1[j] - SR[j] - DR[j];
+      // chords are detected on the mix without drums: removing the sax as well takes chord tones with it
+      mono[k] = 0.5 * (X0[j] - DL[j] + X1[j] - DR[j]);
+    }
+    const an = analyzeChords(mono, sr);
+    const song = songTitle(t);
+    const list = readPatterns();
+    const old = list.findIndex(p => p.song === song && Math.abs(p.start - lp.start) < 0.002 && Math.abs(p.end - lp.end) < 0.002);
+    const id = old >= 0 ? list[old].id : uid();
+    await idb.put('pat:' + id + ':harm', { sr, L: hL, R: hR });
+    await idb.put('pat:' + id + ':drums', { sr, L: dL, R: dR });
+    const entry = {
+      id, song, name: 'Loop ' + (i + 1) + ' · ' + fmt(lp.start) + '–' + fmt(lp.end),
+      start: lp.start, end: lp.end, dur: n / sr, sr,
+      key: an.key, chords: an.chords, method: S.ai ? 'ai' : 'classic', created: Date.now()
+    };
+    if (old >= 0) list[old] = Object.assign(list[old], entry, { chords: list[old].edited ? list[old].chords : entry.chords, key: list[old].edited ? list[old].key : entry.key });
+    else list.push(entry);
+    writePatterns(list);
+    refreshLoop(i);
+    const names = an.chords.map(c => PC_NAMES[c.root] + c.q).join(' · ');
+    setStatus('Pattern saved in "' + song + '": ' + names + ' (key ' + PC_NAMES[an.key.pc] + (an.key.minor ? 'm' : '') + '). Open Pattern Practice to play it in every key.');
+  } catch (e) {
+    setStatus('The pattern could not be saved: ' + e.message, true);
+  }
+}
+// Chord + key detection for a short audio pattern (mono Float32Array).
+// Chroma (pitch-class energy) per frame, template matching for common jazz chord
+// types, Viterbi smoothing (a chord tends to last), then Krumhansl key estimate.
+function analyzeChords(x, sr) {
+  const N = 8192 * Math.max(1, Math.round(sr / 48000)), H = N >> 2, half = N >> 1;
+  // --- FFT ---
+  const re = new Float64Array(N), im = new Float64Array(N), win = new Float64Array(N);
+  for (let n = 0; n < N; n++) win[n] = 0.5 - 0.5 * Math.cos(2 * Math.PI * n / N);
+  const bits = Math.round(Math.log2(N)), rev = new Uint32Array(N);
+  for (let i = 0; i < N; i++) { let r = 0, v = i; for (let b = 0; b < bits; b++) { r = (r << 1) | (v & 1); v >>= 1; } rev[i] = r; }
+  const cs = new Float64Array(half), sn = new Float64Array(half);
+  for (let k = 0; k < half; k++) { cs[k] = Math.cos(2 * Math.PI * k / N); sn[k] = Math.sin(2 * Math.PI * k / N); }
+  function fft() {
+    for (let i = 0; i < N; i++) { const j = rev[i]; if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+    for (let size = 2; size <= N; size <<= 1) {
+      const hs = size >> 1, step = N / size;
+      for (let s = 0; s < N; s += size) for (let k = 0, tw = 0; k < hs; k++, tw += step) {
+        const a = s + k, b = a + hs, wr = cs[tw], wi = -sn[tw];
+        const xr = re[b] * wr - im[b] * wi, xi = re[b] * wi + im[b] * wr;
+        re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+      }
+    }
+  }
+  // --- bin -> pitch class maps ---
+  const binHz = sr / N, pcOf = new Int8Array(half), wOf = new Float32Array(half), bassOf = new Int8Array(half);
+  for (let k = 1; k < half; k++) {
+    const f = k * binHz;
+    pcOf[k] = -1; bassOf[k] = -1;
+    if (f < 50 || f > 2500) continue;
+    const m = 69 + 12 * Math.log2(f / 440), r = Math.round(m);
+    if (Math.abs(m - r) > 0.35) continue;            // only bins near a semitone centre
+    pcOf[k] = ((r % 12) + 12) % 12;
+    wOf[k] = 1 - Math.abs(m - r) / 0.35;
+    if (f < 220) bassOf[k] = pcOf[k];
+  }
+  const nF = Math.max(1, Math.floor((x.length - N) / H) + 1);
+  const chroma = [], bass = [], energy = new Float64Array(nF), lowMidi = new Float64Array(nF).fill(NaN);
+  const kB0 = Math.max(1, Math.floor(35 / binHz)), kB1 = Math.ceil(180 / binHz);
+  for (let t = 0; t < nF; t++) {
+    const o = t * H;
+    for (let n = 0; n < N; n++) { const i = o + n; re[n] = (i < x.length ? x[i] : 0) * win[n]; im[n] = 0; }
+    fft();
+    const c = new Float64Array(12), b = new Float64Array(12);
+    let e = 0;
+    for (let k = 1; k < half; k++) {
+      if (pcOf[k] < 0) continue;
+      const mag = Math.sqrt(re[k] * re[k] + im[k] * im[k]);
+      const v = Math.sqrt(mag) * wOf[k];            // compress: quieter chord tones still count
+      c[pcOf[k]] += v; e += mag * mag;
+      if (bassOf[k] >= 0) b[bassOf[k]] += v;
+    }
+    // lowest strong peak in the bass band = fundamental of the bass note (its harmonics are higher)
+    let bmax = 0;
+    for (let k = kB0; k <= kB1; k++) { const m = re[k] * re[k] + im[k] * im[k]; if (m > bmax) bmax = m; }
+    if (bmax > 0) for (let k = kB0 + 1; k < kB1; k++) {
+      const m = re[k] * re[k] + im[k] * im[k], ml = re[k - 1] * re[k - 1] + im[k - 1] * im[k - 1], mr = re[k + 1] * re[k + 1] + im[k + 1] * im[k + 1];
+      if (m > 0.2 * bmax && m >= ml && m >= mr) {
+        // a bass note has a 2nd harmonic; a kick drum (almost a pure sine sweep) does not
+        let h2 = 0;
+        for (let j = 2 * k - 2; j <= 2 * k + 2; j++) h2 = Math.max(h2, re[j] * re[j] + im[j] * im[j]);
+        if (h2 < 0.02 * m) continue;
+        lowMidi[t] = 69 + 12 * Math.log2(k * binHz / 440); break;
+      }
+    }
+    const cn = Math.hypot(...c) || 1, bn = Math.max(...b) || 1;
+    chroma.push(c.map(v => v / cn)); bass.push(b.map(v => v / bn)); energy[t] = e;
+  }
+  // smooth chroma over ±2 frames (~0.35 s): voicings and walking bass notes blur into the chord
+  const smooth = (arr) => arr.map((_, t) => {
+    const o = new Float64Array(12); let w = 0;
+    for (let u = Math.max(0, t - 2); u <= Math.min(arr.length - 1, t + 2); u++) { const k = 3 - Math.abs(u - t); w += k; for (let i = 0; i < 12; i++) o[i] += k * arr[u][i]; }
+    return o.map(v => v / w);
+  });
+  const chromaS = smooth(chroma), bassS = smooth(bass);
+  // lowest bass note within ±0.4 s: in root/fifth bass lines the root is usually the lower note
+  const wB = Math.max(2, Math.round(0.4 * sr / H)), lowPc = new Int8Array(nF).fill(-1);
+  for (let t = 0; t < nF; t++) {
+    let m = Infinity;
+    for (let u = Math.max(0, t - wB); u <= Math.min(nF - 1, t + wB); u++) if (lowMidi[u] < m) m = lowMidi[u];
+    if (m < Infinity) lowPc[t] = ((Math.round(m) % 12) + 12) % 12;
+  }
+  // --- chord templates (weights: root, 3rd, 5th, 7th) ---
+  // root weight < 1: jazz voicings often leave the root to the bass; 9ths and 13ths are common colours
+  const Q = [
+    { q: 'maj7', iv: [[0, .8], [4, .9], [7, .5], [11, .85], [2, .3]] },
+    { q: '7', iv: [[0, .8], [4, .9], [7, .4], [10, .85], [2, .3], [9, .25]] },
+    { q: 'm7', iv: [[0, .8], [3, .9], [7, .5], [10, .85], [2, .3]] },
+    { q: 'm7b5', iv: [[0, 1], [3, .85], [6, .75], [10, .8]] },
+    { q: 'dim7', iv: [[0, 1], [3, .85], [6, .75], [9, .8]] },
+    { q: '', iv: [[0, 1], [4, .9], [7, .7]] },
+    { q: 'm', iv: [[0, 1], [3, .9], [7, .7]] },
+    { q: '6', iv: [[0, 1], [4, .85], [7, .55], [9, .75]] },
+    { q: 'm6', iv: [[0, 1], [3, .85], [7, .55], [9, .75]] },
+  ];
+  const states = [];
+  for (let r = 0; r < 12; r++) for (const tq of Q) {
+    const v = new Float64Array(12);
+    for (const [i, w] of tq.iv) v[(r + i) % 12] = w;
+    const n = Math.hypot(...v);
+    states.push({ root: r, q: tq.q, v: v.map(z => z / n), size: tq.iv.length });
+  }
+  const S = states.length, eMax = Math.max(...energy) || 1;
+  const score = (t, s) => {
+    const st = states[s], c = chromaS[t];
+    let d = 0, n = 0;
+    for (let i = 0; i < 12; i++) { d += st.v[i] * c[i]; n += c[i] * c[i]; }
+    return d / Math.sqrt(n || 1) + 0.12 * bassS[t][st.root] + (lowPc[t] === st.root ? 0.16 : 0) - (st.size === 3 ? 0.015 : 0) - (st.q === '6' || st.q === 'm6' ? 0.02 : 0);   // slight preference for 7th chords (jazz)
+  };
+  // --- Viterbi ---
+  const change = 0.42;
+  let prev = new Float64Array(S), cur = new Float64Array(S);
+  const bp = new Int16Array(nF * S);
+  for (let s = 0; s < S; s++) prev[s] = score(0, s);
+  for (let t = 1; t < nF; t++) {
+    let bi = 0; for (let s = 1; s < S; s++) if (prev[s] > prev[bi]) bi = s;
+    const quiet = energy[t] < eMax * 1e-4;
+    for (let s = 0; s < S; s++) {
+      let best = prev[s], from = s;
+      if (prev[bi] - change > best) { best = prev[bi] - change; from = bi; }
+      cur[s] = best + (quiet ? 0 : score(t, s));
+      bp[t * S + s] = from;
+    }
+    [prev, cur] = [cur, prev];
+  }
+  const path = new Int16Array(nF);
+  let s = 0; for (let k = 1; k < S; k++) if (prev[k] > prev[s]) s = k;
+  for (let t = nF - 1; t >= 0; t--) { path[t] = s; s = bp[t * S + s]; }
+  // --- segments ---
+  const hopSec = H / sr, total = x.length / sr;
+  let lastLoud = nF - 1;
+  while (lastLoud > 0 && energy[lastLoud] < eMax * 1e-3) { path[lastLoud] = path[lastLoud - 1]; lastLoud--; }
+  let segs = [];
+  for (let t = 0; t < nF; t++) {
+    if (!segs.length || segs[segs.length - 1].s !== path[t]) segs.push({ s: path[t], f0: t, f1: t + 1 });
+    else segs[segs.length - 1].f1 = t + 1;
+  }
+  // merge segments shorter than ~0.3 s into the stronger neighbour
+  const minF = Math.max(2, Math.round(0.45 / hopSec));
+  let changed = true;
+  while (changed && segs.length > 1) {
+    changed = false;
+    for (let i = 0; i < segs.length; i++) {
+      if (segs[i].f1 - segs[i].f0 >= minF) continue;
+      const j = i === 0 ? 1 : i === segs.length - 1 ? i - 1 : (segs[i - 1].f1 - segs[i - 1].f0 >= segs[i + 1].f1 - segs[i + 1].f0 ? i - 1 : i + 1);
+      segs[j].f0 = Math.min(segs[j].f0, segs[i].f0); segs[j].f1 = Math.max(segs[j].f1, segs[i].f1);
+      segs.splice(i, 1); changed = true; break;
+    }
+    for (let i = 1; i < segs.length; i++) if (segs[i].s === segs[i - 1].s) { segs[i - 1].f1 = segs[i].f1; segs.splice(i, 1); changed = true; break; }
+  }
+  // frame centre time: frame t covers [t*H, t*H+N); report boundaries at frame centres
+  const chords = segs.map((g, i) => {
+    const t0 = i === 0 ? 0 : (g.f0 * H + N / 2) / sr;
+    const t1 = i === segs.length - 1 ? total : (g.f1 * H + N / 2) / sr;
+    return { t: +t0.toFixed(3), d: +(t1 - t0).toFixed(3), root: states[g.s].root, q: states[g.s].q };
+  });
+  // --- key (Krumhansl-Kessler profiles on the duration-weighted chord tones + raw chroma) ---
+  const MAJ = [6.35, 2.23, 3.48, 2.33, 4.38, 4.09, 2.52, 5.19, 2.39, 3.66, 2.29, 2.88];
+  const MIN = [6.33, 2.68, 3.52, 5.38, 2.60, 3.53, 2.54, 4.75, 3.98, 2.69, 3.34, 3.17];
+  const tot = new Float64Array(12);
+  for (let t = 0; t < nF; t++) for (let i = 0; i < 12; i++) tot[i] += chroma[t][i];
+  const corr = (a, b) => {
+    const ma = a.reduce((p, q) => p + q) / 12, mb = b.reduce((p, q) => p + q) / 12;
+    let n = 0, da = 0, db = 0;
+    for (let i = 0; i < 12; i++) { n += (a[i] - ma) * (b[i] - mb); da += (a[i] - ma) ** 2; db += (b[i] - mb) ** 2; }
+    return n / Math.sqrt(da * db || 1);
+  };
+  let key = { pc: 0, minor: false, r: -2 };
+  for (let k = 0; k < 12; k++) for (const minor of [false, true]) {
+    const prof = (minor ? MIN : MAJ).map((_, i) => (minor ? MIN : MAJ)[(i - k + 12) % 12]);
+    let r = corr(tot, prof);
+    // the last chord of a pattern is often the tonic
+    const last = chords[chords.length - 1];
+    if (last && last.root === k && (minor ? /^m(?!7b5)/.test(last.q) : !/^m/.test(last.q))) r += 0.15;
+    if (r > key.r) key = { pc: k, minor, r };
+  }
+  return { chords, key: { pc: key.pc, minor: key.minor } };
+}
+
 function refreshLoop(i, force = false) {
   const lp = loops[i], e = loopEls[i];
   e.ts.value = lp.start == null ? '' : fmt(lp.start);
   e.te.value = lp.end == null ? '' : fmt(lp.end);
   e.sp.value = lp.speed; e.spv.textContent = pct(lp.speed);
+  if (e.pat) e.pat.classList.toggle('saved', !!findPattern(lp));
 }
 const storeKey = () => audio ? 'loops|' + audio.name + '|' + audio.duration.toFixed(1) : null;
 function saveLoops() { const k = storeKey(); if (!k) return; try { localStorage.setItem(k, JSON.stringify(loops)); } catch (e) {} }
