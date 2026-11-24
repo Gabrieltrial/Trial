@@ -166,7 +166,7 @@
     <p class="hint">If nothing happens when you tap the mic, try opening this page in its own browser tab (mic access can be blocked inside embedded previews). Use headphones with the metronome so the click is not picked up by the tuner.</p>
 
     <div class="metro-panel">
-      <h2>Metronome <button type="button" class="accent-btn" id="accentBtn" aria-pressed="true" title="First beat of each bar: accented (on) or the same as the other beats (off)">1</button></h2>
+      <h2>Metronome <button type="button" class="accent-btn" id="accentBtn" aria-pressed="false" title="First beat of each bar: accented (on) or the same as the other beats (off)">1</button></h2>
       <button type="button" class="modebtn" id="modeBtn" data-mode="off" title="Click to cycle: Off, On, Partial">Metronome: Off</button>
       <div class="row bpm-row">
         <button type="button" class="mbtn" id="bpmDown" aria-label="Slower">−</button>
@@ -744,7 +744,7 @@ class MetronomeScheduler {
     if (metroCtx.state === "suspended") metroCtx.resume();
   }
 
-  let accentFirst = true;            // first beat of each bar sounds different (the tiny "1" button)
+  let accentFirst = false;           // first beat of each bar sounds different (the tiny "1" button); off by default
   function clickSound(t, level) {
     if (level === 2 && !accentFirst) level = 0;
     const vol = Number(els.vol.value);
@@ -824,7 +824,7 @@ class MetronomeScheduler {
       localStorage.setItem("afinador-metro", JSON.stringify({
         bpm, num: els.num.value, den: els.den.value, groups: els.groups.value, vol: els.vol.value,
         play: els.play.value, mute: els.mute.value, step: els.step.value, max: els.max.value, after: els.after.value, pp: els.pPreset.value,
-        accent: accentFirst
+        accentOn: accentFirst
       }));
     } catch (e) {}
   }
@@ -837,7 +837,7 @@ class MetronomeScheduler {
       els.num.value = s.num; els.den.value = s.den; els.groups.value = s.groups || ""; els.vol.value = s.vol;
       els.play.value = s.play; els.mute.value = s.mute; els.step.value = s.step; els.max.value = s.max; els.after.value = s.after;
       if (s.pp) els.pPreset.value = s.pp;
-      if (s.accent === false) accentFirst = false;
+      accentFirst = s.accentOn === true;
     } catch (e) {}
   }
 
